@@ -1,0 +1,319 @@
+<project name="chinographis-test" basedir=".">
+
+	<taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
+
+	<target name="full">
+		<antcall target="basic-mapper"/>
+		<antcall target="basic-mapper-up-to-date"/>
+		<antcall target="basic-refer-content"/>
+		<antcall target="transform"/>
+		<antcall target="transform-params"/>
+		<antcall target="transform-params-ns"/>
+		<antcall target="transform-refer-content"/>
+		<antcall target="transform-not-up-to-date"/>
+		<antcall target="all"/>
+		<antcall target="all-up-to-date"/>
+		<antcall target="all-ns"/>
+		<antcall target="snip-1"/>
+		<antcall target="snip-2"/>
+		<antcall target="snip-3"/>
+	</target>
+	
+	<target name="basic-mapper">
+		<delete dir="basic/output-mapper"/>
+
+		<chionographis basedir="basic" srcdir="input" includes="*.xml">
+			<output destdir="output-mapper" mkdirs="yes">
+				<globmapper from="input*.xml" to="output*.xml"/>
+			</output>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" basedir="basic/output-mapper" destdir="basic/output-mapper" includes="*.xml">
+			<globmapper from="output*.xml" to="actual-mapper*.txt"/>
+		</xslt>
+		<fail message="Failed test: basic-mapper - 1">
+			<condition><not><filesmatch file1="snip/input1/expected-mapper1.txt" file2="snip/output-mapper/actual-mapper1.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: basic-mapper - 2">
+			<condition><not><filesmatch file1="snip/input1/expected-mapper2.txt" file2="snip/output-mapper/actual-mapper2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="basic/output-mapper"/>
+	</target>
+
+	<target name="basic-mapper-up-to-date">
+		<delete dir="basic/output-mapper-up-to-date"/>
+		<mkdir dir="basic/output-mapper-up-to-date"/>
+		<touch file="basic/output-mapper-up-to-date/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+		<copy file="basic/input/input1.xml" tofile="basic/output-mapper-up-to-date/input1.xml"/>
+		<touch file="basic/output-mapper-up-to-date/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+		<copy file="basic/input/input2.xml" tofile="basic/output-mapper-up-to-date/input2.xml"/>
+
+		<chionographis srcdir="basic/output-mapper-up-to-date" includes="input*.xml">
+			<output destdir="basic/output-mapper-up-to-date">
+				<globmapper from="input*.xml" to="output*.xml"/>
+			</output>
+		</chionographis>
+		
+		<fail message="Failed test: basic-mapper-up-to-date">
+			<condition>
+				<not>
+					<islastmodified datetime="01/01/2001 00:01:20 AM" mode="equals">
+						<file file="basic/output-mapper-up-to-date/output1.xml"/>
+					</islastmodified>
+				</not>
+			</condition>
+		</fail>
+
+		<delete dir="basic/output-mapper-up-to-date"/>
+	</target>
+
+	<target name="basic-refer-content">
+		<delete dir="basic/output-ref-content"/>
+
+		<chionographis basedir="basic" srcdir="input-refer-content" includes="*.xml">
+			<output destdir="output-refer-content" refercontent="yes" mkdirs="yes"/>
+			<output destdir="output-refer-content" refercontent="yes" mkdirs="yes">
+				<globmapper from="output*.xml" to="output*.2.xml"/>
+			</output>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" basedir="basic/output-refer-content" destdir="basic/output-refer-content" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+		<fail message="Failed test: basic-refer-content - 1">
+			<condition><not><filesmatch file1="basic/input-refer-content/expected.txt" file2="basic/output-refer-content/actual.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: basic-refer-content - 2">
+			<condition><not><filesmatch file1="basic/input-refer-content/expected.txt" file2="basic/output-refer-content/actual.2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="basic/output-refer-content"/>
+	</target>
+
+	<target name="transform">
+		<delete dir="transform/output"/>
+
+		<chionographis basedir="transform" includes="input/input.xml">
+			<transform style="../flatten.xsl">
+				<output dest="output/actual.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform">
+			<condition><not><filesmatch file1="transform/input/expected.txt" file2="transform/output/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output"/>
+	</target>
+
+	<target name="transform-params">
+		<delete dir="transform/output-params"/>
+
+		<chionographis basedir="transform" includes="input/input.xml">
+			<transform style="input/flatten-nons.xsl">
+				<param name="p1" value="v1"/>
+				<param name="p2" value="v2"/>
+				<output dest="output-params/actual.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform-params">
+			<condition><not><filesmatch file1="transform/input/expected-params.txt" file2="transform/output-params/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-params"/>
+	</target>
+
+	<target name="transform-params-ns">
+		<delete dir="transform/output-params-ns"/>
+
+		<chionographis basedir="transform" includes="input/input.xml">
+			<namespace prefix="p">http://www.furfurylic.net/chionographis/test/transform/ns</namespace>		
+			<transform style="input/flatten-ns.xsl">
+				<param name="p:p1" value="v1"/>
+				<param name="{http://www.furfurylic.net/chionographis/test/transform/ns}p2" value="v2"/>
+				<output dest="output-params-ns/actual.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform-params-ns">
+			<condition><not><filesmatch file1="transform/input/expected-params.txt" file2="transform/output-params-ns/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-params-ns"/>
+	</target>
+
+	<target name="transform-refer-content">
+		<delete dir="transform/output-refer-content"/>
+
+		<chionographis includes="transform/input/*-refer-content.xml">
+			<transform style="flatten.xsl">
+				<output destdir="transform/output-refer-content" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform-refer-content">
+			<condition><not><filesmatch file1="transform/input/expected-refer-content.txt" file2="transform/output-refer-content/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-refer-content"/>
+	</target>
+
+	<target name="transform-not-up-to-date">
+		<delete dir="transform/output-not-up-to-date"/>
+		<mkdir dir="transform/output-not-up-to-date"/>
+		<touch file="transform/output-not-up-to-date/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+		<copy file="transform/input/input.xml" todir="transform/output-not-up-to-date"/>
+		<touch file="transform/output-not-up-to-date/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+		<copy file="flatten.xsl" todir="transform/output-not-up-to-date"/>
+		<touch file="transform/output-not-up-to-date/flatten.xsl" datetime="01/01/2001 00:01:20 AM"/>
+
+		<chionographis basedir="transform" includes="input/input.xml">
+			<transform style="output-not-up-to-date/flatten.xsl">
+				<output dest="output-not-up-to-date/actual.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform">
+			<condition><not><filesmatch file1="transform/input/expected.txt" file2="transform/output-not-up-to-date/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-not-up-to-date"/>
+	</target>
+
+	<target name="all">
+		<delete dir="all/output"/>
+
+		<chionographis basedir="all" includes="input/*.xml">
+			<all root="q">
+				<output dest="output/output.xml" mkdirs="yes"/>
+			</all>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" in="all/output/output.xml" out="all/output/actual.txt"/>
+		<fail message="Failed test: all">
+			<condition><not><filesmatch file1="all/input/expected.txt" file2="all/output/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="all/output"/>
+	</target>
+
+	<target name="all-up-to-date">
+		<delete dir="all/output-up-to-date"/>
+		<mkdir dir="all/output-up-to-date"/>
+		<touch file="all/output-up-to-date/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+		<copy todir="all/output-up-to-date"><fileset dir="all/input" includes="*.xml"/></copy>
+		<touch file="all/output-up-to-date/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+		<touch file="all/output-up-to-date/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+		<chionographis basedir="all" includes="output-up-to-date/input*.xml">
+			<all root="q">
+				<output dest="output-up-to-date/output.xml"/>
+			</all>
+		</chionographis>
+
+		<fail message="Failed test: all-up-to-date">
+			<condition>
+				<not>
+					<islastmodified datetime="01/01/2001 00:01:20 AM" mode="equals">
+						<file file="all/output-up-to-date/output.xml"/>
+					</islastmodified>
+				</not>
+			</condition>
+		</fail>
+
+		<delete dir="all/output-up-to-date"/>
+	</target>
+
+	<target name="all-ns">
+		<delete dir="all/output-ns"/>
+
+		<chionographis basedir="all" includes="input-ns/*.xml">
+			<namespace prefix="all">http://www.furfurylic.net/chionographis/test/all/ns/task1</namespace>
+			<all root="all:p">
+				<all root="{http://www.furfurylic.net/chionographis/test/all/ns/task2}q">
+					<output dest="output-ns/output.xml" mkdirs="yes"/>
+				</all>
+			</all>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" in="all/output-ns/output.xml" out="all/output-ns/actual.txt"/>
+		<fail message="Failed test: all-ns">
+			<condition><not><filesmatch file1="all/input-ns/expected.txt" file2="all/output-ns/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="all/output-ns"/>
+	</target>
+
+	<target name="snip-1">
+		<delete dir="snip/output1"/>
+
+		<chionographis srcdir="snip/input1" includes="*.xml">
+			<snip select="//b">
+				<output destdir="snip/output1" mkdirs="yes"/>
+			</snip>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" basedir="snip/output1" destdir="snip/output1" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+		<fail message="Failed test: snip-1 - 1a">
+			<condition><not><filesmatch file1="snip/input1/expected1a.txt" file2="snip/output1/actual1a.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: snip-1 - 1b">
+			<condition><not><filesmatch file1="snip/input1/expected1b.txt" file2="snip/output1/actual1b.txt"/></not></condition>
+		</fail>
+
+		<delete dir="snip/output1"/>
+	</target>
+
+	<target name="snip-2">
+		<delete dir="snip/output2"/>
+
+		<chionographis srcdir="snip/input2" includes="*.xml">
+			<snip select="a/b">
+				<output destdir="snip/output2" mkdirs="yes"/>
+			</snip>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" basedir="snip/output2" destdir="snip/output2" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+		<fail message="Failed test: snip-2 - 1a">
+			<condition><not><filesmatch file1="snip/input2/expected1a.txt" file2="snip/output2/actual1a.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: snip-2 - 1b">
+			<condition><not><filesmatch file1="snip/input2/expected1b.txt" file2="snip/output2/actual1b.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: snip-2 - 2a">
+			<condition><not><filesmatch file1="snip/input2/expected2a.txt" file2="snip/output2/actual2a.txt"/></not></condition>
+		</fail>
+
+		<delete dir="snip/output2"/>
+	</target>
+
+	<target name="snip-3">
+		<delete dir="snip/output3"/>
+
+		<chionographis srcdir="snip/input3" includes="*.xml">
+			<namespace prefix="q">http://www.furfurylic.net/chionographis/test</namespace>
+			<snip select="//q:a[2]">
+				<output destdir="snip/output3" mkdirs="yes"/>
+			</snip>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" basedir="snip/output3" destdir="snip/output3" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+
+		<fail message="Failed test: snip-3">
+			<condition><not><filesmatch file1="snip/input3/expected2.txt" file2="snip/output3/actual2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="snip/output3"/>
+</target>
+
+</project>
