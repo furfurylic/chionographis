@@ -1,0 +1,6 @@
+<a>
+	<b><?chionographis-output output2a.xml?>I am B</b>
+	<c>
+		<b><?chionographis-output output2b.xml?>I am B too</b>
+	</c>
+</a>

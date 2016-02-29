@@ -1,0 +1,6 @@
+<x:a xmlns:x="http://www.furfurylic.net/chionographis/test">
+	<b><?chionographis-output output1a.xml?>B's content</b>
+	<x:c>
+		<b><?chionographis-output output1b.xml?>Here <x:d>d</x:d> from namespace x goes</b>
+	</x:c>
+</x:a>
