@@ -1,0 +1,1 @@
+<chionographis-output=trap>[input1:<trap=trap>abc[a:<chionographis-output=trap>xyz]]
