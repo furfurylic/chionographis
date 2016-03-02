@@ -11,6 +11,7 @@
 		<antcall target="transform-params-ns"/>
 		<antcall target="transform-refer-content"/>
 		<antcall target="transform-not-up-to-date"/>
+		<antcall target="transform-cache"/>
 		<antcall target="all"/>
 		<antcall target="all-up-to-date"/>
 		<antcall target="all-ns"/>
@@ -177,11 +178,33 @@
 			</transform>
 		</chionographis>
 
-		<fail message="Failed test: transform">
+		<fail message="Failed test: transform-not-up-to-date">
 			<condition><not><filesmatch file1="transform/input/expected.txt" file2="transform/output-not-up-to-date/actual.txt"/></not></condition>
 		</fail>
 
 		<delete dir="transform/output-not-up-to-date"/>
+	</target>
+
+	<target name="transform-cache">
+		<delete dir="transform/output-cache"/>
+
+		<chionographis basedir="transform/input-cache" includes="input.xml">
+			<transform style="style1.xsl" cache="yes">
+				<output dest="../output-cache/actual1.txt" mkdirs="yes"/>
+			</transform>
+			<transform style="style2.xsl" cache="yes">
+				<output dest="../output-cache/actual2.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform-cache (1)">
+			<condition><not><filesmatch file1="transform/input-cache/expected1.txt" file2="transform/output-cache/actual1.txt"/></not></condition>
+		</fail>	
+		<fail message="Failed test: transform-cache (2)">
+			<condition><not><filesmatch file1="transform/input-cache/expected2.txt" file2="transform/output-cache/actual2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-cache"/>
 	</target>
 
 	<target name="all">
