@@ -8,11 +8,8 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -21,17 +18,10 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
-import javax.xml.transform.Source;
 import javax.xml.transform.Templates;
 import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.URIResolver;
-import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
@@ -39,7 +29,6 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
-import org.w3c.dom.Document;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.Locator;
@@ -50,9 +39,6 @@ import org.xml.sax.SAXException;
  * each source document into an document styled by an XSLT stylsheet.
  */
 public final class Transform extends Sink implements SinkDriver {
-
-    private static final Object LOCK = new Object();
-    private static Map<URI, Source> sources_;
 
     private Sinks sinks_;
     private String style_;
@@ -346,66 +332,5 @@ public final class Transform extends Sink implements SinkDriver {
         public void skippedEntity(String name) throws SAXException {
             handler_.skippedEntity(name);
         }
-    }
-
-    private static class CachingResolver implements URIResolver {
-
-        Consumer<URI> listenStored_;
-        Consumer<URI> listenHit_;
-        
-        public CachingResolver(Consumer<URI> listenStored, Consumer<URI> listenHit) {
-            listenStored_ = listenStored;
-            listenHit_ = listenHit;
-        }
-
-        @Override
-        public Source resolve(String href, String base) throws TransformerException {
-            URI uri;
-            if (base == null) {
-                uri = URI.create(href);
-            } else {
-                uri = URI.create(base).resolve(href);
-            }
-            if (!uri.isAbsolute()) {
-                return null;
-            }
-            if (uri.getScheme().toLowerCase().equals("file")) {
-                // Afraid that omission of "xx/../" is bad for symbolic links
-                try {
-                    uri = Paths.get(uri).toRealPath().toUri();                    
-                } catch (IOException e) {
-                    return null;
-                }
-            } else {
-                uri = uri.normalize();
-            }           
-            synchronized (LOCK) {
-                if (sources_ == null) {
-                    sources_ = new HashMap<>();
-                }
-            }
-            Source cached;
-            synchronized (LOCK) {
-                cached = sources_.get(uri);
-                if (cached == null) {
-                    if (!sources_.containsKey(uri)) {
-                        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                        dbfac.setNamespaceAware(true);
-                        try {
-                            DocumentBuilder builder = dbfac.newDocumentBuilder();
-                            Document document = builder.parse(uri.toString());
-                            cached = new DOMSource(document, uri.toString());
-                            listenStored_.accept(uri);
-                        } catch (ParserConfigurationException | SAXException | IOException e) {
-                        }
-                        sources_.put(uri, cached);
-                    }
-                } else {
-                    listenHit_.accept(uri);
-                }
-            }
-            return cached;
-        }
-        
     }
 }
