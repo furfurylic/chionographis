@@ -10,6 +10,7 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,9 @@ import org.xml.sax.SAXException;
  */
 public final class Transform extends Sink implements SinkDriver {
 
+    private static final Object LOCK = new Object();
+    private static Map<URI, Source> sources_;
+
     private Sinks sinks_;
     private String style_;
     private boolean usesCache_;
@@ -59,8 +63,8 @@ public final class Transform extends Sink implements SinkDriver {
     private URI styleURI_;
 
     private Templates stylesheet_;
+    private CachingResolver resolver_;
     private Map<String, Object> params_;
-    private URIResolver resolver_;
 
     private String output_;
     
@@ -346,7 +350,6 @@ public final class Transform extends Sink implements SinkDriver {
 
     private static class CachingResolver implements URIResolver {
 
-        Map<URI, Source> sources_;
         Consumer<URI> listenStored_;
         Consumer<URI> listenHit_;
         
@@ -357,26 +360,49 @@ public final class Transform extends Sink implements SinkDriver {
 
         @Override
         public Source resolve(String href, String base) throws TransformerException {
-            if (sources_ == null) {
-                sources_ = new HashMap<>();
+            URI uri;
+            if (base == null) {
+                uri = URI.create(href);
+            } else {
+                uri = URI.create(base).resolve(href);
             }
-            URI uri = URI.create(base).resolve(href).normalize();
-            Source cached = sources_.get(uri);
-            if (cached == null) {
-                if (!sources_.containsKey(uri)) {
-                    DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                    dbfac.setNamespaceAware(true);
-                    try {
-                        DocumentBuilder builder = dbfac.newDocumentBuilder();
-                        Document document = builder.parse(uri.toString());
-                        cached = new DOMSource(document, uri.toString());
-                        listenStored_.accept(uri);
-                    } catch (ParserConfigurationException | SAXException | IOException e) {
-                    }
-                    sources_.put(uri, cached);
+            if (!uri.isAbsolute()) {
+                return null;
+            }
+            if (uri.getScheme().toLowerCase().equals("file")) {
+                // Afraid that omission of "xx/../" is bad for symbolic links
+                try {
+                    uri = Paths.get(uri).toRealPath().toUri();                    
+                } catch (IOException e) {
+                    return null;
                 }
             } else {
-                listenHit_.accept(uri);
+                uri = uri.normalize();
+            }           
+            synchronized (LOCK) {
+                if (sources_ == null) {
+                    sources_ = new HashMap<>();
+                }
+            }
+            Source cached;
+            synchronized (LOCK) {
+                cached = sources_.get(uri);
+                if (cached == null) {
+                    if (!sources_.containsKey(uri)) {
+                        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                        dbfac.setNamespaceAware(true);
+                        try {
+                            DocumentBuilder builder = dbfac.newDocumentBuilder();
+                            Document document = builder.parse(uri.toString());
+                            cached = new DOMSource(document, uri.toString());
+                            listenStored_.accept(uri);
+                        } catch (ParserConfigurationException | SAXException | IOException e) {
+                        }
+                        sources_.put(uri, cached);
+                    }
+                } else {
+                    listenHit_.accept(uri);
+                }
             }
             return cached;
         }
