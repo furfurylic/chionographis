@@ -17,6 +17,7 @@
 		<antcall target="snip-1"/>
 		<antcall target="snip-2"/>
 		<antcall target="snip-3"/>
+		<antcall target="crossing-cache"/>
 	</target>
 	
 	<target name="basic-mapper">
@@ -177,7 +178,7 @@
 			</transform>
 		</chionographis>
 
-		<fail message="Failed test: transform">
+		<fail message="Failed test: transform-not-up-to-date">
 			<condition><not><filesmatch file1="transform/input/expected.txt" file2="transform/output-not-up-to-date/actual.txt"/></not></condition>
 		</fail>
 
@@ -314,6 +315,28 @@
 		</fail>
 
 		<delete dir="snip/output3"/>
-</target>
+	</target>
+
+	<target name="crossing-cache">
+		<delete dir="crossing/output-cache"/>
+
+		<chionographis basedir="crossing/input-cache" includes="input.xml" cache="yes">
+			<transform style="style1.xsl" cache="yes">
+				<output dest="../output-cache/actual1.txt" mkdirs="yes"/>
+			</transform>
+			<transform style="style2.xsl" cache="yes">
+				<output dest="../output-cache/actual2.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: crossing-cache (1)">
+			<condition><not><filesmatch file1="crossing/input-cache/expected1.txt" file2="crossing/output-cache/actual1.txt"/></not></condition>
+		</fail>	
+		<fail message="Failed test: crossing-cache (2)">
+			<condition><not><filesmatch file1="crossing/input-cache/expected2.txt" file2="crossing/output-cache/actual2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="crossing/output-cache"/>
+	</target>
 
 </project>

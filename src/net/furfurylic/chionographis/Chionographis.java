@@ -53,7 +53,9 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
     private Path srcDir_;
     private Path baseDir_;
+    private boolean usesCache_;
     private int prefixCount_;
+
     private Map<String, String> prefixMap_;
     private Sinks sinks_;
 
@@ -61,6 +63,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      * Sole constructor.
      */
     public Chionographis() {
+        usesCache_ = false;
     }
 
     /**
@@ -98,6 +101,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      */
     public void setSrcDir(String srcDir) {
         srcDir_ = Paths.get(srcDir);
+    }
+
+    public void setCache(boolean cache) {
+        usesCache_ = cache;
     }
 
     /**
@@ -279,6 +286,11 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         reader = new OutputFinderFilter(reader, s -> output[0] = s);
                     } else {
                         sinks_.log(this, "  PI search not required", LogLevel.DEBUG);
+                    }
+                    if (usesCache_) {
+                        reader.setEntityResolver(new CachingResolver(
+                            u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
+                            u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG)));
                     }
 
                     // Do processing.

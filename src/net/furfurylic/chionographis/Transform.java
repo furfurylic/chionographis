@@ -42,18 +42,22 @@ public final class Transform extends Sink implements SinkDriver {
 
     private Sinks sinks_;
     private String style_;
+    private boolean usesCache_;
     private int paramCount_;
 
     private SAXTransformerFactory tfac_;
     private URI styleURI_;
 
     private Templates stylesheet_;
-    private Map<String, Object> params_; 
+    private CachingResolver resolver_;
+    private Map<String, Object> params_;
 
     private String output_;
     
     Transform(Logger logger) {
         sinks_ = new Sinks(logger);
+        style_ = null;
+        usesCache_ = false;
         paramCount_ = 0;
         params_ = Collections.<String, Object>emptyMap();
     }
@@ -70,6 +74,10 @@ public final class Transform extends Sink implements SinkDriver {
         style_ = style;
     }
     // TODO: Make this class able to accept non-file stylesheet URI
+    
+    public void setCache(boolean cache) {
+        usesCache_ = cache;
+    }
     
     /**
      * Adds a stylesheet parameter.
@@ -200,11 +208,20 @@ public final class Transform extends Sink implements SinkDriver {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 String styleSystemID = styleURI_.toString();
                 sinks_.log(this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+                if (usesCache_) {
+                    resolver_ = new CachingResolver(
+                        u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
+                        u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
+                    tfac_.setURIResolver(resolver_);
+                }
                 stylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
             }
             TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
             for (Map.Entry<String, Object> param : params_.entrySet()) {
                 styler.getTransformer().setParameter(param.getKey(), param.getValue());
+            }
+            if (usesCache_) {
+                styler.getTransformer().setURIResolver(resolver_);
             }
             styler.setResult(sinks_.startOne(originalSrcIndex, originalSrcFileName));
             ContentHandler handler;
@@ -314,6 +331,6 @@ public final class Transform extends Sink implements SinkDriver {
         @Override
         public void skippedEntity(String name) throws SAXException {
             handler_.skippedEntity(name);
-        }        
+        }
     }
 }
