@@ -10,6 +10,7 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +24,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
@@ -51,6 +53,8 @@ final class Sinks extends Sink implements SinkDriver, Logger {
      * <p>This field is maintained by {@link #startOne(int, String)} method.
      */
     private List<Sink> activeSinks_;
+    
+    private int[] referentCounts_;
 
     public Sinks(Logger logger) {
         logger_ = logger;
@@ -120,6 +124,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName) {
+        referentCounts_ = null;
         if (originalSrcIndex < 0) {
             activeSinks_ = sinks_;
         } else {
@@ -142,13 +147,33 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    boolean needsOutput() {
-        return activeSinks_.stream().anyMatch(Sink::needsOutput);
+    List<XPathExpression> referents() {
+        List<List<XPathExpression>> referents = activeSinks_.stream()
+                .map(Sink::referents)
+                .collect(Collectors.toList());
+        if (referents.stream().noneMatch(r -> !r.isEmpty())) {
+            return Collections.<XPathExpression>emptyList();
+        }
+        referentCounts_ = referents.stream()
+            .mapToInt(r -> (r.isEmpty() ? 0 : r.size())).toArray();
+        List<XPathExpression> expressions = referents.stream()
+            .filter(r -> !r.isEmpty())
+            .flatMap(r -> r.stream())
+            .collect(Collectors.toList());
+        return expressions;
     }
 
     @Override
-    void finishOne(String output) {
-        activeSinks_.stream().forEach(s -> s.finishOne(output));
+    void finishOne(List<String> referredContents) {
+        if (referredContents .isEmpty()) {
+            activeSinks_.stream().forEach(s -> s.finishOne(Collections.<String>emptyList()));
+        } else {
+            int i = 0;
+            for (int j = 0; j < referentCounts_.length; ++j) {
+                activeSinks_.get(j).finishOne(referredContents.subList(i, i + referentCounts_[j]));
+                i += referentCounts_[j];
+            }
+        }
     }
 
     @Override
