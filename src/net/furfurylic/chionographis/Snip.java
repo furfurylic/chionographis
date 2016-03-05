@@ -37,7 +37,7 @@ import org.w3c.dom.NodeList;
  * extraction of tree fragments from the source documents and passes the fragments to its sinks.
  *
  * <p>The way of extraction is specified by <i>XPath</i> expression.
- * The root nodes of the fragments are the matched elements with the XPath expression.</p>   
+ * The root nodes of the fragments are the matched elements with the XPath expression.</p>
  */
 public final class Snip extends Sink implements SinkDriver {
 
@@ -46,7 +46,7 @@ public final class Snip extends Sink implements SinkDriver {
 
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
-    
+
     private Document document_;
     private int currentIndex_;
     private String currentSrcFileName_;
@@ -60,9 +60,9 @@ public final class Snip extends Sink implements SinkDriver {
      *
      * <p>If the XPath expression contains names within namespaces, the names shall be accompanied
      * by namespace prefixes as specified in XPath specification.
-     * You can define prefix-namespace URI mapping entries in 
+     * You can define prefix-namespace URI mapping entries in
      * {@linkplain Chionographis#createNamespace() the task}.</p>
-     * 
+     *
      * @param xpath
      *      an XPath expression.
      */
@@ -142,8 +142,8 @@ public final class Snip extends Sink implements SinkDriver {
 
     @Override
     void finishOne(List<String> notUsed) {
-        try {           
-            // Apply XPath expression to current document 
+        try {
+            // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criteria " + select_ +"; the original source is " + currentSrcFileName_, LogLevel.VERBOSE);
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
@@ -158,7 +158,7 @@ public final class Snip extends Sink implements SinkDriver {
                 if (node.getNodeType() == Node.ELEMENT_NODE) {
                     // Open sink's result
                     Result result = sinks_.startOne(currentIndex_, currentSrcFileName_);
-                    
+
                     Document document = newDocument();
                     document.appendChild(document.adoptNode(node));
 
@@ -173,7 +173,7 @@ public final class Snip extends Sink implements SinkDriver {
                     } else {
                         sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                     }
-                    
+
                     // Send fragment to sink
                     TransformerFactory.newInstance().newTransformer().transform(
                         new DOMSource(document), result);
