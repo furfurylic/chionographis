@@ -228,7 +228,8 @@ public final class Output extends Sink {
         }
         assert(destMapping_ != null);
 
-        boolean hasNonFile = additionalURIs.stream().anyMatch(u -> !u.getScheme().equals("file"));
+        boolean hasNonFile = additionalURIs.stream()
+            .anyMatch(u -> !u.getScheme().equalsIgnoreCase("file"));
 
         long additionalLastModified = hasNonFile ? Long.MAX_VALUE :
             additionalURIs.stream()
