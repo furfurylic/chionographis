@@ -75,8 +75,8 @@
 		<delete dir="basic/output-ref-content"/>
 
 		<chionographis basedir="basic" srcdir="input-refer-content" includes="*.xml">
-			<output destdir="output-refer-content" refercontent="yes" mkdirs="yes"/>
-			<output destdir="output-refer-content" refercontent="yes" mkdirs="yes">
+			<output destdir="output-refer-content" refer="//processing-instruction('chionographis-output')[1]" mkdirs="yes"/>
+			<output destdir="output-refer-content" refer="//processing-instruction('chionographis-output')[1]" mkdirs="yes">
 				<globmapper from="output*.xml" to="output*.2.xml"/>
 			</output>
 		</chionographis>
@@ -152,7 +152,7 @@
 
 		<chionographis includes="transform/input/*-refer-content.xml">
 			<transform style="flatten.xsl">
-				<output destdir="transform/output-refer-content" mkdirs="yes"/>
+				<output destdir="transform/output-refer-content" refer="/*/processing-instruction('chionographis-output')[1]" mkdirs="yes"/>
 			</transform>
 		</chionographis>
 
@@ -254,7 +254,7 @@
 
 		<chionographis srcdir="snip/input1" includes="*.xml">
 			<snip select="//b">
-				<output destdir="snip/output1" mkdirs="yes"/>
+				<output destdir="snip/output1" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
 			</snip>
 		</chionographis>
 
@@ -276,7 +276,7 @@
 
 		<chionographis srcdir="snip/input2" includes="*.xml">
 			<snip select="a/b">
-				<output destdir="snip/output2" mkdirs="yes"/>
+				<output destdir="snip/output2" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
 			</snip>
 		</chionographis>
 
@@ -302,7 +302,7 @@
 		<chionographis srcdir="snip/input3" includes="*.xml">
 			<namespace prefix="q">http://www.furfurylic.net/chionographis/test</namespace>
 			<snip select="//q:a[2]">
-				<output destdir="snip/output3" mkdirs="yes"/>
+				<output destdir="snip/output3" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
 			</snip>
 		</chionographis>
 

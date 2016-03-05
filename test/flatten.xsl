@@ -5,5 +5,6 @@
 <xsl:template match="@*[starts-with(local-name(), 'xml')]"/>
 <xsl:template match="text()"><xsl:value-of select="."/></xsl:template>
 <xsl:template match="processing-instruction()">&lt;<xsl:value-of select="local-name()"/>=<xsl:value-of select="."/>&gt;</xsl:template>
+<xsl:template match="processing-instruction('chionographis-output')"/>
 <xsl:template name="write-node-name"><xsl:if test="namespace-uri(.)">{<xsl:value-of select="namespace-uri(.)"/>}</xsl:if><xsl:value-of select="local-name(.)"/></xsl:template>
 </xsl:stylesheet>

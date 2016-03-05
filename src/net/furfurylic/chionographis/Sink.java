@@ -9,10 +9,13 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
+import javax.xml.xpath.XPathExpression;
 
 /**
  * A <i>sink</i> object is a destination of processed documents.
@@ -85,26 +88,33 @@ public abstract class Sink {
     abstract Result startOne(int originalSrcIndex, String originalSrcFileName);
 
     /**
-     * Tells whether this sink requires the source content (which is the data of a processing 
-     * instruction (PI) whose target is {@code chionographis-output} and which resides between the 
-     * document element and its first child element).
+     * Returns XPath expressions which point the input document contents required by this object.
      * 
-     * <p>When the driver is responsive to the requirement and finds the PI, the data is informed 
-     * as the argument of {@link #finishOne(String)}.</p>
+     * <p>When the driver is responsive to the requirement and finds the pointees,
+     * the data is informed as the argument of {@link #finishOne(List)}.</p>
      * 
      * <p>This method can be invoked between the invocation of {@link #startOne(int, String)} and
-     * the one of {@link #finishOne(String)}.</p>
+     * the one of {@link #finishOne(List)}.</p>
      * 
-     * <p>The {@code needsOutput} method of {@code Sink} returns {@code false}.</p>
+     * <p>The {@code referents} method of {@code Sink} returns an empty list.</p>
      * 
      * @return
-     *      {@code true} if this sink requires the source content; otherwise {@code false}.
-     */
-    boolean needsOutput() {
-        return false;
+     *      XPath expressions which point the input document contents required by this object,
+     *      or an empty list if this object requires none.
+     */    
+    List<XPathExpression> referents() {
+        return Collections.<XPathExpression>emptyList();
     }
     
-    abstract void finishOne(String output);
+    /**
+     * Finishes to receive one input document.
+     * 
+     * @param referredContents
+     *      an list whose size is the same as the return value of {@link #referents()}
+     *      and contains the required input document contents (possibly {@code null}),
+     *      or an empty list if the driver is not responsive to the request.
+     */
+    abstract void finishOne(List<String> referredContents);
     
     abstract void abortOne();
 
