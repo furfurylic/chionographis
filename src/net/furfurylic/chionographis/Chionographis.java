@@ -8,6 +8,7 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,33 +16,41 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.Result;
+import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
-import javax.xml.transform.stream.StreamSource;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
-import org.xml.sax.Attributes;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLFilterImpl;
 
 /**
  * An Ant task class that performs cascading transformation to XML documents.
@@ -261,6 +270,13 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 return;
             }
 
+            EntityResolver resolver = null;
+            if (usesCache_) {
+                resolver = new CachingResolver(
+                    u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
+                    u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
+            }
+
             int count = 0;
             sinks_.startBundle();
             for (int i = 0; i < includedFiles.length; ++i) {
@@ -272,39 +288,41 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 }
                 ++count;
                 try {
-                    // Prepare input source.
                     sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                    InputSource input = SAXSource.sourceToInputSource(new StreamSource(systemID));
 
-                    // Set up reader, possibly configured to search output.
-                    XMLReader reader = parser.getXMLReader();
                     Result result = sinks_.startOne(i, includedFile);
-                    String[] output = new String[] { null };
-                    boolean searchesPI = sinks_.needsOutput();
-                    if (searchesPI) {
-                        sinks_.log(this, "  PI search required", LogLevel.DEBUG);
-                        reader = new OutputFinderFilter(reader, s -> output[0] = s);
+                    Source source;
+                    List<XPathExpression> referents = sinks_.referents();
+                    List<String> referredContents = Collections.emptyList();
+                    if (!referents.isEmpty()) {
+                        sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
+                        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                        dbfac.setNamespaceAware(true);
+                        DocumentBuilder builder = dbfac.newDocumentBuilder();
+                        builder.setEntityResolver(resolver);
+                        Document document = builder.parse(systemID);
+                        referredContents = Referral.extract(document, referents);
+                        sinks_.log(this, "  Referred source data: "
+                            + Referral.join(referredContents), LogLevel.DEBUG);
+                        source = new DOMSource(document, systemID);
+                        
                     } else {
-                        sinks_.log(this, "  PI search not required", LogLevel.DEBUG);
-                    }
-                    if (usesCache_) {
-                        reader.setEntityResolver(new CachingResolver(
-                            u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
-                            u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG)));
+                        XMLReader reader = parser.getXMLReader();
+                        sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
+                        reader.setEntityResolver(resolver);
+                        InputSource input = new InputSource(systemID);
+                        source = new SAXSource(reader, input);
                     }
 
                     // Do processing.
-                    identity.transform(new SAXSource(reader, input), result);
+                    identity.transform(source, result);
 
-                    if (searchesPI) {
-                        sinks_.log(this, "  PI data is " + output[0], LogLevel.DEBUG);
-                    }
-                    sinks_.finishOne(output[0]);
+                    sinks_.finishOne(referredContents);
 
                     parser.reset();
                     identity.reset();
 
-                } catch (TransformerException e) {
+                } catch (TransformerException | IOException e) {
                     e.printStackTrace();    // TODO: Other notification
                     sinks_.abortOne();
                 }
@@ -352,36 +370,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     System.identityHashCode(issuer),
                     message);
                 Chionographis.this.log(formatter.toString(), level.getLevel());
-                // TODO: Object -> line header caching 
-            }
-        }       
-    }
-    
-    private static class OutputFinderFilter extends XMLFilterImpl {
-
-        private Consumer<String> outputHandler_;
-        private int counter_;
-
-        public OutputFinderFilter(XMLReader parent, Consumer<String> outputHandler) {
-            super(parent);
-            outputHandler_ = outputHandler;
-            counter_ = 0;
-        }
-
-        @Override
-        public void startElement(String uri, String localName, String qName, Attributes atts)
-                throws SAXException {
-            ++counter_;
-            super.startElement(uri, localName, qName, atts);
-        }
-
-        @Override
-        public void processingInstruction(String target, String data) throws SAXException {
-            if ((counter_ == 1) && target.equals("chionographis-output")) {
-                outputHandler_.accept(data);
-                ++counter_;
-            } else {
-                super.processingInstruction(target, data);
             }
         }       
     }

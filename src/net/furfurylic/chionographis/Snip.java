@@ -9,7 +9,9 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -28,10 +30,8 @@ import javax.xml.xpath.XPathFactory;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
-import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.ProcessingInstruction;
 
 /**
  * A <i>Snip</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} performs
@@ -49,7 +49,6 @@ public final class Snip extends Sink implements SinkDriver {
     private XPathExpression expr_;
     
     private Document document_;
-    private DocumentFragment fragment_;
     private int currentIndex_;
     private String currentSrcFileName_;
 
@@ -128,32 +127,31 @@ public final class Snip extends Sink implements SinkDriver {
     Result startOne(int originalSrcIndex, String originalSrcFileName) {
         currentIndex_ = originalSrcIndex;
         currentSrcFileName_ = originalSrcFileName;
+        document_ = newDocument();
+        return new DOMResult(document_);
+    }
 
-        if (document_ == null) {
-            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-            dbfac.setNamespaceAware(true);
-            try {
-                document_ = dbfac.newDocumentBuilder().newDocument();
-                fragment_ = document_.createDocumentFragment(); 
-            } catch (ParserConfigurationException e) {
-                throw new BuildException(e);
-            }
+    private Document newDocument() {
+        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+        dbfac.setNamespaceAware(true);
+        try {
+            return dbfac.newDocumentBuilder().newDocument();
+        } catch (ParserConfigurationException e) {
+            throw new BuildException(e);
         }
-
-        return new DOMResult(fragment_);
     }
 
     @Override
-    void finishOne(String notUsed) {
+    void finishOne(List<String> notUsed) {
         try {           
             // Apply XPath expression to current document 
-            sinks_.log(this, "Applying snipping criteria \"" + select_ +"\"; input source is " + currentSrcFileName_, LogLevel.VERBOSE);
+            sinks_.log(this, "Applying snipping criteria " + select_ +"; the original source is " + currentSrcFileName_, LogLevel.VERBOSE);
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext_);
                 expr_ = xpath.compile(select_);
             }
-            NodeList nodes = (NodeList) expr_.evaluate(fragment_, XPathConstants.NODESET);
+            NodeList nodes = (NodeList) expr_.evaluate(document_, XPathConstants.NODESET);
 
             int count = 0;
             for (int i = 0; i < nodes.getLength(); ++i) {
@@ -162,24 +160,27 @@ public final class Snip extends Sink implements SinkDriver {
                     // Open sink's result
                     Result result = sinks_.startOne(currentIndex_, currentSrcFileName_);
                     
+                    Document document = newDocument();
+                    document.appendChild(document.adoptNode(node));
+
                     // Search output if necessary
-                    String output = null;
-                    if (sinks_.needsOutput()) {
-                        sinks_.log(this, "  PI search required", LogLevel.DEBUG);
-                        output = extractOutput(node);                        
-                        sinks_.log(this, "  PI data is " + output, LogLevel.DEBUG);
+                    List<XPathExpression> referents = sinks_.referents();
+                    List<String> referredContents = null;
+                    if (!referents.isEmpty()) {
+                        sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
+                        referredContents = Referral.extract(document, referents);
+                        sinks_.log(this, "  Referred source data: "
+                            + Referral.join(referredContents), LogLevel.DEBUG);
                     } else {
-                        sinks_.log(this, "  PI search not required", LogLevel.DEBUG);
+                        sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                     }
                     
                     // Send fragment to sink
-                    DocumentFragment frag = fragment_.getOwnerDocument().createDocumentFragment();
-                    frag.appendChild(node);
                     TransformerFactory.newInstance().newTransformer().transform(
-                        new DOMSource(frag), result);
+                        new DOMSource(document), result);
 
                     // Finish sink
-                    sinks_.finishOne(output);
+                    sinks_.finishOne(referredContents);
 
                     ++count;
                 }
@@ -187,7 +188,7 @@ public final class Snip extends Sink implements SinkDriver {
             if (count > 0) {
                 sinks_.log(this, count + " snipped fragments processed", LogLevel.VERBOSE);
             } else {
-                sinks_.log(this, "No snipped fragments generated; input source is " + currentSrcFileName_, LogLevel.INFO);
+                sinks_.log(this, "No snipped fragments generated; the original source is " + currentSrcFileName_, LogLevel.INFO);
             }
 
         } catch (TransformerException | XPathExpressionException e) {
@@ -200,29 +201,6 @@ public final class Snip extends Sink implements SinkDriver {
     void abortOne() {
         // sink_.startOne(int, String) is not invoked yet,
         // so we can evade call sink_.abortOne().
-    }
-
-    private String extractOutput(Node node) {
-        Node child = node.getFirstChild();
-        while (child != null) {
-            switch (child.getNodeType()) {
-            case Node.PROCESSING_INSTRUCTION_NODE:
-                {
-                    ProcessingInstruction pi = (ProcessingInstruction) child;
-                    if (pi.getTarget().equals("chionographis-output")) {
-                        node.removeChild(pi);
-                        return pi.getData();
-                    }
-                }
-                break;
-            case Node.ELEMENT_NODE:
-                return null;
-            default:
-                break;
-            }
-            child = child.getNextSibling();            
-        }
-        return null;
     }
 
     @Override

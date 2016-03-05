@@ -10,6 +10,8 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -177,7 +179,7 @@ public final class All extends Sink implements SinkDriver {
     }
 
     @Override
-    void finishOne(String dest) {
+    void finishOne(List<String> notUsed) {
     }
 
     @Override
@@ -206,7 +208,7 @@ public final class All extends Sink implements SinkDriver {
         }
         // TODO: what if documentCount == 0?
         sinks_.log(this, "Finishing 1 output containing " + handler_.documentCount() + " input sources ", LogLevel.VERBOSE);
-        sinks_.finishOne(null);
+        sinks_.finishOne(Collections.<String>emptyList());
         sinks_.finishBundle();
     }
 
