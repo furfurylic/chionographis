@@ -153,7 +153,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             sinks_.log(this, "Empty namespace prefixes are not acceptable", LogLevel.ERR);
             throw new BuildException();
         }
-        if ((prefix.length() >= 3) && prefix.substring(0, 3).toLowerCase().equals("xml")) {
+        if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
             sinks_.log(this, "Bad namespace prefix: " + prefix, LogLevel.ERR);
             throw new BuildException();
         }
