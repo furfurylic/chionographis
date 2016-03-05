@@ -1,4 +1,4 @@
-<project name="chinographis-test" basedir=".">
+<project name="chinographis-test" basedir="." default="full">
 
 	<taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
 
@@ -6,6 +6,8 @@
 		<antcall target="basic-mapper"/>
 		<antcall target="basic-mapper-up-to-date"/>
 		<antcall target="basic-refer-content"/>
+		<antcall target="basic-force-output"/>
+		<antcall target="basic-force-task"/>
 		<antcall target="transform"/>
 		<antcall target="transform-params"/>
 		<antcall target="transform-params-ns"/>
@@ -30,13 +32,13 @@
 		</chionographis>
 
 		<xslt style="${basedir}/flatten.xsl" basedir="basic/output-mapper" destdir="basic/output-mapper" includes="*.xml">
-			<globmapper from="output*.xml" to="actual-mapper*.txt"/>
+			<globmapper from="output*.xml" to="actual*.txt"/>
 		</xslt>
 		<fail message="Failed test: basic-mapper - 1">
-			<condition><not><filesmatch file1="snip/input1/expected-mapper1.txt" file2="snip/output-mapper/actual-mapper1.txt"/></not></condition>
+			<condition><not><filesmatch file1="snip/input1/expected1.txt" file2="snip/output-mapper/actual1.txt"/></not></condition>
 		</fail>
 		<fail message="Failed test: basic-mapper - 2">
-			<condition><not><filesmatch file1="snip/input1/expected-mapper2.txt" file2="snip/output-mapper/actual-mapper2.txt"/></not></condition>
+			<condition><not><filesmatch file1="snip/input1/expected2.txt" file2="snip/output-mapper/actual2.txt"/></not></condition>
 		</fail>
 
 		<delete dir="basic/output-mapper"/>
@@ -47,10 +49,13 @@
 		<mkdir dir="basic/output-mapper-up-to-date"/>
 		<touch file="basic/output-mapper-up-to-date/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
 
+		<!-- input1: older -->
 		<copy file="basic/input/input1.xml" tofile="basic/output-mapper-up-to-date/input1.xml"/>
 		<touch file="basic/output-mapper-up-to-date/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
 
+		<!-- input2: newer -->
 		<copy file="basic/input/input2.xml" tofile="basic/output-mapper-up-to-date/input2.xml"/>
+		<touch file="basic/output-mapper-up-to-date/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
 
 		<chionographis srcdir="basic/output-mapper-up-to-date" includes="input*.xml">
 			<output destdir="basic/output-mapper-up-to-date">
@@ -92,6 +97,70 @@
 		</fail>
 
 		<delete dir="basic/output-refer-content"/>
+	</target>
+
+	<target name="basic-force-output">
+		<delete dir="basic/output-force-output"/>
+		<mkdir dir="basic/output-force-output"/>
+		<touch file="basic/output-force-output/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+		<!-- input1: older -->
+		<copy file="basic/input/input1.xml" tofile="basic/output-force-output/input1.xml"/>
+		<touch file="basic/output-force-output/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+		<!-- input2: newer -->
+		<copy file="basic/input/input2.xml" tofile="basic/output-force-output/input2.xml"/>
+		<touch file="basic/output-force-output/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+		<chionographis srcdir="basic/output-force-output" includes="input*.xml">
+			<output destdir="basic/output-force-output" force="yes">
+				<globmapper from="input*.xml" to="output*.xml"/>
+			</output>
+		</chionographis>
+		
+		<xslt style="${basedir}/flatten.xsl" basedir="basic/output-force-output" destdir="basic/output-force-output" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+		<fail message="Failed test: basic-force-output - 1">
+			<condition><not><filesmatch file1="basic/input/expected1.txt" file2="basic/output-force-output/actual1.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: basic-force-output - 2">
+			<condition><not><filesmatch file1="basic/input/expected2.txt" file2="basic/output-force-output/actual2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="basic/output-force-output"/>
+	</target>
+
+	<target name="basic-force-task">
+		<delete dir="basic/output-force-task"/>
+		<mkdir dir="basic/output-force-task"/>
+		<touch file="basic/output-force-task/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+		<!-- input1: older -->
+		<copy file="basic/input/input1.xml" tofile="basic/output-force-task/input1.xml"/>
+		<touch file="basic/output-force-task/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+		<!-- input2: newer -->
+		<copy file="basic/input/input2.xml" tofile="basic/output-force-task/input2.xml"/>
+		<touch file="basic/output-force-task/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+		<chionographis srcdir="basic/output-force-task" includes="input*.xml" force="yes">
+			<output destdir="basic/output-force-task">
+				<globmapper from="input*.xml" to="output*.xml"/>
+			</output>
+		</chionographis>
+		
+		<xslt style="${basedir}/flatten.xsl" basedir="basic/output-force-task" destdir="basic/output-force-task" includes="*.xml">
+			<globmapper from="output*.xml" to="actual*.txt"/>
+		</xslt>
+		<fail message="Failed test: basic-force-task - 1">
+			<condition><not><filesmatch file1="basic/input/expected1.txt" file2="basic/output-force-task/actual1.txt"/></not></condition>
+		</fail>
+		<fail message="Failed test: basic-force-task - 2">
+			<condition><not><filesmatch file1="basic/input/expected2.txt" file2="basic/output-force-task/actual2.txt"/></not></condition>
+		</fail>
+
+		<delete dir="basic/output-force-task"/>
 	</target>
 
 	<target name="transform">

@@ -115,17 +115,21 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     void startBundle() {
-        IntStream.range(0, includes_.length)
+        if (includes_ == null) {
+            sinks_.stream().forEach(Sink::startBundle);
+        } else {
+            IntStream.range(0, includes_.length)
             .filter(i -> IntStream.range(0, includes_[i].length)
                             .anyMatch(j -> includes_[i][j]))
             .mapToObj(i -> sinks_.get(i))
             .forEach(Sink::startBundle);
+        }
     }
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName) {
         referentCounts_ = null;
-        if (originalSrcIndex < 0) {
+        if ((includes_ == null) || (originalSrcIndex < 0)) {
             activeSinks_ = sinks_;
         } else {
             activeSinks_ = IntStream.range(0, includes_.length)
@@ -189,11 +193,15 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     void finishBundle() {
-        IntStream.range(0, includes_.length)
+        if (includes_ == null) {
+            sinks_.stream().forEach(Sink::finishBundle);
+        } else {
+            IntStream.range(0, includes_.length)
             .filter(i -> IntStream.range(0, includes_[i].length)
                             .anyMatch(j -> includes_[i][j]))
             .mapToObj(i -> sinks_.get(i))
             .forEach(Sink::finishBundle);
+        }
     }
 
     private static final class CompositeHandlerBuilder {
