@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -37,16 +36,13 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
-import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathExpressionException;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
-import org.w3c.dom.Node;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -63,6 +59,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     private Path srcDir_;
     private Path baseDir_;
     private boolean usesCache_;
+    private boolean force_;
     private int prefixCount_;
 
     private Map<String, String> prefixMap_;
@@ -114,6 +111,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
     public void setCache(boolean cache) {
         usesCache_ = cache;
+    }
+
+    public void setForce(boolean force) {
+        force_ = force;
     }
 
     /**
@@ -256,18 +257,20 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             }
            
             sinks_.init(baseDir_.toFile(), namespaceContext);
-            // TODO: pass caching EntityResolver/URIResolver
             // TODO: pass SAXTransformerFactory
 
-            // Tell whether input sources are newer.
-            boolean[] includes =
-                sinks_.preexamineBundle(includedURIs, includedFiles, Collections.<URI>emptySet());
-            if (IntStream.range(0, includes.length).noneMatch(i -> includes[i])) {
-                sinks_.log(this, "No input sources processed", LogLevel.INFO);
-                sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
-                Arrays.stream(includedURIs)
-                    .forEach(u -> sinks_.log(this, "    " + u.toString(), LogLevel.DEBUG));
-                return;
+            // Tell whether destinations are older.
+            boolean[] includes = null;
+            if (!force_) {
+                boolean[] examined = sinks_.preexamineBundle(includedURIs, includedFiles, Collections.<URI>emptySet());
+                if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
+                    sinks_.log(this, "No input sources processed", LogLevel.INFO);
+                    sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
+                    Arrays.stream(includedURIs)
+                        .forEach(u -> sinks_.log(this, "    " + u.toString(), LogLevel.DEBUG));
+                    return;
+                }
+                includes = examined;
             }
 
             EntityResolver resolver = null;
@@ -282,7 +285,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             for (int i = 0; i < includedFiles.length; ++i) {
                 String includedFile = includedFiles[i];
                 String systemID = srcDir_.resolve(includedFile).toUri().toString();
-                if (!includes[i]) {
+                if ((includes != null) && !includes[i]) {
                     sinks_.log(this, "Skipping " + systemID, LogLevel.DEBUG);
                     continue;
                 }
