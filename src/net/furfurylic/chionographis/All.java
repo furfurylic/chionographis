@@ -44,7 +44,8 @@ import org.xml.sax.helpers.AttributesImpl;
  */
 public final class All extends Sink implements SinkDriver {
 
-    private String root_;
+    private String root_ = null;
+    private boolean force_ = true;
     private Sinks sinks_;
 
     private QName rootQ_;
@@ -70,6 +71,10 @@ public final class All extends Sink implements SinkDriver {
      */
     public void setRoot(String root) {
         root_ = root;
+    }
+
+    public void setForce(boolean force) {
+        force_ = force;
     }
 
     /**
@@ -129,12 +134,18 @@ public final class All extends Sink implements SinkDriver {
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
             Set<URI> additionalURIs) {
-        boolean[] includes =
-            sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
-        if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
-            Arrays.fill(includes, true);
+        if (force_) {
+            boolean[] result = new boolean[originalSrcURIs.length];
+            Arrays.fill(result, true);
+            return result;
+        } else {
+            boolean[] includes =
+                sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
+            if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
+                Arrays.fill(includes, true);
+            }
+            return includes;
         }
-        return includes;
     }
 
     @Override

@@ -9,6 +9,7 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -16,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,9 +33,7 @@ import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamSource;
-import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathExpressionException;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
@@ -50,6 +48,7 @@ public final class Transform extends Sink implements SinkDriver {
     private Sinks sinks_;
     private String style_;
     private boolean usesCache_;
+    private boolean force_;
     private int paramCount_;
 
     private SAXTransformerFactory tfac_;
@@ -84,6 +83,10 @@ public final class Transform extends Sink implements SinkDriver {
     
     public void setCache(boolean cache) {
         usesCache_ = cache;
+    }
+    
+    public void setForce(boolean force) {
+        force_ = force;
     }
     
     /**
@@ -192,6 +195,12 @@ public final class Transform extends Sink implements SinkDriver {
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
             Set<URI> additionalURIs) {
+        if (force_) {
+            boolean[] result = new boolean[originalSrcURIs.length];
+            Arrays.fill(result, true);
+            return result;
+        }
+        
         if (additionalURIs.isEmpty()) {
             additionalURIs = Collections.<URI>singleton(styleURI_);
         } else {
@@ -258,7 +267,6 @@ public final class Transform extends Sink implements SinkDriver {
                 return new SAXResult(styler);
             }
         } catch (TransformerConfigurationException e) {
-            e.printStackTrace();
             throw new BuildException(e);
         }
     }

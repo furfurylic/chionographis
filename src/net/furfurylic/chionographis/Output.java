@@ -43,6 +43,7 @@ public final class Output extends Sink {
     private Path dest_;
     private boolean mkDirs_;
     private String referent_;
+    private boolean force_;
     private FileNameMapper mapper_;
 
     private Logger logger_;
@@ -119,12 +120,16 @@ public final class Output extends Sink {
      *
      * @see #add(FileNameMapper)
      */
-    public void setRefer(String referent) {
-        referent_ = referent;
+    public void setRefer(String refer) {
+        referent_ = refer;
     }
 
     public void setMkDirs(boolean mkDirs) {
         mkDirs_ = mkDirs;
+    }
+    
+    public void setForce(boolean force) {
+        force_ = force;
     }
 
     /**
@@ -179,28 +184,27 @@ public final class Output extends Sink {
         if (referents_ == null) {
             referents_ = Collections.emptyList();
         }
+
+        destMapping_ = null;
+        if (mapper_ != null) {
+            // There is a mapper and the output path will be decided later using it. 
+            destMapping_ = s -> Arrays.stream(mapper_.mapFileName(s))
+                                    .map(destDir_::resolve)
+                                    .map(Path::toFile)
+                                    .collect(Collectors.toSet());
+        } else if (referents_.isEmpty()) {
+            // There is no mapper and the output path has been already decided. 
+            assert dest_ != null;
+            destMapping_ = s -> Collections.singleton(dest_.toFile());
+        }
     }
 
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
             Set<URI> additionalURIs) {
-        destMapping_ = null;
-        if (mapper_ != null) {
-            destMapping_ = s -> Arrays.stream(mapper_.mapFileName(s))
-                                    .map(destDir_::resolve)
-                                    .map(Path::toFile)
-                                    .collect(Collectors.toSet());
-        } else if (referent_ == null) {
-            if (dest_ != null) {
-                destMapping_ = s -> Collections.singleton(dest_.toFile());
-            } else {
-                referent_ = "";
-            }
-        }
-
         boolean[] includes = new boolean[originalSrcFileNames.length];
 
-        if (referent_ != null) {
+        if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
             return includes;
         }
@@ -246,7 +250,7 @@ public final class Output extends Sink {
             currentContent_.reset();
         }
 
-        if (referent_ == null) {
+        if (referents_.isEmpty()) {
             assert(destMapping_ != null);
             currentDests_.addAll(destMapping_.apply(originalSrcFileName));
         }
@@ -262,7 +266,7 @@ public final class Output extends Sink {
     @Override
     void finishOne(List<String> referredContents) {
         if (!referents_.isEmpty()) {
-            if ((referredContents == null) || (referredContents.get(0) == null)) {
+            if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
                 throw new BuildException(); // TODO: message
             } else if (destMapping_ != null) {
                 currentDests_.addAll(destMapping_.apply(referredContents.get(0)));
