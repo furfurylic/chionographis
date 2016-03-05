@@ -9,8 +9,8 @@ package net.furfurylic.chionographis;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
 import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
@@ -114,7 +115,7 @@ public final class Output extends Sink {
      * You can define prefix-namespace URI mapping entries in
      * {@linkplain Chionographis#createNamespace() the task}.</p>
      *
-     * @param referent
+     * @param refer
      *      an XPath expression which points the source content
      *      needed to decide the output file path.
      *
@@ -152,32 +153,48 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            throw new BuildException(); // TODO: message
+            logger_.log(this, "File mappers added twice", LogLevel.ERR);
+            throw new BuildException();
         }
         mapper_ = mapper;
     }
 
     @Override
     void init(File baseDir, NamespaceContext namespaceContext) {
+        // Configure destDir_ to be an absolute path.
         if (destDir_ == null) {
             destDir_ = baseDir.toPath();
         } else {
             destDir_ = baseDir.toPath().resolve(destDir_);
         }
+
         if (dest_!= null) {
+            // A predefined destination path exists.
             if (referent_ != null) {
                 logger_.log(this, "\"dest\" and \"refer\" can be set exclusively", LogLevel.ERR);
+                throw new BuildException();
+            } else if (mapper_ != null) {
+                logger_.log(this, "\"dest\" and file mappers can be set exclusively", LogLevel.ERR);
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
         } else if (referent_ != null) {
+            // No predefined destination path exists
+            // and specified to refer the source document contents.
             try {
-                referents_ = Collections.singletonList(XPathFactory.newInstance().newXPath().compile(referent_));
+
+                XPath xpath = XPathFactory.newInstance().newXPath();
+                xpath.setNamespaceContext(namespaceContext);
+                referents_ = Collections.singletonList(xpath.compile(referent_));
             } catch (XPathExpressionException e) {
                 logger_.log(this, "Failed to compile XPath expression: " + referent_, LogLevel.ERR);
                 throw new BuildException(e);
             }
         } else if (mapper_ == null) {
+            // No predefined destination path configured,
+            // neither does reference to the source document contents,
+            // neither do file mappers.
+            // -> No clue to decide the output path.
             logger_.log(this, "Neither \"dest\", \"refer\" nor file mappers are set", LogLevel.ERR);
             throw new BuildException();
         }
@@ -185,6 +202,7 @@ public final class Output extends Sink {
             referents_ = Collections.emptyList();
         }
 
+        // Configure destMapping_.
         destMapping_ = null;
         if (mapper_ != null) {
             // There is a mapper and the output path will be decided later using it.
@@ -251,7 +269,7 @@ public final class Output extends Sink {
         }
 
         if (referents_.isEmpty()) {
-            assert(destMapping_ != null);
+            assert destMapping_ != null;
             currentDests_.addAll(destMapping_.apply(originalSrcFileName));
         }
 
@@ -265,28 +283,30 @@ public final class Output extends Sink {
 
     @Override
     void finishOne(List<String> referredContents) {
+        // Make sure currentDests_ fully configured.
         if (!referents_.isEmpty()) {
             if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
-                throw new BuildException(); // TODO: message
+                logger_.log(this, "Cannot decide the output file path", LogLevel.ERR);
+                throw new BuildException();
             } else if (destMapping_ != null) {
                 currentDests_.addAll(destMapping_.apply(referredContents.get(0)));
             } else {
                 currentDests_.add(destDir_.resolve(referredContents.get(0)).toFile());
             }
         }
+
+        // Write the buffer contents to currentDests_.
         try {
-            byte[] content = currentContent_.toByteArray();
             for (File mapped : currentDests_) {
                 if (mkDirs_) {
                     File parent = mapped.getParentFile();
                     if (!parent.exists()) {
-                        mapped.getParentFile().mkdirs();
+                        parent.mkdirs();
                     }
                 }
                 logger_.log(this, "Creating " + mapped.getAbsolutePath(), LogLevel.VERBOSE);
-                try (RandomAccessFile channel = new RandomAccessFile(mapped, "rw")) {
-                    channel.write(content);
-                    channel.setLength(content.length);
+                try (FileOutputStream channel = new FileOutputStream(mapped)) {
+                    currentContent_.writeTo(channel);
                 }
             }
         } catch (IOException e) {

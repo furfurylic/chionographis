@@ -37,6 +37,12 @@ import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+/**
+ * A class that implements SAX {@link EntityResolver} and TrAX {@link URIResolver}
+ * backed by a statically maintained cache.
+ *
+ * <p>The backing cache is thread safe.</p>
+ */
 final class CachingResolver implements EntityResolver, URIResolver {
 
     private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
@@ -45,6 +51,14 @@ final class CachingResolver implements EntityResolver, URIResolver {
     private Consumer<URI> listenStored_;
     private Consumer<URI> listenHit_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param listenStored
+     *      a listener which receives notifications when documents are stored to the cache.
+     * @param listenHit
+     *      a listener which receives notifications when documents in the cache are reused.
+     */
     public CachingResolver(Consumer<URI> listenStored, Consumer<URI> listenHit) {
         listenStored_ = listenStored;
         listenHit_ = listenHit;
@@ -187,15 +201,16 @@ final class CachingResolver implements EntityResolver, URIResolver {
                 }
             }
 
-            // Get the canonicalized form
+            // Get the privately-canonicalized form.
             URI canonicalizedURI = canonicalizeURI(uri);
 
-            // From here uri shall not be in the canonicalized form
+            // From here uri shall not be in the canonicalized form.
             if (canonicalizedURI == uri) {
                 uri = URI.create(uri.toString());
             }
 
             // Lock with privately-canonicalized form
+            // in order to minimize granularity of locks.
             synchronized (canonicalizedURI) {
                 Optional<T> cached = cache_.get(canonicalizedURI);
                 if (cached != null) {

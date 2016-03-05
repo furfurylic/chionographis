@@ -46,26 +46,22 @@ import org.w3c.dom.Document;
 public final class Transform extends Sink implements SinkDriver {
 
     private Sinks sinks_;
-    private String style_;
-    private boolean usesCache_;
-    private boolean force_;
-    private int paramCount_;
+    private String style_ = null;
+    private boolean usesCache_ = false;
+    private boolean force_ = false;
+    private int paramCount_ = 0;
 
     private SAXTransformerFactory tfac_;
     private URI styleURI_;
 
     private Templates stylesheet_;
     private CachingResolver resolver_;
-    private Map<String, Object> params_;
+    private Map<String, Object> params_ = Collections.emptyMap();
 
     private Runnable finisher_;
 
     Transform(Logger logger) {
         sinks_ = new Sinks(logger);
-        style_ = null;
-        usesCache_ = false;
-        paramCount_ = 0;
-        params_ = Collections.<String, Object>emptyMap();
     }
 
     /**
@@ -101,12 +97,16 @@ public final class Transform extends Sink implements SinkDriver {
     }
 
     private void receiveParam(String name, Object value) {
+        if (name.isEmpty()) {
+            sinks_.log(this, "Parameters with empty names are not acceptable", LogLevel.ERR);
+            throw new BuildException();
+        }
         if (params_.isEmpty()) {
             params_ = new TreeMap<>();
         }
         if (params_.put(name, value) != null) {
             sinks_.log(this, "Parameter " + name + " added twice", LogLevel.ERR);
-            throw new BuildException(); // TODO: message
+            throw new BuildException();
         }
     }
 
@@ -169,7 +169,7 @@ public final class Transform extends Sink implements SinkDriver {
                 sinks_.log(this,
                     "  Parameters without values are: " + paramNames.get(), LogLevel.ERR);
             }
-            throw new BuildException(); // TODO: message
+            throw new BuildException();
         }
         Map<String, Object> resolvedParams_ = new TreeMap<>();
         for (Map.Entry<String, Object> e : params_.entrySet()) {
@@ -185,7 +185,7 @@ public final class Transform extends Sink implements SinkDriver {
             }
             if (resolvedParams_.put(name, e.getValue()) != null) {
                 sinks_.log(this, "Parameter " + name + " added twice", LogLevel.ERR);
-                throw new BuildException(); // TODO: message
+                throw new BuildException();
             }
             sinks_.log(this, "Parameter added: " + name + '=' + e.getValue(), LogLevel.VERBOSE);
         }

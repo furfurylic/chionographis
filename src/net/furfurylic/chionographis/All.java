@@ -173,7 +173,8 @@ public final class All extends Sink implements SinkDriver {
             if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
                 handler_.getHandler().startPrefixMapping(
                     rootQ_.getPrefix(), rootQ_.getNamespaceURI());
-                atts.addAttribute("", rootQ_.getPrefix(), "xmlns:" + rootQ_.getPrefix(), "CDATA", rootQ_.getNamespaceURI());
+                atts.addAttribute("", rootQ_.getPrefix(), "xmlns:" + rootQ_.getPrefix(),
+                    "CDATA", rootQ_.getNamespaceURI());
             }
             handler_.getHandler().startElement(
                 rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_, atts);
@@ -197,12 +198,9 @@ public final class All extends Sink implements SinkDriver {
     void abortOne() {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        try {
-            sinks_.abortOne();
-        } catch (BuildException e) {
-            // TODO: Any logging?
-        }
-        throw new BuildException(); // TODO: message
+        sinks_.abortOne();
+        sinks_.log(this, "One of the sources is damaged; must give up all", LogLevel.ERR);
+        throw new BuildException();
     }
 
     @Override
@@ -217,8 +215,15 @@ public final class All extends Sink implements SinkDriver {
         } catch (SAXException e) {
             throw new BuildException(e);
         }
-        // TODO: what if documentCount == 0?
-        sinks_.log(this, "Finishing 1 output containing " + handler_.documentCount() + " input sources ", LogLevel.VERBOSE);
+        if (handler_.documentCount() == 0) {
+            sinks_.log(this,
+                "Finishing 1 output containing no input source",
+                LogLevel.INFO);
+        } else {
+            sinks_.log(this,
+                "Finishing 1 output containing " + handler_.documentCount() + " input sources ",
+                LogLevel.VERBOSE);
+        }
         sinks_.finishOne(Collections.<String>emptyList());
         sinks_.finishBundle();
     }
