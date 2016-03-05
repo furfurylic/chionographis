@@ -11,21 +11,21 @@ import java.util.function.BiConsumer;
 
 /**
  * This class represents one prefix-namespace URI mapping entry.
- * 
+ *
  * @see Chionographis#createNamespace()
  */
 public final class Namespace {
 
     private String prefixOrNamespaceURI_;
     private BiConsumer<String, String> receiver_;
-    
+
     Namespace(BiConsumer<String, String> receiver) {
         receiver_ = receiver;
     }
 
     /**
      * Sets the namespace prefix.
-     * 
+     *
      * @param prefix
      *      the namespace prefix.
      */
@@ -36,7 +36,7 @@ public final class Namespace {
 
     /**
      * Sets the namespace URI.
-     * 
+     *
      * @param namespaceURI
      *      the namespace URI.
      */

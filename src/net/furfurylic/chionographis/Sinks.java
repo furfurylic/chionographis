@@ -42,18 +42,18 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     /**
      * {@code includes_[i][j]} tells whether {@code sinks_.get(i)} wants the source indexed by
      * {@code j} to be processed.
-     * 
+     *
      * <p>This field is maintained by {@link #init(File, URI[], String[], Set)} method.
      */
     private boolean[][] includes_;
 
     /**
      * Sinks which receives the resulted document of which processing is undergoing.
-     * 
+     *
      * <p>This field is maintained by {@link #startOne(int, String)} method.
      */
     private List<Sink> activeSinks_;
-    
+
     private int[] referentCounts_;
 
     public Sinks(Logger logger) {
@@ -65,7 +65,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     public void log(Object issuer, String message, LogLevel level) {
         logger_.log(issuer, message, level);
     }
-    
+
     @Override
     public Transform createTransform() {
         Transform sink = new Transform(logger_);

@@ -1,5 +1,5 @@
 <x>
-	<a>
-		<b><?chionographis-output output3a.xml?>Here B goes</b>
-	</a>
+  <a>
+    <b><?chionographis-output output3a.xml?>Here B goes</b>
+  </a>
 </x>
