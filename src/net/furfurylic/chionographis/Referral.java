@@ -11,6 +11,17 @@ import org.w3c.dom.Node;
 
 final class Referral {
 
+    /**
+     * Extracts string values from XPath expressions.
+     *
+     * @param node
+     *      a node to apply the XPath expressions.
+     * @param referents
+     *      the XPath expressions.
+     *
+     * @return
+     *      the extracted string values arranged in a list in the same order than <i>referents</i>.
+     */
     public static List<String> extract(Node node, List<XPathExpression> referents) {
         List<String> referredContents;
         referredContents = referents.stream().map(r -> {
