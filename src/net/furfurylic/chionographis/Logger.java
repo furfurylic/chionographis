@@ -12,5 +12,5 @@ import org.apache.tools.ant.types.LogLevel;
 interface Logger {
 
     void log(Object issuer, String message, LogLevel level);
-    
+
 }

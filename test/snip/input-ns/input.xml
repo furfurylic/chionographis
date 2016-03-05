@@ -1,5 +1,5 @@
 <c:r xmlns:c="http://www.furfurylic.net/chionographis/test">
-	<c:a><?chionographis-output output1.xml?>a</c:a>
-	<c:a><?chionographis-output output2.xml?>a</c:a>
-	<c:a><?chionographis-output output3.xml?>a</c:a>
+  <c:a><?chionographis-output output1.xml?>a</c:a>
+  <c:a><?chionographis-output output2.xml?>a</c:a>
+  <c:a><?chionographis-output output3.xml?>a</c:a>
 </c:r>

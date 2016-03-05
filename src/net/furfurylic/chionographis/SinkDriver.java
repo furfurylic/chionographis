@@ -9,7 +9,7 @@ package net.furfurylic.chionographis;
 
 /**
  * A <i>sink driver</i> holds one or more <i>sinks</i> and passes processed documents to them.
- * 
+ *
  * <p>Some sink drivers can be sinks held by other sink drivers. In this way
  * process-after-process chains can be formed.</p>
  */
@@ -17,7 +17,7 @@ public interface SinkDriver {
 
     /**
      * Adds an <i>Transform</i> sink which consumes the output of this driver object.
-     * 
+     *
      * @return
      *      a <i>Transform</i> sink object.
      */
@@ -25,7 +25,7 @@ public interface SinkDriver {
 
     /**
      * Adds an <i>All</i> sink which consumes the output of this driver object.
-     * 
+     *
      * @return
      *      a <i>all</i> sink object.
      */
@@ -33,7 +33,7 @@ public interface SinkDriver {
 
     /**
      * Adds an <i>Snip</i> sink which consumes the output of this driver object.
-     * 
+     *
      * @return
      *      a <i>snip</i> sink object.
      */
@@ -41,7 +41,7 @@ public interface SinkDriver {
 
     /**
      * Adds an <i>Output</i> sink which consumes the output of this driver object.
-     * 
+     *
      * @return
      *      a <i>output</i> sink object.
      */
