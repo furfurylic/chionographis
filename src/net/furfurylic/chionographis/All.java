@@ -37,8 +37,8 @@ import org.xml.sax.helpers.AttributesImpl;
 /**
  * An <i>All</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} collects
  * all source documents up into an document.
- *  
- * <p>The resulted document has all elements of the document elements of the source documents 
+ *
+ * <p>The resulted document has all elements of the document elements of the source documents
  * supplied to this object by the driver as the direct child nodes of the document element of the
  * resulted document.</p>
  */
@@ -57,12 +57,12 @@ public final class All extends Sink implements SinkDriver {
 
     /**
      * Sets the name of document element of the resulted document.
-     * 
+     *
      * <p>The name is able to be specified in the following three ways:</p>
      * <ul>
      * <li>{@code localName} - an name that doesn't belong any namespaces.</li>
      * <li>{@code {namespaceURI}localName} - an name within an namespace.</li>
-     * <li>{@code prefix:localName} - an name within an namespace, which is 
+     * <li>{@code prefix:localName} - an name within an namespace, which is
      *      {@linkplain Chionographis#createNamespace() mapped from the prefix in the task}.</li>
      * </ul>
      *
@@ -124,7 +124,7 @@ public final class All extends Sink implements SinkDriver {
         if (rootQ_ == null) {
             rootQ_ = QName.valueOf(root_);
             if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                rootQ_ = new QName(rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), "all"); 
+                rootQ_ = new QName(rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), "all");
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
@@ -185,7 +185,7 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName) {
-        sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);        
+        sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
         return new SAXResult(handler_);
     }
 
@@ -239,7 +239,7 @@ public final class All extends Sink implements SinkDriver {
         public int documentCount() {
             return count_;
         }
-        
+
         public ContentHandler getHandler() {
             return contentHandler_;
         }
@@ -340,7 +340,7 @@ public final class All extends Sink implements SinkDriver {
             if (currentLocator_ != null) {
                 return currentLocator_.getPublicId();
             } else {
-                return null;                
+                return null;
             }
         }
 
@@ -349,7 +349,7 @@ public final class All extends Sink implements SinkDriver {
             if (currentLocator_ != null) {
                 return currentLocator_.getSystemId();
             } else {
-                return null;                
+                return null;
             }
         }
 
@@ -358,7 +358,7 @@ public final class All extends Sink implements SinkDriver {
             if (currentLocator_ != null) {
                 return currentLocator_.getLineNumber();
             } else {
-                return -1;                
+                return -1;
             }
         }
 
@@ -367,7 +367,7 @@ public final class All extends Sink implements SinkDriver {
             if (currentLocator_ != null) {
                 return currentLocator_.getColumnNumber();
             } else {
-                return -1;                
+                return -1;
             }
         }
     }

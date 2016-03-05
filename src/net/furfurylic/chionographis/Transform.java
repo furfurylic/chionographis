@@ -59,7 +59,7 @@ public final class Transform extends Sink implements SinkDriver {
     private Map<String, Object> params_;
 
     private Runnable finisher_;
-    
+
     Transform(Logger logger) {
         sinks_ = new Sinks(logger);
         style_ = null;
@@ -67,12 +67,12 @@ public final class Transform extends Sink implements SinkDriver {
         paramCount_ = 0;
         params_ = Collections.<String, Object>emptyMap();
     }
-    
+
     /**
      * Sets the URI of the XSLT stylesheet. If the given string represents a relative URI,
      * it is resolved by {@linkplain Chionographis#setBaseDir(String)
      * the base directory of the task} to a file path.
-     * 
+     *
      * @param style
      *      the URI of the XSLT stylesheet.
      */
@@ -80,18 +80,18 @@ public final class Transform extends Sink implements SinkDriver {
         style_ = style;
     }
     // TODO: Make this class able to accept non-file stylesheet URI
-    
+
     public void setCache(boolean cache) {
         usesCache_ = cache;
     }
-    
+
     public void setForce(boolean force) {
         force_ = force;
     }
-    
+
     /**
      * Adds a stylesheet parameter.
-     * 
+     *
      * @return
      *      an empty stylesheet parameter.
      */
@@ -99,7 +99,7 @@ public final class Transform extends Sink implements SinkDriver {
         ++paramCount_;
         return new Param(this::receiveParam);
     }
-    
+
     private void receiveParam(String name, Object value) {
         if (params_.isEmpty()) {
             params_ = new TreeMap<>();
@@ -109,7 +109,7 @@ public final class Transform extends Sink implements SinkDriver {
             throw new BuildException(); // TODO: message
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -148,7 +148,7 @@ public final class Transform extends Sink implements SinkDriver {
     @Override
     void init(File baseDir, NamespaceContext namespaceContext) {
         examineParams(namespaceContext);
-                
+
         styleURI_ = URI.create(style_);
         if (!styleURI_.isAbsolute()) {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
@@ -185,9 +185,9 @@ public final class Transform extends Sink implements SinkDriver {
             }
             if (resolvedParams_.put(name, e.getValue()) != null) {
                 sinks_.log(this, "Parameter " + name + " added twice", LogLevel.ERR);
-                throw new BuildException(); // TODO: message                
+                throw new BuildException(); // TODO: message
             }
-            sinks_.log(this, "Parameter added: " + name + '=' + e.getValue(), LogLevel.VERBOSE);            
+            sinks_.log(this, "Parameter added: " + name + '=' + e.getValue(), LogLevel.VERBOSE);
         }
         params_ = resolvedParams_;
     }
@@ -200,13 +200,13 @@ public final class Transform extends Sink implements SinkDriver {
             Arrays.fill(result, true);
             return result;
         }
-        
+
         if (additionalURIs.isEmpty()) {
             additionalURIs = Collections.<URI>singleton(styleURI_);
         } else {
             additionalURIs = new HashSet<>(additionalURIs);
             additionalURIs.add(styleURI_);
-            additionalURIs = Collections.unmodifiableSet(additionalURIs); 
+            additionalURIs = Collections.unmodifiableSet(additionalURIs);
         }
         return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
     }

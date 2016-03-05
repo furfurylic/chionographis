@@ -62,10 +62,10 @@ public final class Output extends Sink {
      * Sets the destination directory. If the given string represents an relative path,
      * it is resolved by {@linkplain Chionographis#setBaseDir(String)
      * the one of the task}.
-     * 
+     *
      * <p>By default, the destination directory is identical to {@linkplain
      * Chionographis#setBaseDir(String) the one of the task}.</p>
-     *   
+     *
      * @param destDir
      *      the destination directory.
      */
@@ -77,12 +77,12 @@ public final class Output extends Sink {
      * Sets the destination file path. If the given string represents an relative path,
      * it is resolved by {@linkplain #setDestDir(String) the destination directory}.
      *
-     * <p>When a destination file path is set, all outputs result to be written 
+     * <p>When a destination file path is set, all outputs result to be written
      * into the same single file.
      * If it is not desirable, don't specify the destination file path by this method,
      * instead {@linkplain #add(FileNameMapper) install an file mapper} and/or
-     * {@linkplain #setRefer(String) configure to require the content of the source}.</p> 
-     *  
+     * {@linkplain #setRefer(String) configure to require the content of the source}.</p>
+     *
      * @param dest
      *      the destination file path.
      */
@@ -96,22 +96,22 @@ public final class Output extends Sink {
      *
      * <p>If set, the driver of this object searchs the pointed content in the source document.
      * If one is found, the driver reports its string value to this object.</p>
-     * 
+     *
      * <p>The "source documents" in above paragraph are different depending on the drivers.
-     * For the {@linkplain Chionographis task} and <i>{@linkplain Snip Snip}</i> drivers, 
+     * For the {@linkplain Chionographis task} and <i>{@linkplain Snip Snip}</i> drivers,
      * the source documents in which the PI is searched for are the same as their output.
      * On the other hand, for {@linkplain Transform Transform} drivers, they are the literally the
      * source documents (i.e., the documents not styled by the XSLT stylesheets yet).
      * And <i>{@linkplain All All}</i> drivers don't do any search because they don't have any
      * particular one source document.</p>
-     * 
+     *
      * <p>This object uses the reported data as if it is set by {@link #setDest(String)}
-     * (when no file mapper install) or as if the source file name for the file mapper 
+     * (when no file mapper install) or as if the source file name for the file mapper
      * (when {@linkplain #add(FileNameMapper) they are installed}).</p>
      *
      * <p>If the XPath expression contains names within namespaces, the names shall be accompanied
      * by namespace prefixes as specified in XPath specification.
-     * You can define prefix-namespace URI mapping entries in 
+     * You can define prefix-namespace URI mapping entries in
      * {@linkplain Chionographis#createNamespace() the task}.</p>
      *
      * @param referent
@@ -127,7 +127,7 @@ public final class Output extends Sink {
     public void setMkDirs(boolean mkDirs) {
         mkDirs_ = mkDirs;
     }
-    
+
     public void setForce(boolean force) {
         force_ = force;
     }
@@ -135,18 +135,18 @@ public final class Output extends Sink {
     /**
      * Installs a file mapper.
      * The file mapper maps a source file name to an destination file name.
-     * If the result is not an absolute file path, then it is resolved by {@linkplain 
+     * If the result is not an absolute file path, then it is resolved by {@linkplain
      * #setDestDir(String) the destination directory}.
-     * 
-     * <p>In above paragraph, a "source file name" is the source file name literally 
+     *
+     * <p>In above paragraph, a "source file name" is the source file name literally
      * (when {@linkplain #setRefer(String) the content of the source is not used}),
      * or the source document content found in the source document (otherwise).</p>
-     * 
+     *
      * @param mapper
      *      a file mapper to be installed.
      *
      * @see #setRefer(String)
-     * 
+     *
      * @throws BuildException
      *      if an mapper has been already installed.
      */
@@ -187,13 +187,13 @@ public final class Output extends Sink {
 
         destMapping_ = null;
         if (mapper_ != null) {
-            // There is a mapper and the output path will be decided later using it. 
+            // There is a mapper and the output path will be decided later using it.
             destMapping_ = s -> Arrays.stream(mapper_.mapFileName(s))
                                     .map(destDir_::resolve)
                                     .map(Path::toFile)
                                     .collect(Collectors.toSet());
         } else if (referents_.isEmpty()) {
-            // There is no mapper and the output path has been already decided. 
+            // There is no mapper and the output path has been already decided.
             assert dest_ != null;
             destMapping_ = s -> Collections.singleton(dest_.toFile());
         }
@@ -209,15 +209,15 @@ public final class Output extends Sink {
             return includes;
         }
         assert(destMapping_ != null);
-        
-        boolean hasNonFile = additionalURIs.stream().anyMatch(u -> !u.getScheme().equals("file")); 
+
+        boolean hasNonFile = additionalURIs.stream().anyMatch(u -> !u.getScheme().equals("file"));
 
         long additionalLastModified = hasNonFile ? Long.MAX_VALUE :
             additionalURIs.stream()
                 .mapToLong(u -> new File(u).lastModified())
                 .max()
                 .orElse(Long.MIN_VALUE);
-               
+
         for (int i = 0; i < originalSrcURIs.length; ++i) {
             if (originalSrcURIs[i].getScheme().equals("file")) {
                 long srcLastModified = new File(originalSrcURIs[i]).lastModified();
@@ -230,7 +230,7 @@ public final class Output extends Sink {
             } else {
                 includes[i] = true;
             }
-        }            
+        }
 
         return includes;
     }

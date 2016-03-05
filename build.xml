@@ -1,39 +1,41 @@
 <project name="chionographis" default="release">
 
-	<target name="release">
-		<sequential>
-			<delete dir="release/classes"/>
-			<mkdir dir="release/classes"/>
-			<javac srcdir="src" includes="net/furfurylic/chionographis/**/*.java" destdir="release/classes" nowarn="yes" source="1.8" debug="yes" debuglevel="source,lines" includeantruntime="yes"/>
-			<delete dir="release/lib"/>
-			<mkdir dir="release/lib"/>
-			<jar destfile="release/lib/chionographis.jar" basedir="release/classes" includes="**/*" update="false" filesonly="true" index="yes">
-				<manifest><attribute name="Sealed" value="true"/></manifest>
-			</jar>
-		</sequential>
-	</target>
+  <target name="release">
+    <sequential>
+      <delete dir="release/classes" />
+      <mkdir dir="release/classes" />
+      <javac srcdir="src" includes="net/furfurylic/chionographis/**/*.java"
+        destdir="release/classes" nowarn="yes" source="1.8" debug="yes"
+        debuglevel="source,lines" includeantruntime="yes" />
+      <delete dir="release/lib" />
+      <mkdir dir="release/lib" />
+      <jar destfile="release/lib/chionographis.jar" basedir="release/classes"
+        includes="**/*" update="false" filesonly="true" index="yes">
+        <manifest>
+          <attribute name="Sealed" value="true" />
+        </manifest>
+      </jar>
+    </sequential>
+  </target>
 
-	<target name="doc">
-		<delete dir="release/doc"/>
-		<mkdir dir="release/doc"/>
-		<javadoc locale="en"
-		         packagenames="net.furfurylic.chionographis.*" sourcepath="src" destdir="release/doc"
-		         encoding="UTF-8" docencoding="UTF-8" charset="UTF-8"
-		         windowtitle="Chionographis API Specification" doctitle="Chionographis API Specification" header="Chionographis API"
-			     classpath="${ant.home}/lib/ant.jar"
-		         use="yes"/>
-	</target>
+  <target name="doc">
+    <delete dir="release/doc" />
+    <mkdir dir="release/doc" />
+    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
+      sourcepath="src" destdir="release/doc" encoding="UTF-8" docencoding="UTF-8"
+      charset="UTF-8" windowtitle="Chionographis API Specification"
+      doctitle="Chionographis API Specification" header="Chionographis API"
+      classpath="${ant.home}/lib/ant.jar" use="yes" />
+  </target>
 
-	<target name="doc-devel">
-		<delete dir="devel/doc"/>
-		<mkdir dir="devel/doc"/>
-		<javadoc locale="en"
-		         packagenames="net.furfurylic.chionographis.*" sourcepath="src" destdir="devel/doc"
-		         encoding="UTF-8" docencoding="UTF-8" charset="UTF-8"
-		         windowtitle="Chionographis API Specification" doctitle="Chionographis API Specification for developers" header="Chionographis API for developers"
-			     classpath="${ant.home}/lib/ant.jar"
-				 access="package"
-		         use="yes"/>
-	</target>
+  <target name="doc-devel">
+    <delete dir="devel/doc" />
+    <mkdir dir="devel/doc" />
+    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
+      sourcepath="src" destdir="devel/doc" encoding="UTF-8" docencoding="UTF-8"
+      charset="UTF-8" windowtitle="Chionographis API Specification"
+      doctitle="Chionographis API Specification for developers" header="Chionographis API for developers"
+      classpath="${ant.home}/lib/ant.jar" access="package" use="yes" />
+  </target>
 
 </project>

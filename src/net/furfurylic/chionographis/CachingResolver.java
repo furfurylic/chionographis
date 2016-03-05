@@ -41,10 +41,10 @@ final class CachingResolver implements EntityResolver, URIResolver {
 
     private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
     private static final NetResourceCache<Source> TREES = new NetResourceCache<>();
-    
+
     private Consumer<URI> listenStored_;
     private Consumer<URI> listenHit_;
-    
+
     public CachingResolver(Consumer<URI> listenStored, Consumer<URI> listenHit) {
         listenStored_ = listenStored;
         listenHit_ = listenHit;
@@ -93,7 +93,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             InputSource inputSource = new InputSource(new ByteArrayInputStream(cached.get()));
             inputSource.setSystemId(systemId);
             inputSource.setPublicId(publicId);
-            return inputSource;            
+            return inputSource;
         } else {
             return null;
         }
@@ -129,10 +129,10 @@ final class CachingResolver implements EntityResolver, URIResolver {
 
     /**
      * Normalizes a URI in terms of its logical content.
-     * 
+     *
      * @param uri
      *      a URI to normalize.
-     *      
+     *
      * @return
      *      the normalized URI.
      */
@@ -144,7 +144,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
         if (uri.getScheme().toLowerCase().equals("file")) {
             // Afraid that omission of "xx/../" may break path meanings for symbolic links
             try {
-                uri = Paths.get(uri).toRealPath().toUri();                    
+                uri = Paths.get(uri).toRealPath().toUri();
             } catch (IOException e) {
                 return null;
             }
@@ -153,7 +153,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
         }
         return uri;
     }
-    
+
     private static class NetResourceCache<T> {
 
         private final Object LOCK = new Object();
@@ -165,9 +165,9 @@ final class CachingResolver implements EntityResolver, URIResolver {
         private Map<URI, Optional<T>> cache_;
 
         /**
-         * 
+         *
          * @param uri
-         *      a URI. 
+         *      a URI.
          * @param factory
          *      a factory function which make an object from a URI.
          *
@@ -179,22 +179,22 @@ final class CachingResolver implements EntityResolver, URIResolver {
                 Function<URI, ? extends T> factory) {
             assert uri != null;
             assert uri.isAbsolute();
-            
+
             synchronized (LOCK) {
                 if (cache_ == null) {
                     canonURIs_ = Collections.synchronizedMap(new WeakHashMap<URI, URI>());
                     cache_ = Collections.synchronizedMap(new IdentityHashMap<>());
                 }
-            }        
+            }
 
             // Get the canonicalized form
             URI canonicalizedURI = canonicalizeURI(uri);
-            
+
             // From here uri shall not be in the canonicalized form
             if (canonicalizedURI == uri) {
                 uri = URI.create(uri.toString());
             }
-            
+
             // Lock with privately-canonicalized form
             synchronized (canonicalizedURI) {
                 Optional<T> cached = cache_.get(canonicalizedURI);
@@ -215,14 +215,14 @@ final class CachingResolver implements EntityResolver, URIResolver {
                 }
                 return cached;
             }
-        }        
+        }
 
         /**
-         * Canonicalizes a URI so that URIs which have the same logical content are one same object. 
-         * 
+         * Canonicalizes a URI so that URIs which have the same logical content are one same object.
+         *
          * @param uri
          *      a URI to canonicalize.
-         *      
+         *
          * @return
          *      the canonicalized form of the URI,
          *      which is different object from the parameter <i>uri</i>

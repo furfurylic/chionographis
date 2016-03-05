@@ -51,8 +51,8 @@ import org.xml.sax.XMLReader;
 /**
  * An Ant task class that performs cascading transformation to XML documents.
  * As of now, only files can be original sources of the processing.
- * 
- * <p>An object of this class behaves as a <i>sink driver</i>.</p> 
+ *
+ * <p>An object of this class behaves as a <i>sink driver</i>.</p>
  */
 public final class Chionographis extends MatchingTask implements SinkDriver {
 
@@ -81,15 +81,15 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         prefixCount_ = 0;
         prefixMap_ = new TreeMap<>();
     }
-    
+
     /**
      * Sets the base directory of this task. If this is an relative path,
      * it is resolved by the project's base directory.
-     * 
+     *
      * <p>By default, the base directory is identical to the project's base directory.</p>
-     * 
+     *
      * @param baseDir
-     *      the base directory of this task. 
+     *      the base directory of this task.
      */
     public void setBaseDir(String baseDir) {
         baseDir_ = Paths.get(baseDir);
@@ -98,10 +98,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     /**
      * Sets the original source directory. If this is an relative path,
      * it is resolved by {@linkplain #setBaseDir(String) this task's base directory}.
-     * 
+     *
      * <p>By default, the original source directory is identical to {@linkplain
      * Chionographis#setBaseDir(String) this task's base directory}.</p>
-     *   
+     *
      * @param srcDir
      *      the original source directory.
      */
@@ -124,10 +124,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      * XPaths of their criteria includes namespace prefixes. <i>{@linkplain All}</i> and
      * <i>{@linkplain Transform}</i> sinks also can refer this mapping information, however,
      * it is not mandatory (they can use {@code "{namespaceURI}localName"} notation).</p>
-     * 
+     *
      * @return
      *      an empty prefix-namespace URI mapping entry.
-     * 
+     *
      * @see Snip#setSelect(String)
      * @see All#setRoot(String)
      * @see Transform#createParam()
@@ -137,15 +137,15 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         ++prefixCount_;
         return new Namespace(this::receiveNamespace);
     }
-    
+
     /**
      * Receives a possibly imperfect prefix-namespace mapping entry.
      *
      * <p>This method is invoked by {@link Namespace#setPrefix(String)}.</p>
-     * 
+     *
      * <p>One prefix can be invoked twice at most, and then in the first call <i>namespaceURI</i>
      * must be {@code null}.</p>
-     * 
+     *
      * @param prefix
      *      the namespace prefix, which shall not be {@code null}.
      * @param namespaceURI
@@ -165,7 +165,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 "Namespace prefix added: " + prefix + '=' + namespaceURI, LogLevel.VERBOSE);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -200,7 +200,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
     // TODO: Make this task configurable to log level escalation (e.g. VERBOSE -> INFO)
     // TODO: Make this task able to accept soures other than files
-    
+
     /**
      * Performs cascading XML document transformation.
      */
@@ -255,7 +255,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 parser = pfac.newSAXParser();
                 identity = TransformerFactory.newInstance().newTransformer();
             }
-           
+
             sinks_.init(baseDir_.toFile(), namespaceContext);
             // TODO: pass SAXTransformerFactory
 
@@ -308,7 +308,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         sinks_.log(this, "  Referred source data: "
                             + Referral.join(referredContents), LogLevel.DEBUG);
                         source = new DOMSource(document, systemID);
-                        
+
                     } else {
                         XMLReader reader = parser.getXMLReader();
                         sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
@@ -352,7 +352,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                                             .map(e -> e.getKey())
                                             .reduce((r, s) -> r += ", " + s);
             if (paramNames.isPresent()) {
-                sinks_.log(this, 
+                sinks_.log(this,
                     "  Namespace prefixes without names are: " + paramNames.get(), LogLevel.ERR);
             }
             throw new BuildException(); // TODO: message
@@ -368,23 +368,23 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         public void log(Object issuer, String message, LogLevel level) {
             try (Formatter formatter = new Formatter()) {
                 String className = issuer.getClass().getSimpleName();
-                formatter.format("%13s(%08x): %s", 
+                formatter.format("%13s(%08x): %s",
                     className.substring(0, Math.min(13, className.length())),
                     System.identityHashCode(issuer),
                     message);
                 Chionographis.this.log(formatter.toString(), level.getLevel());
             }
-        }       
+        }
     }
-    
+
     private static final class PrefixMap implements NamespaceContext {
-        
+
         Map<String, String> prefixMap_;
-        
+
         public PrefixMap(Map<String, String> prefixMap) {
             prefixMap_ = prefixMap;
         }
-        
+
         @Override
         public String getNamespaceURI(String prefix) {
             return prefixMap_.get(prefix);
@@ -412,6 +412,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 .map(e -> e.getKey())
                 .iterator();
         }
-        
+
     }
 }
