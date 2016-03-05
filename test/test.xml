@@ -13,12 +13,14 @@
 		<antcall target="transform-params-ns"/>
 		<antcall target="transform-refer-content"/>
 		<antcall target="transform-not-up-to-date"/>
+		<antcall target="transform-force"/>
 		<antcall target="all"/>
 		<antcall target="all-up-to-date"/>
 		<antcall target="all-ns"/>
+		<antcall target="all-force"/>
 		<antcall target="snip-1"/>
 		<antcall target="snip-2"/>
-		<antcall target="snip-3"/>
+		<antcall target="snip-ns"/>
 		<antcall target="crossing-cache"/>
 	</target>
 	
@@ -112,6 +114,7 @@
 		<copy file="basic/input/input2.xml" tofile="basic/output-force-output/input2.xml"/>
 		<touch file="basic/output-force-output/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
 
+		<!-- output1 shall not be processed and output2 shall be processed -->
 		<chionographis srcdir="basic/output-force-output" includes="input*.xml">
 			<output destdir="basic/output-force-output" force="yes">
 				<globmapper from="input*.xml" to="output*.xml"/>
@@ -144,6 +147,7 @@
 		<copy file="basic/input/input2.xml" tofile="basic/output-force-task/input2.xml"/>
 		<touch file="basic/output-force-task/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
 
+		<!-- output1 shall not be processed and output2 shall be processed -->
 		<chionographis srcdir="basic/output-force-task" includes="input*.xml" force="yes">
 			<output destdir="basic/output-force-task">
 				<globmapper from="input*.xml" to="output*.xml"/>
@@ -235,12 +239,18 @@
 	<target name="transform-not-up-to-date">
 		<delete dir="transform/output-not-up-to-date"/>
 		<mkdir dir="transform/output-not-up-to-date"/>
+
 		<touch file="transform/output-not-up-to-date/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+		<!-- input: older -->
 		<copy file="transform/input/input.xml" todir="transform/output-not-up-to-date"/>
 		<touch file="transform/output-not-up-to-date/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+		<!-- style: newer -->
 		<copy file="flatten.xsl" todir="transform/output-not-up-to-date"/>
 		<touch file="transform/output-not-up-to-date/flatten.xsl" datetime="01/01/2001 00:01:20 AM"/>
 
+		<!-- Shall be processed -->
 		<chionographis basedir="transform" includes="input/input.xml">
 			<transform style="output-not-up-to-date/flatten.xsl">
 				<output dest="output-not-up-to-date/actual.txt" mkdirs="yes"/>
@@ -252,6 +262,34 @@
 		</fail>
 
 		<delete dir="transform/output-not-up-to-date"/>
+	</target>
+
+	<target name="transform-force">
+		<delete dir="transform/output-force"/>
+		<mkdir dir="transform/output-force"/>
+
+		<touch file="transform/output-force/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+		<!-- input: older -->
+		<copy file="transform/input/input.xml" todir="transform/output-force"/>
+		<touch file="transform/output-force/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+		<!-- style: older -->
+		<copy file="flatten.xsl" todir="transform/output-force"/>
+		<touch file="transform/output-force/flatten.xsl" datetime="01/01/2001 00:00:50 AM"/>
+
+		<!-- Shall be processed -->
+		<chionographis basedir="transform" includes="input/input.xml">
+			<transform style="output-force/flatten.xsl" force="yes">
+				<output dest="output-force/actual.txt" mkdirs="yes"/>
+			</transform>
+		</chionographis>
+
+		<fail message="Failed test: transform-force">
+			<condition><not><filesmatch file1="transform/input/expected.txt" file2="transform/output-force/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="transform/output-force"/>
 	</target>
 
 	<target name="all">
@@ -274,13 +312,17 @@
 	<target name="all-up-to-date">
 		<delete dir="all/output-up-to-date"/>
 		<mkdir dir="all/output-up-to-date"/>
+
 		<touch file="all/output-up-to-date/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+		<!-- input1 and 2: older -->
 		<copy todir="all/output-up-to-date"><fileset dir="all/input" includes="*.xml"/></copy>
 		<touch file="all/output-up-to-date/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
 		<touch file="all/output-up-to-date/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
 
+		<!-- Shall not be processed -->
 		<chionographis basedir="all" includes="output-up-to-date/input*.xml">
-			<all root="q">
+			<all root="q" force="no">
 				<output dest="output-up-to-date/output.xml"/>
 			</all>
 		</chionographis>
@@ -316,6 +358,32 @@
 		</fail>
 
 		<delete dir="all/output-ns"/>
+	</target>
+
+	<target name="all-force">
+		<delete dir="all/output-force"/>
+		<mkdir dir="all/output-force"/>
+
+		<touch file="all/output-force/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+		<!-- input1 and 2: older -->
+		<copy todir="all/output-force"><fileset dir="all/input" includes="*.xml"/></copy>
+		<touch file="all/output-force/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+		<touch file="all/output-force/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+		<!-- Shall BE processed -->
+		<chionographis basedir="all" includes="output-force/input*.xml">
+			<all root="q">
+				<output dest="output-force/output.xml"/>
+			</all>
+		</chionographis>
+
+		<xslt style="${basedir}/flatten.xsl" in="all/output-force/output.xml" out="all/output-force/actual.txt"/>
+		<fail message="Failed test: all-force">
+			<condition><not><filesmatch file1="all/input/expected.txt" file2="all/output-force/actual.txt"/></not></condition>
+		</fail>
+
+		<delete dir="all/output-force"/>
 	</target>
 
 	<target name="snip-1">
@@ -365,25 +433,25 @@
 		<delete dir="snip/output2"/>
 	</target>
 
-	<target name="snip-3">
-		<delete dir="snip/output3"/>
+	<target name="snip-ns">
+		<delete dir="snip/output-ns"/>
 
-		<chionographis srcdir="snip/input3" includes="*.xml">
+		<chionographis srcdir="snip/input-ns" includes="*.xml">
 			<namespace prefix="q">http://www.furfurylic.net/chionographis/test</namespace>
 			<snip select="//q:a[2]">
-				<output destdir="snip/output3" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
+				<output destdir="snip/output-ns" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
 			</snip>
 		</chionographis>
 
-		<xslt style="${basedir}/flatten.xsl" basedir="snip/output3" destdir="snip/output3" includes="*.xml">
+		<xslt style="${basedir}/flatten.xsl" basedir="snip/output-ns" destdir="snip/output-ns" includes="*.xml">
 			<globmapper from="output*.xml" to="actual*.txt"/>
 		</xslt>
 
 		<fail message="Failed test: snip-3">
-			<condition><not><filesmatch file1="snip/input3/expected2.txt" file2="snip/output3/actual2.txt"/></not></condition>
+			<condition><not><filesmatch file1="snip/input-ns/expected2.txt" file2="snip/output-ns/actual2.txt"/></not></condition>
 		</fail>
 
-		<delete dir="snip/output3"/>
+		<delete dir="snip/output-ns"/>
 	</target>
 
 	<target name="crossing-cache">
