@@ -67,6 +67,11 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
+    public void log(Object issuer, String message, Throwable ex, LogLevel level) {
+        logger_.log(issuer, message, ex, level);
+    }
+
+    @Override
     public Transform createTransform() {
         Transform sink = new Transform(logger_);
         sinks_.add(sink);
@@ -100,7 +105,8 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames, Set<URI> additionalURIs) {
+    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
+                Set<URI> additionalURIs) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
             .map(s -> s.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs))

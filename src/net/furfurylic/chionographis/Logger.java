@@ -13,4 +13,5 @@ interface Logger {
 
     void log(Object issuer, String message, LogLevel level);
 
+    void log(Object issuer, String message, Throwable ex, LogLevel level);
 }

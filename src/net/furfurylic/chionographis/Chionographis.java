@@ -15,11 +15,11 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -58,12 +58,12 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
     private Path srcDir_;
     private Path baseDir_;
-    private boolean usesCache_;
-    private boolean force_;
-    private int prefixCount_;
+    private boolean usesCache_ = false;
+    private boolean force_ = false;
+    private int prefixCount_ = 0;
 
-    private Map<String, String> prefixMap_;
-    private Sinks sinks_;
+    private Map<String, String> prefixMap_ = Collections.emptyMap();
+    private Sinks sinks_ = new Sinks(new ChionographisLogger());
 
     /**
      * Sole constructor.
@@ -77,9 +77,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      */
     @Override
     public void init() {
-        sinks_ = new Sinks(new ChionographisLogger());
-        prefixCount_ = 0;
-        prefixMap_ = new TreeMap<>();
     }
 
     /**
@@ -152,13 +149,20 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      *      the namespace URI, which may be {@code null}.
      */
     private void receiveNamespace(String prefix, String namespaceURI) {
+        if (prefix.isEmpty()) {
+            sinks_.log(this, "Empty namespace prefixes are not acceptable", LogLevel.ERR);
+            throw new BuildException();
+        }
         if ((prefix.length() >= 3) && prefix.substring(0, 3).toLowerCase().equals("xml")) {
             sinks_.log(this, "Bad namespace prefix: " + prefix, LogLevel.ERR);
-            throw new BuildException(); // TODO: message
+            throw new BuildException();
+        }
+        if (prefixMap_.isEmpty()) {
+            prefixMap_ = new HashMap<>();
         }
         if (prefixMap_.put(prefix, namespaceURI) != null) {
             sinks_.log(this, "Namespace prefix " + prefix + " mapped twice", LogLevel.ERR);
-            throw new BuildException(); // TODO: message
+            throw new BuildException();
         }
         if (namespaceURI != null) {
             sinks_.log(this,
@@ -262,7 +266,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             // Tell whether destinations are older.
             boolean[] includes = null;
             if (!force_) {
-                boolean[] examined = sinks_.preexamineBundle(includedURIs, includedFiles, Collections.<URI>emptySet());
+                boolean[] examined = sinks_.preexamineBundle(
+                    includedURIs, includedFiles, Collections.<URI>emptySet());
                 if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
                     sinks_.log(this, "No input sources processed", LogLevel.INFO);
                     sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
@@ -298,7 +303,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     List<XPathExpression> referents = sinks_.referents();
                     List<String> referredContents = Collections.emptyList();
                     if (!referents.isEmpty()) {
-                        sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
+                        sinks_.log(this,
+                            "  Referral to the source contents required", LogLevel.DEBUG);
                         DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
                         dbfac.setNamespaceAware(true);
                         DocumentBuilder builder = dbfac.newDocumentBuilder();
@@ -311,7 +317,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
                     } else {
                         XMLReader reader = parser.getXMLReader();
-                        sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
+                        sinks_.log(this,
+                            "  Referral to the source contents not required", LogLevel.DEBUG);
                         reader.setEntityResolver(resolver);
                         InputSource input = new InputSource(systemID);
                         source = new SAXSource(reader, input);
@@ -326,7 +333,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     identity.reset();
 
                 } catch (TransformerException | IOException e) {
-                    e.printStackTrace();    // TODO: Other notification
+                    sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
                     sinks_.abortOne();
                 }
             }
@@ -355,10 +362,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 sinks_.log(this,
                     "  Namespace prefixes without names are: " + paramNames.get(), LogLevel.ERR);
             }
-            throw new BuildException(); // TODO: message
+            throw new BuildException();
         }
-        prefixMap_.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
-        prefixMap_.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
         return new PrefixMap(prefixMap_);
     }
 
@@ -366,13 +371,22 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
         @Override
         public void log(Object issuer, String message, LogLevel level) {
+            Chionographis.this.log(format(issuer, message), level.getLevel());
+        }
+
+        @Override
+        public void log(Object issuer, String message, Throwable ex, LogLevel level) {
+            Chionographis.this.log(format(issuer, message), ex, level.getLevel());
+        }
+
+        private String format(Object issuer, String message) {
             try (Formatter formatter = new Formatter()) {
                 String className = issuer.getClass().getSimpleName();
                 formatter.format("%13s(%08x): %s",
                     className.substring(0, Math.min(13, className.length())),
                     System.identityHashCode(issuer),
                     message);
-                Chionographis.this.log(formatter.toString(), level.getLevel());
+                return formatter.toString();
             }
         }
     }
@@ -392,25 +406,24 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
         @Override
         public String getPrefix(String namespaceURI) {
-            if (namespaceURI == null) {
-                throw new IllegalArgumentException("Namespace URI is null");
-            }
-            return prefixMap_.entrySet().stream()
-                .filter(e -> e.getKey().equals(namespaceURI))
-                .map(e -> e.getKey())
-                .findAny()
-                .orElse(XMLConstants.DEFAULT_NS_PREFIX);
+            Iterator<String> i = getPrefixes(namespaceURI);
+            return i.hasNext() ? i.next() : null;
         }
 
         @Override
         public Iterator<String> getPrefixes(String namespaceURI) {
             if (namespaceURI == null) {
                 throw new IllegalArgumentException("Namespace URI is null");
+            } else if (namespaceURI.equals(XMLConstants.XML_NS_URI)) {
+                return Collections.singleton(XMLConstants.XML_NS_PREFIX).iterator();
+            } else if (namespaceURI.equals(XMLConstants.XMLNS_ATTRIBUTE_NS_URI)) {
+                return Collections.singleton(XMLConstants.XMLNS_ATTRIBUTE).iterator();
+            } else {
+                return prefixMap_.entrySet().stream()
+                    .filter(e -> e.getKey().equals(namespaceURI))
+                    .map(e -> e.getKey())
+                    .iterator();
             }
-            return prefixMap_.entrySet().stream()
-                .filter(e -> e.getKey().equals(namespaceURI))
-                .map(e -> e.getKey())
-                .iterator();
         }
 
     }
