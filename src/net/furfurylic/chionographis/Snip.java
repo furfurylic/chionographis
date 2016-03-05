@@ -9,6 +9,7 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -164,7 +165,7 @@ public final class Snip extends Sink implements SinkDriver {
 
                     // Search output if necessary
                     List<XPathExpression> referents = sinks_.referents();
-                    List<String> referredContents = null;
+                    List<String> referredContents = Collections.emptyList();
                     if (!referents.isEmpty()) {
                         sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                         referredContents = Referral.extract(document, referents);
