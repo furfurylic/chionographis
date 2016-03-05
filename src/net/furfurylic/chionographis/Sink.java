@@ -37,7 +37,8 @@ public abstract class Sink {
      * @param baseDir
      *      the base directory of the {@linkplain Chionographis task},
      *      which represents an absolute file path and is never {@code null}.
-     * @param namespaceContext TODO
+     * @param namespaceContext
+     *      the namespace context used to resolve prefixes in the configurations of this object.
      */
     abstract void init(File baseDir, NamespaceContext namespaceContext);
 
@@ -116,6 +117,12 @@ public abstract class Sink {
      */
     abstract void finishOne(List<String> referredContents);
 
+    /**
+     * Aborts processing the current source doucment.
+     *
+     * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
+     * is considered fatal (i.e. the build process itself will be aborted).</p>
+     */
     abstract void abortOne();
 
     abstract void finishBundle();
