@@ -78,7 +78,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
 
         Optional<byte[]> cached = BYTES.accessCache(uri, listenStored_, listenHit_, u -> {
             try {
-                if (u.getScheme().toLowerCase().equals("file")) {
+                if (u.getScheme().equalsIgnoreCase("file")) {
                     File file = new File(u);
                     long length = file.length();
                     if (length <= Integer.MAX_VALUE) {
@@ -155,7 +155,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
         if (!uri.isAbsolute()) {
             return null;
         }
-        if (uri.getScheme().toLowerCase().equals("file")) {
+        if (uri.getScheme().equalsIgnoreCase("file")) {
             // Afraid that omission of "xx/../" may break path meanings for symbolic links
             try {
                 uri = Paths.get(uri).toRealPath().toUri();
