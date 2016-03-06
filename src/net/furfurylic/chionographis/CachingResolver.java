@@ -49,6 +49,8 @@ final class CachingResolver implements EntityResolver, URIResolver {
     private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
     private static final NetResourceCache<Source> TREES = new NetResourceCache<>();
 
+    private static final ThreadLocal<SoftReference<byte[]>> BUFFER = new ThreadLocal<>();
+
     private Consumer<URI> listenStored_;
     private Consumer<URI> listenHit_;
 
@@ -80,6 +82,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
         Optional<byte[]> cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
             try {
                 if (u.getScheme().equalsIgnoreCase("file")) {
+                    // Files are easy to get lengths in advance.
                     File file = new File(u);
                     long length = file.length();
                     if (length <= Integer.MAX_VALUE) {
@@ -88,9 +91,23 @@ final class CachingResolver implements EntityResolver, URIResolver {
                             in.readFully(content);
                         }
                         return content;
+                    } else {
+                        // Fall through
                     }
                 }
-                byte[] buffer = new byte[4096];
+
+                // In case of non-files and too-long files
+                byte[] buffer = null;
+                {
+                    SoftReference<byte[]> ref = BUFFER.get();
+                    if (ref != null) {
+                        buffer = ref.get();
+                    }
+                    if (buffer == null) {
+                        buffer = new byte[4096];
+                        BUFFER.set(new SoftReference<byte[]>(buffer));
+                    }
+                }
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 try (InputStream in = u.toURL().openStream()) {
                     int length;
@@ -99,6 +116,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
                     }
                 }
                 return bytes.toByteArray();
+
             } catch (IOException e) {
                 return null;
             }
