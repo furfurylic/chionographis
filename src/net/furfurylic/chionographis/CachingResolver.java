@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -76,7 +77,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        Optional<byte[]> cached = BYTES.accessCache(uri, listenStored_, listenHit_, u -> {
+        Optional<byte[]> cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
             try {
                 if (u.getScheme().equalsIgnoreCase("file")) {
                     File file = new File(u);
@@ -126,12 +127,12 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        Optional<Source> cached = TREES.accessCache(uri, listenStored_, listenHit_, u -> {
+        Optional<Source> cached = TREES.get(uri, listenStored_, listenHit_, u -> {
             DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
             dbfac.setNamespaceAware(true);
             try {
                 DocumentBuilder builder = dbfac.newDocumentBuilder();
-                builder.setEntityResolver(this);
+                builder.setEntityResolver(this);    // This hinders making factory static
                 Document document = builder.parse(u.toString());
                 return new DOMSource(document, u.toString());
             } catch (ParserConfigurationException | SAXException | IOException e) {
@@ -173,10 +174,10 @@ final class CachingResolver implements EntityResolver, URIResolver {
         private final Object LOCK = new Object();
 
         /** A synchronized canonicalization mapping for URIs. */
-        private Map<URI, URI> canonURIs_;
+        private Map<URI, URI> canonURIs_ = null;
 
         /** A possibly identity-based synchronized map. */
-        private Map<URI, Optional<T>> cache_;
+        private SoftReference<Map<URI, Optional<T>>> cache_ = null;
 
         /**
          *
@@ -188,16 +189,22 @@ final class CachingResolver implements EntityResolver, URIResolver {
          * @return
          *      a possibly-empty resolved object.
          */
-        public Optional<T> accessCache(URI uri,
+        public Optional<T> get(URI uri,
                 Consumer<URI> listenStored, Consumer<URI> listenHit,
                 Function<URI, ? extends T> factory) {
             assert uri != null;
             assert uri.isAbsolute();
 
+            Map<URI, Optional<T>> strongOne = null;
             synchronized (LOCK) {
                 if (cache_ == null) {
                     canonURIs_ = Collections.synchronizedMap(new WeakHashMap<URI, URI>());
-                    cache_ = Collections.synchronizedMap(new IdentityHashMap<>());
+                } else {
+                    strongOne = cache_.get();
+                }
+                if (strongOne == null) {
+                    strongOne = Collections.synchronizedMap(new IdentityHashMap<>());
+                    cache_ = new SoftReference<>(strongOne);
                 }
             }
 
@@ -212,7 +219,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             // Lock with privately-canonicalized form
             // in order to minimize granularity of locks.
             synchronized (canonicalizedURI) {
-                Optional<T> cached = cache_.get(canonicalizedURI);
+                Optional<T> cached = strongOne.get(canonicalizedURI);
                 if (cached != null) {
                     if (!cached.isPresent()) {
                         // Means that an error occurred in the previous try.
@@ -222,11 +229,11 @@ final class CachingResolver implements EntityResolver, URIResolver {
                         listenHit.accept(uri);
                     }
                 } else {
-                    cached = Optional.<T>ofNullable(factory.apply(uri));
+                    cached = Optional.ofNullable(factory.apply(uri));
                     if (cached.isPresent()) {
                         listenStored.accept(uri);
                     }
-                    cache_.put(canonicalizedURI, cached);
+                    strongOne.put(canonicalizedURI, cached);
                 }
                 return cached;
             }
