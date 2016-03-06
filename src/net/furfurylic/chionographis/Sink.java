@@ -43,10 +43,12 @@ public abstract class Sink {
     abstract void init(File baseDir, NamespaceContext namespaceContext);
 
     /**
-     * Receives information about the input sources.
+     * Picks sources to include in the processing from candidate sources.
      *
      * <p>This method should be able to be invoked multiple times in one lifetime,
-     * but as of this version, is invoked once at most in one lifetime.</p>
+     * but as of this version, is invoked once at most in one lifetime.
+     * If the driver consider all of the candidate are to be included to the processing,
+     * this method might never be invoked.</p>
      *
      * <p>Callees must not try to modify arrays and a set passed as parameters.</p>
      *
@@ -56,7 +58,7 @@ public abstract class Sink {
      * @param originalSrcFileNames
      *      the source file names which correspond the URIs in {@code srcURIs},
      *      whose elements shall not be {@code null}.
-     * @param additionalURIs
+     * @param stylesheetURIs
      *      the URIs of the resources which may affects the output contents,
      *      which possibly is an empty set if no such resources are present.
      *      {@code null}s shall not be not contained.
@@ -67,55 +69,89 @@ public abstract class Sink {
      *      to be included in the process, i.e., the corresponding output is already up-to-date.
      */
     abstract boolean[] preexamineBundle(
-        URI[] originalSrcURIs, String[] originalSrcFileNames, Set<URI> additionalURIs);
+        URI[] originalSrcURIs, String[] originalSrcFileNames, Set<URI> stylesheetURIs);
 
     abstract void startBundle();
 
     /**
-     * Starts to receive one input document.
+     * Returns XPath expressions which point the source document contents required by this object.
+     *
+     * <p>When the driver is responsive to the requirement and finds the pointees,
+     * the data is informed as the argument of {@link #startOne(int, URI, String, List)}.</p>
+     *
+     * <p>This method can be invoked prior to the invocation of {@link #startOne(int, URI, String,
+     * List)}. If the driver is not responsive to this sink's request,
+     * this method might never be invoked.</p>
+     *
+     * <p>The {@code referents} method of {@code Sink} returns an empty list.</p>
      *
      * @param originalSrcIndex
      *      the index of the corresponding input source,
      *      which meets the index for {@code originalSrcURIs} and {@code originalSrcFileNames}
      *      parameters in {@link #preexamineBundle(URI[], String[], Set)}.
+     * @param originalSrcURI
+     *      the URI of the corresponding original source,
+     *      which is equal to {@code originalSrcURIs[originalSrcIndex]} where
+     *      {@code originalSrcURIs} is the argument passed in the prior call of {@link
+     *      #preexamineBundle(URI[], String[], Set)}.
      * @param originalSrcFileName
-     *      the file name of the corresponding input source,
-     *      which is equal to {@code originalSrcURIs[originalSrcIndex]} for
-     *      {@code originalSrcURIs} parameter in {@link #preexamineBundle(URI[], String[], Set)}.
-     *
-     * @return
-     *      an TrAX {@code Result} object which receives the input document.
-     */
-    abstract Result startOne(int originalSrcIndex, String originalSrcFileName);
-
-    /**
-     * Returns XPath expressions which point the input document contents required by this object.
-     *
-     * <p>When the driver is responsive to the requirement and finds the pointees,
-     * the data is informed as the argument of {@link #finishOne(List)}.</p>
-     *
-     * <p>This method can be invoked between the invocation of {@link #startOne(int, String)} and
-     * the one of {@link #finishOne(List)}.</p>
-     *
-     * <p>The {@code referents} method of {@code Sink} returns an empty list.</p>
-     *
+     *      the file name of the corresponding original source,
+     *      which is equal to {@code originalSrcFileNames[originalSrcIndex]} where
+     *      {@code originalSrcFileNames} is the argument passed in the prior call of {@link
+     *      #preexamineBundle(URI[], String[], Set)}.
      * @return
      *      XPath expressions which point the input document contents required by this object,
      *      or an empty list if this object requires none.
      */
-    List<XPathExpression> referents() {
-        return Collections.<XPathExpression>emptyList();
+    List<XPathExpression> referents(int originalSrcIndex,
+            URI originalSrcURI, String originalSrcFileName) {
+        return Collections.emptyList();
     }
 
     /**
-     * Finishes to receive one input document.
+     * Starts to receive one input document.
      *
+     * <p>If this sink object has returned a non-empty list in prior invocation of {@link
+     * #referents(int, URI, String)}, the driver may pass the referred source contents as
+     * <i>referredContents</i> argument. Note this behavior is optional (i.e. the driver can
+     * ignore the request made by {@link #referents(int, URI, String)}).</p>
+     *
+     * @param originalSrcIndex
+     *      the index of the corresponding original source,
+     *      which meets the index for {@code originalSrcURIs} and {@code originalSrcFileNames}
+     *      parameters in {@link #preexamineBundle(URI[], String[], Set)};
+     *      or -1 if the driver have not invoked {@link #preexamineBundle(URI[], String[], Set)}.
+     * @param originalSrcURI
+     *      the URI of the corresponding original source,
+     *      which is equal to {@code originalSrcURIs[originalSrcIndex]} where
+     *      {@code originalSrcURIs} is the argument passed in the prior call of {@link
+     *      #preexamineBundle(URI[], String[], Set)};
+     *      or {@code null} if the driver have not invoked
+     *      {@link #preexamineBundle(URI[], String[], Set)}.
+     * @param originalSrcFileName
+     *      the file name of the corresponding original source,
+     *      which is equal to {@code originalSrcFileNames[originalSrcIndex]} where
+     *      {@code originalSrcFileNames} is the argument passed in the prior call of {@link
+     *      #preexamineBundle(URI[], String[], Set)};
+     *      or {@code null} if the driver have not invoked
+     *      {@link #preexamineBundle(URI[], String[], Set)}.
      * @param referredContents
-     *      an list whose size is the same as the return value of {@link #referents()}
+     *      an list whose size is the same as the return value of
+     *      {@link #referents(int, URI, String)}
      *      and contains the required input document contents (possibly {@code null}),
      *      or an empty list if the driver is not responsive to the request.
+     *
+     * @return
+     *      an TrAX {@code Result} object which receives the input document.
      */
-    abstract void finishOne(List<String> referredContents);
+    abstract Result startOne(int originalSrcIndex,
+        URI originalSrcURI, String originalSrcFileName,
+        List<String> referredContents);
+
+    /**
+     * Finishes to receive one input document.
+     */
+    abstract void finishOne();
 
     /**
      * Aborts processing the current source doucment.

@@ -50,6 +50,7 @@ public final class Snip extends Sink implements SinkDriver {
 
     private Document document_;
     private int currentIndex_;
+    private URI currentSrcURI_;
     private String currentSrcFileName_;
 
     Snip(Logger logger) {
@@ -114,8 +115,8 @@ public final class Snip extends Sink implements SinkDriver {
 
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> additionalURIs) {
-        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
+            Set<URI> stylesheetURIs) {
+        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
     }
 
     @Override
@@ -124,8 +125,10 @@ public final class Snip extends Sink implements SinkDriver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName) {
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+            List<String> notUsed) {
         currentIndex_ = originalSrcIndex;
+        currentSrcURI_ = originalSrcURI;
         currentSrcFileName_ = originalSrcFileName;
         document_ = newDocument();
         return new DOMResult(document_);
@@ -142,10 +145,11 @@ public final class Snip extends Sink implements SinkDriver {
     }
 
     @Override
-    void finishOne(List<String> notUsed) {
+    void finishOne() {
         try {
             // Apply XPath expression to current document
-            sinks_.log(this, "Applying snipping criteria " + select_ +"; the original source is " + currentSrcFileName_, LogLevel.VERBOSE);
+            sinks_.log(this, "Applying snipping criteria " + select_ +
+                "; the original source is " + currentSrcFileName_, LogLevel.VERBOSE);
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext_);
@@ -157,30 +161,34 @@ public final class Snip extends Sink implements SinkDriver {
             for (int i = 0; i < nodes.getLength(); ++i) {
                 Node node = nodes.item(i);
                 if (node.getNodeType() == Node.ELEMENT_NODE) {
-                    // Open sink's result
-                    Result result = sinks_.startOne(currentIndex_, currentSrcFileName_);
-
                     Document document = newDocument();
                     document.appendChild(document.adoptNode(node));
 
-                    // Search output if necessary
-                    List<XPathExpression> referents = sinks_.referents();
+                    // Search the source contents if necessary
+                    List<XPathExpression> referents =
+                        sinks_.referents(currentIndex_, currentSrcURI_, currentSrcFileName_);
                     List<String> referredContents = Collections.emptyList();
                     if (!referents.isEmpty()) {
                         sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                         referredContents = Referral.extract(document, referents);
                         sinks_.log(this, "  Referred source data: "
-                            + Referral.join(referredContents), LogLevel.DEBUG);
+                            + String.join(", ", referredContents), LogLevel.DEBUG);
                     } else {
                         sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                     }
 
-                    // Send fragment to sink
-                    TransformerFactory.newInstance().newTransformer().transform(
-                        new DOMSource(document), result);
+                    // Open sink's result
+                    Result result = sinks_.startOne(currentIndex_, currentSrcURI_, currentSrcFileName_,
+                        referredContents);
 
-                    // Finish sink
-                    sinks_.finishOne(referredContents);
+                    if (result != null) {
+                        // Send fragment to sink
+                        TransformerFactory.newInstance().newTransformer().transform(
+                            new DOMSource(document), result);
+
+                        // Finish sink
+                        sinks_.finishOne();
+                    }
 
                     ++count;
                 }
@@ -192,7 +200,6 @@ public final class Snip extends Sink implements SinkDriver {
             }
 
         } catch (TransformerException | XPathExpressionException e) {
-            e.printStackTrace();
             throw new BuildException(e);
         }
     }
