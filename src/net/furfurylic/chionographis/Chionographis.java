@@ -298,10 +298,9 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 try {
                     sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
 
-                    Result result = sinks_.startOne(i, includedFile);
-                    Source source;
-                    List<XPathExpression> referents = sinks_.referents();
+                    List<XPathExpression> referents = sinks_.referents(i, includedURIs[i], includedFile);
                     List<String> referredContents = Collections.emptyList();
+                    Source source;
                     if (!referents.isEmpty()) {
                         sinks_.log(this,
                             "  Referral to the source contents required", LogLevel.DEBUG);
@@ -312,7 +311,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         Document document = builder.parse(systemID);
                         referredContents = Referral.extract(document, referents);
                         sinks_.log(this, "  Referred source data: "
-                            + Referral.join(referredContents), LogLevel.DEBUG);
+                            + String.join(", ", referredContents), LogLevel.DEBUG);
                         source = new DOMSource(document, systemID);
 
                     } else {
@@ -325,9 +324,11 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     }
 
                     // Do processing.
-                    identity.transform(source, result);
-
-                    sinks_.finishOne(referredContents);
+                    Result result = sinks_.startOne(i, includedURIs[i], includedFile, referredContents);
+                    if (result != null) {
+                        identity.transform(source, result);
+                        sinks_.finishOne();
+                    }
 
                     parser.reset();
                     identity.reset();
