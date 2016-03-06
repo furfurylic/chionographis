@@ -14,13 +14,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 import javax.xml.namespace.NamespaceContext;
@@ -48,10 +49,11 @@ public final class Output extends Sink {
     private FileNameMapper mapper_;
 
     private Logger logger_;
+    private long stylesheetLastModified_ = Long.MAX_VALUE;
     private Function<String, Set<File>> destMapping_;
     private List<XPathExpression> referents_;
 
-    private Collection<File> currentDests_;
+    private Set<File> currentDests_;
     private ByteArrayOutputStream currentContent_;
     private int countInBundle_;
 
@@ -210,6 +212,7 @@ public final class Output extends Sink {
                                     .map(destDir_::resolve)
                                     .map(Path::toFile)
                                     .collect(Collectors.toSet());
+            // TODO: what if s is null? (All filter passes null)
         } else if (referents_.isEmpty()) {
             // There is no mapper and the output path has been already decided.
             assert dest_ != null;
@@ -219,38 +222,36 @@ public final class Output extends Sink {
 
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> additionalURIs) {
+            Set<URI> stylesheetURIs) {
         boolean[] includes = new boolean[originalSrcFileNames.length];
 
-        if (force_ || !referents_.isEmpty()) {
+        if (force_) {
             Arrays.fill(includes, true);
             return includes;
         }
-        assert(destMapping_ != null);
 
-        boolean hasNonFile = additionalURIs.stream()
-            .anyMatch(u -> !u.getScheme().equalsIgnoreCase("file"));
-
-        long additionalLastModified = hasNonFile ? Long.MAX_VALUE :
-            additionalURIs.stream()
-                .mapToLong(u -> new File(u).lastModified())
-                .max()
-                .orElse(Long.MIN_VALUE);
-
-        for (int i = 0; i < originalSrcURIs.length; ++i) {
-            if (originalSrcURIs[i].getScheme().equals("file")) {
-                long srcLastModified = new File(originalSrcURIs[i]).lastModified();
-                long lastModified = Math.max(srcLastModified, additionalLastModified);
-                includes[i] =
-                    destMapping_.apply(originalSrcFileNames[i]).stream()
-                        .anyMatch(f -> (hasNonFile
-                                     || !f.exists()
-                                     || (f.lastModified() < lastModified)));
+        ToLongFunction<URI> getConservativeLastModified = u -> {
+            if (u.getScheme().equalsIgnoreCase("file")) {
+                return new File(u).lastModified();
             } else {
-                includes[i] = true;
+                return Long.MAX_VALUE;
             }
+        };
+        stylesheetLastModified_ = stylesheetURIs.stream()
+                                                .mapToLong(getConservativeLastModified)
+                                                .max()
+                                                .orElse(Long.MIN_VALUE);
+
+        if (!referents_.isEmpty()) {
+            Arrays.fill(includes, true);
+            return includes;
         }
 
+        assert(destMapping_ != null);
+        for (int i = 0; i < originalSrcURIs.length; ++i) {
+            includes[i] = isOriginalSrcNewer(
+                originalSrcURIs[i], originalSrcFileNames[i], destMapping_);
+        }
         return includes;
     }
 
@@ -260,32 +261,25 @@ public final class Output extends Sink {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName) {
-        if (currentDests_ == null) {
-            currentDests_ = new ArrayList<>();
-            currentContent_ = new ByteArrayOutputStream();
-        } else {
-            currentDests_.clear();
-            currentContent_.reset();
-        }
-
-        if (referents_.isEmpty()) {
-            assert destMapping_ != null;
-            currentDests_.addAll(destMapping_.apply(originalSrcFileName));
-        }
-
-        return new StreamResult(currentContent_);
-    }
-
-    @Override
-    List<XPathExpression> referents() {
+    List<XPathExpression> referents(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName) {
         return referents_;
     }
 
     @Override
-    void finishOne(List<String> referredContents) {
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+            List<String> referredContents) {
+        // Initialize currentDests_ as empty.
+        if (currentDests_ == null) {
+            currentDests_ = new TreeSet<>();
+        } else {
+            currentDests_.clear();
+        }
+
         // Make sure currentDests_ fully configured.
-        if (!referents_.isEmpty()) {
+        if (referents_.isEmpty()) {
+            assert destMapping_ != null;
+            currentDests_.addAll(destMapping_.apply(originalSrcFileName));
+        } else {
             if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
                 logger_.log(this, "Cannot decide the output file path", LogLevel.ERR);
                 throw new BuildException();
@@ -294,9 +288,48 @@ public final class Output extends Sink {
             } else {
                 currentDests_.add(destDir_.resolve(referredContents.get(0)).toFile());
             }
+            if (!isOriginalSrcNewer(originalSrcURI, originalSrcFileName, s -> currentDests_)) {
+                return null;
+            }
         }
 
+        // Initialize currentContent_ as empty.
+        if (currentContent_ == null) {
+            currentContent_ = new ByteArrayOutputStream();
+        } else {
+            currentContent_.reset();
+        }
+
+        return new StreamResult(currentContent_);
+    }
+
+    private boolean isOriginalSrcNewer(URI originalSrcURI, String originalSrcFileName,
+            Function<String, Set<File>> destMapping) {
+        if (originalSrcURI == null) {
+            // No certain original source available -> Continue processing
+            return true;
+        }
+        if (stylesheetLastModified_ == Long.MAX_VALUE) {
+            // Stylesheets are non-file resources -> Continue processing
+            return true;
+        }
+        if (!originalSrcURI.getScheme().equalsIgnoreCase("file")) {
+            // The original source is a non-file resource -> Continue processing
+            return true;
+        }
+
+        long srcLastModified = new File(originalSrcURI).lastModified();
+        long lastModified = Math.max(srcLastModified, stylesheetLastModified_);
+        Collection<File> dests = destMapping.apply(originalSrcFileName);
+        return dests.stream()
+                     .anyMatch(f -> (!f.exists()
+                                  || (f.lastModified() < lastModified)));
+    }
+
+    @Override
+    void finishOne() {
         // Write the buffer contents to currentDests_.
+        assert currentDests_ != null;
         try {
             for (File mapped : currentDests_) {
                 if (mkDirs_) {

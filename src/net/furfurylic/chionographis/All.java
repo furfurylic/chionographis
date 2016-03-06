@@ -133,14 +133,14 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> additionalURIs) {
+            Set<URI> stylesheetURIs) {
         if (force_) {
             boolean[] result = new boolean[originalSrcURIs.length];
             Arrays.fill(result, true);
             return result;
         } else {
             boolean[] includes =
-                sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
+                sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
@@ -152,7 +152,8 @@ public final class All extends Sink implements SinkDriver {
     void startBundle() {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
-        Result result = sinks_.startOne(-1, null);
+        Result result = sinks_.startOne(-1, null, null, Collections.emptyList());
+        // TODO: what if null is returned (in fact does not happen as of now)
         if (result instanceof SAXResult) {
             SAXResult saxResult = (SAXResult) result;
             handler_ = new AllHandler(saxResult.getHandler(), saxResult.getLexicalHandler());
@@ -185,13 +186,13 @@ public final class All extends Sink implements SinkDriver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName) {
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName, List<String> notUsed) {
         sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
         return new SAXResult(handler_);
     }
 
     @Override
-    void finishOne(List<String> notUsed) {
+    void finishOne() {
     }
 
     @Override
@@ -224,7 +225,7 @@ public final class All extends Sink implements SinkDriver {
                 "Finishing 1 output containing " + handler_.documentCount() + " input sources ",
                 LogLevel.VERBOSE);
         }
-        sinks_.finishOne(Collections.<String>emptyList());
+        sinks_.finishOne();
         sinks_.finishBundle();
     }
 

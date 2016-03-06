@@ -133,33 +133,11 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName) {
+    List<XPathExpression> referents(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName) {
+        prepareActiveSinks(originalSrcIndex);
         referentCounts_ = null;
-        if ((includes_ == null) || (originalSrcIndex < 0)) {
-            activeSinks_ = sinks_;
-        } else {
-            activeSinks_ = IntStream.range(0, includes_.length)
-                .filter(i -> includes_[i][originalSrcIndex])
-                .mapToObj(i -> sinks_.get(i))
-                .collect(Collectors.toList());
-        }
-        if (activeSinks_.isEmpty()) {
-            return null;
-        } else if (activeSinks_.size() == 1) {
-            return activeSinks_.get(0).startOne(originalSrcIndex, originalSrcFileName);
-        } else {
-            CompositeHandlerBuilder builder = new CompositeHandlerBuilder();
-            for (Sink sink : activeSinks_) {
-                builder.add(sink.startOne(originalSrcIndex, originalSrcFileName));
-            }
-            return new SAXResult(builder.newCompositeHandler());
-        }
-    }
-
-    @Override
-    List<XPathExpression> referents() {
         List<List<XPathExpression>> referents = activeSinks_.stream()
-                .map(Sink::referents)
+                .map(s -> s.referents(originalSrcIndex, originalSrcURI, originalSrcFileName))
                 .collect(Collectors.toList());
         if (referents.stream().noneMatch(r -> !r.isEmpty())) {
             return Collections.<XPathExpression>emptyList();
@@ -173,17 +151,56 @@ final class Sinks extends Sink implements SinkDriver, Logger {
         return expressions;
     }
 
-    @Override
-    void finishOne(List<String> referredContents) {
-        if (referredContents .isEmpty()) {
-            activeSinks_.stream().forEach(s -> s.finishOne(Collections.<String>emptyList()));
+    private void prepareActiveSinks(int originalSrcIndex) {
+        if ((includes_ == null) || (originalSrcIndex < 0)) {
+            activeSinks_ = sinks_;
         } else {
+            activeSinks_ = IntStream.range(0, includes_.length)
+                .filter(i -> includes_[i][originalSrcIndex])
+                .mapToObj(i -> sinks_.get(i))
+                .collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+            List<String> referredContents) {
+        if (activeSinks_ == null) {
+            prepareActiveSinks(originalSrcIndex);
+        }
+        if (activeSinks_.isEmpty()) {
+            return null;
+        } else if (activeSinks_.size() == 1) {
+            return activeSinks_.get(0).startOne(
+                originalSrcIndex, originalSrcURI, originalSrcFileName, referredContents);
+        } else {
+            CompositeHandlerBuilder builder = new CompositeHandlerBuilder();
             int i = 0;
-            for (int j = 0; j < referentCounts_.length; ++j) {
-                activeSinks_.get(j).finishOne(referredContents.subList(i, i + referentCounts_[j]));
-                i += referentCounts_[j];
+            for (int j = 0; j < activeSinks_.size(); ++j) {
+                List<String> referredContentsOne;
+                if (referentCounts_ != null) {
+                    referredContentsOne = referredContents.subList(i, i + referentCounts_[j]);
+                    i += referentCounts_[j];
+                } else {
+                    referredContentsOne = Collections.emptyList();
+                }
+                Result result = activeSinks_.get(j).startOne(
+                    originalSrcIndex, originalSrcURI, originalSrcFileName, referredContentsOne);
+                if (result != null) {
+                    builder.add(result);
+                }
+            }
+            if (builder.count() > 0) {
+                return new SAXResult(builder.newCompositeHandler());
+            } else {
+                return null;
             }
         }
+    }
+
+    @Override
+    void finishOne() {
+        activeSinks_.stream().forEach(Sink::finishOne);
     }
 
     @Override
@@ -231,6 +248,10 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             } catch (TransformerConfigurationException e) {
                 throw new BuildException(e);
             }
+        }
+
+        public int count() {
+            return contentHandlers_.size();
         }
 
         public CompositeHandler newCompositeHandler() {

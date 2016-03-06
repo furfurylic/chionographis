@@ -33,8 +33,4 @@ final class Referral {
         }).collect(Collectors.toList());
         return referredContents;
     }
-
-    public static String join(List<String> extracted) {
-        return extracted.stream().reduce((s, t) -> s + ", " + t).orElse("");
-    }
 }
