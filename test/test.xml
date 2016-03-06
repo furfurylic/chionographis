@@ -457,7 +457,7 @@
   <target name="crossing-cache">
     <delete dir="crossing/output-cache"/>
 
-    <chionographis basedir="crossing/input-cache" includes="input.xml" cache="yes">
+    <chionographis basedir="crossing/input-cache" includes="input.xml" cache="yes" verbose="yes">
       <transform style="style1.xsl" cache="yes">
         <output dest="../output-cache/actual1.txt" mkdirs="yes"/>
       </transform>

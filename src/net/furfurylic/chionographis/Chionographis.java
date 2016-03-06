@@ -60,6 +60,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     private Path baseDir_;
     private boolean usesCache_ = false;
     private boolean force_ = false;
+    private boolean verbose_ = false;
     private int prefixCount_ = 0;
 
     private Map<String, String> prefixMap_ = Collections.emptyMap();
@@ -69,7 +70,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      * Sole constructor.
      */
     public Chionographis() {
-        usesCache_ = false;
     }
 
     /**
@@ -112,6 +112,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
     public void setForce(boolean force) {
         force_ = force;
+    }
+
+    public void setVerbose(boolean verbose) {
+        verbose_ = verbose;
     }
 
     /**
@@ -202,7 +206,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         return sinks_.createOutput();
     }
 
-    // TODO: Make this task configurable to log level escalation (e.g. VERBOSE -> INFO)
     // TODO: Make this task able to accept soures other than files
 
     /**
@@ -372,12 +375,12 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
 
         @Override
         public void log(Object issuer, String message, LogLevel level) {
-            Chionographis.this.log(format(issuer, message), level.getLevel());
+            Chionographis.this.log(format(issuer, message), translateLevel(level));
         }
 
         @Override
         public void log(Object issuer, String message, Throwable ex, LogLevel level) {
-            Chionographis.this.log(format(issuer, message), ex, level.getLevel());
+            Chionographis.this.log(format(issuer, message), ex, translateLevel(level));
         }
 
         private String format(Object issuer, String message) {
@@ -389,6 +392,18 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     message);
                 return formatter.toString();
             }
+        }
+
+        private int translateLevel(LogLevel level) {
+            LogLevel mutated = level;
+            if (Chionographis.this.verbose_) {
+                if (level == LogLevel.VERBOSE) {
+                    mutated = LogLevel.INFO;
+                } else if (level == LogLevel.DEBUG) {
+                    mutated = LogLevel.VERBOSE;
+                }
+            }
+            return mutated.getLevel();
         }
     }
 
