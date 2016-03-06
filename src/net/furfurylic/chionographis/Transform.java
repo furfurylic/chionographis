@@ -194,21 +194,21 @@ public final class Transform extends Sink implements SinkDriver {
 
     @Override
     boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> additionalURIs) {
+            Set<URI> stylesheetURIs) {
         if (force_) {
             boolean[] result = new boolean[originalSrcURIs.length];
             Arrays.fill(result, true);
             return result;
         }
 
-        if (additionalURIs.isEmpty()) {
-            additionalURIs = Collections.<URI>singleton(styleURI_);
+        if (stylesheetURIs.isEmpty()) {
+            stylesheetURIs = Collections.<URI>singleton(styleURI_);
         } else {
-            additionalURIs = new HashSet<>(additionalURIs);
-            additionalURIs.add(styleURI_);
-            additionalURIs = Collections.unmodifiableSet(additionalURIs);
+            stylesheetURIs = new HashSet<>(stylesheetURIs);
+            stylesheetURIs.add(styleURI_);
+            stylesheetURIs = Collections.unmodifiableSet(stylesheetURIs);
         }
-        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs);
+        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
     }
 
     @Override
@@ -217,7 +217,8 @@ public final class Transform extends Sink implements SinkDriver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName) {
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+            List<String> notUsed) {
         try {
             if (stylesheet_ == null) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
@@ -232,8 +233,8 @@ public final class Transform extends Sink implements SinkDriver {
                 stylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
             }
 
-            Result openedResult = sinks_.startOne(originalSrcIndex, originalSrcFileName);
-            List<XPathExpression> referents = sinks_.referents();
+            List<XPathExpression> referents =
+                sinks_.referents(originalSrcIndex, originalSrcURI, originalSrcFileName);
             if (!referents.isEmpty()) {
                 sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                 Document document;
@@ -247,24 +248,35 @@ public final class Transform extends Sink implements SinkDriver {
                 Transformer transformer = stylesheet_.newTransformer();
                 configureTransformer(transformer);
                 finisher_ = () -> {
-                    try {
-                        transformer.transform(new DOMSource(document), openedResult);
-                    } catch (TransformerException e) {
-                        throw new BuildException(e);
-                    }
                     List<String> referredContents = Referral.extract(document, referents);
                     sinks_.log(this, "  Referred source data: "
-                        + Referral.join(referredContents), LogLevel.DEBUG);
-                    sinks_.finishOne(referredContents);
+                        + String.join(", ", referredContents), LogLevel.DEBUG);
+                    Result openedResult =
+                        sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName, referredContents);
+                    if (openedResult != null) {
+                        try {
+                            transformer.transform(new DOMSource(document), openedResult);
+                        } catch (TransformerException e) {
+                            throw new BuildException(e);
+                        }
+                        sinks_.finishOne();
+                    }
                 };
                 return new DOMResult(document);
             } else {
                 sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
-                TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
-                configureTransformer(styler.getTransformer());
-                styler.setResult(openedResult);
-                finisher_ = () -> sinks_.finishOne(Collections.<String>emptyList());
-                return new SAXResult(styler);
+                Result openedResult =
+                    sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName, Collections.emptyList());
+                if (openedResult != null) {
+                    TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
+                    configureTransformer(styler.getTransformer());
+                    styler.setResult(openedResult);
+                    finisher_ = () -> sinks_.finishOne();
+                    return new SAXResult(styler);
+                } else {
+                    // TODO: then templates are not required to have been compiled
+                    return null;
+                }
             }
         } catch (TransformerConfigurationException e) {
             throw new BuildException(e);
@@ -281,7 +293,7 @@ public final class Transform extends Sink implements SinkDriver {
     }
 
     @Override
-    void finishOne(List<String> notUsed) {
+    void finishOne() {
         finisher_.run();
     }
 
