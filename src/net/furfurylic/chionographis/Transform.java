@@ -51,13 +51,10 @@ public final class Transform extends Sink implements SinkDriver {
     private boolean force_ = false;
     private int paramCount_ = 0;
 
-    private SAXTransformerFactory tfac_;
     private URI styleURI_;
-
-    private Templates stylesheet_;
-    private CachingResolver resolver_;
     private Map<String, Object> params_ = Collections.emptyMap();
 
+    private Stylesheet stylesheet_ = new Stylesheet();
     private Runnable finisher_;
 
     Transform(Logger logger) {
@@ -220,19 +217,6 @@ public final class Transform extends Sink implements SinkDriver {
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
             List<String> notUsed) {
         try {
-            if (stylesheet_ == null) {
-                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
-                String styleSystemID = styleURI_.toString();
-                sinks_.log(this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
-                if (usesCache_) {
-                    resolver_ = new CachingResolver(
-                        u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
-                        u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
-                    tfac_.setURIResolver(resolver_);
-                }
-                stylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
-            }
-
             List<XPathExpression> referents =
                 sinks_.referents(originalSrcIndex, originalSrcURI, originalSrcFileName);
             if (!referents.isEmpty()) {
@@ -245,17 +229,17 @@ public final class Transform extends Sink implements SinkDriver {
                 } catch (ParserConfigurationException e) {
                     throw new BuildException(e);
                 }
-                Transformer transformer = stylesheet_.newTransformer();
-                configureTransformer(transformer);
                 finisher_ = () -> {
                     List<String> referredContents = Referral.extract(document, referents);
                     sinks_.log(this, "  Referred source data: "
                         + String.join(", ", referredContents), LogLevel.DEBUG);
                     Result openedResult =
-                        sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName, referredContents);
+                        sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
+                            referredContents);
                     if (openedResult != null) {
                         try {
-                            transformer.transform(new DOMSource(document), openedResult);
+                            stylesheet_.newTransformer()
+                                .transform(new DOMSource(document), openedResult);
                         } catch (TransformerException e) {
                             throw new BuildException(e);
                         }
@@ -266,29 +250,19 @@ public final class Transform extends Sink implements SinkDriver {
             } else {
                 sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                 Result openedResult =
-                    sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName, Collections.emptyList());
+                    sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
+                        Collections.emptyList());
                 if (openedResult != null) {
-                    TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
-                    configureTransformer(styler.getTransformer());
+                    TransformerHandler styler = stylesheet_.newTransformerHandler();
                     styler.setResult(openedResult);
                     finisher_ = () -> sinks_.finishOne();
                     return new SAXResult(styler);
                 } else {
-                    // TODO: then templates are not required to have been compiled
                     return null;
                 }
             }
         } catch (TransformerConfigurationException e) {
             throw new BuildException(e);
-        }
-    }
-
-    private void configureTransformer(Transformer transformer) {
-        for (Map.Entry<String, Object> param : params_.entrySet()) {
-            transformer.setParameter(param.getKey(), param.getValue());
-        }
-        if (usesCache_) {
-            transformer.setURIResolver(resolver_);
         }
     }
 
@@ -305,5 +279,51 @@ public final class Transform extends Sink implements SinkDriver {
     @Override
     void finishBundle() {
         sinks_.finishBundle();
+    }
+
+    private class Stylesheet {
+
+        private SAXTransformerFactory tfac_;
+        private Templates stylesheet_;
+        private CachingResolver resolver_;
+
+        public Transformer newTransformer() throws TransformerConfigurationException {
+            ensureStylesheetCompiled();
+            Transformer transformer = stylesheet_.newTransformer();
+            configureTransformer(transformer);
+            return transformer;
+        }
+
+        public TransformerHandler newTransformerHandler() throws TransformerConfigurationException {
+            ensureStylesheetCompiled();
+            TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
+            configureTransformer(styler.getTransformer());
+            return styler;
+        }
+
+        private void ensureStylesheetCompiled() throws TransformerConfigurationException {
+            if (stylesheet_ == null) {
+                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+                String styleSystemID = styleURI_.toString();
+                sinks_.log(this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+                if (usesCache_) {
+                    resolver_ = new CachingResolver(
+                        u -> sinks_.log(Transform.this, "Caching " + u, LogLevel.DEBUG),
+                        u -> sinks_.log(Transform.this, "Reusing " + u, LogLevel.DEBUG));
+                    tfac_.setURIResolver(resolver_);
+                }
+                stylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
+            }
+        }
+
+        private void configureTransformer(Transformer transformer) {
+            for (Map.Entry<String, Object> param : params_.entrySet()) {
+                transformer.setParameter(param.getKey(), param.getValue());
+            }
+            if (usesCache_) {
+                transformer.setURIResolver(resolver_);
+            }
+        }
+
     }
 }

@@ -153,7 +153,10 @@ public final class All extends Sink implements SinkDriver {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
         Result result = sinks_.startOne(-1, null, null, Collections.emptyList());
-        // TODO: what if null is returned (in fact does not happen as of now)
+        if (result == null) {
+            handler_ = null;
+            return;
+        }
         if (result instanceof SAXResult) {
             SAXResult saxResult = (SAXResult) result;
             handler_ = new AllHandler(saxResult.getHandler(), saxResult.getLexicalHandler());
@@ -180,15 +183,18 @@ public final class All extends Sink implements SinkDriver {
             handler_.getHandler().startElement(
                 rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_, atts);
         } catch (SAXException e) {
-            e.printStackTrace();
             throw new BuildException(e);
         }
     }
 
     @Override
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName, List<String> notUsed) {
-        sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
-        return new SAXResult(handler_);
+        if (handler_ != null) {
+            sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
+            return new SAXResult(handler_);
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -206,26 +212,28 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     void finishBundle() {
-        try {
-            handler_.getHandler().endElement(
-                rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_);
-            if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                handler_.getHandler().endPrefixMapping(rootQ_.getPrefix());
+        if (handler_ != null) {
+            try {
+                handler_.getHandler().endElement(
+                    rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_);
+                if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+                    handler_.getHandler().endPrefixMapping(rootQ_.getPrefix());
+                }
+                handler_.getHandler().endDocument();
+            } catch (SAXException e) {
+                throw new BuildException(e);
             }
-            handler_.getHandler().endDocument();
-        } catch (SAXException e) {
-            throw new BuildException(e);
+            if (handler_.documentCount() == 0) {
+                sinks_.log(this,
+                    "Finishing 1 output containing no input source",
+                    LogLevel.INFO);
+            } else {
+                sinks_.log(this,
+                    "Finishing 1 output containing " + handler_.documentCount() + " input sources ",
+                    LogLevel.VERBOSE);
+            }
+            sinks_.finishOne();
         }
-        if (handler_.documentCount() == 0) {
-            sinks_.log(this,
-                "Finishing 1 output containing no input source",
-                LogLevel.INFO);
-        } else {
-            sinks_.log(this,
-                "Finishing 1 output containing " + handler_.documentCount() + " input sources ",
-                LogLevel.VERBOSE);
-        }
-        sinks_.finishOne();
         sinks_.finishBundle();
     }
 
