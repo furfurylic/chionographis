@@ -15,6 +15,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -192,7 +193,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
         private final Object LOCK = new Object();
 
         /** A synchronized canonicalization mapping for URIs. */
-        private Map<URI, URI> canonURIs_ = null;
+        private Map<URI, WeakReference<URI>> canonURIs_ = null;
 
         /** A possibly identity-based synchronized map. */
         private SoftReference<Map<URI, Optional<T>>> cache_ = null;
@@ -216,7 +217,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             Map<URI, Optional<T>> strongOne = null;
             synchronized (LOCK) {
                 if (cache_ == null) {
-                    canonURIs_ = Collections.synchronizedMap(new WeakHashMap<URI, URI>());
+                    canonURIs_ = Collections.synchronizedMap(new WeakHashMap<>());
                 } else {
                     strongOne = cache_.get();
                 }
@@ -270,7 +271,8 @@ final class CachingResolver implements EntityResolver, URIResolver {
          */
         private URI canonicalizeURI(URI uri) {
             assert uri != null;
-            URI existing = canonURIs_.putIfAbsent(uri, uri);
+            WeakReference<URI> ref = canonURIs_.putIfAbsent(uri, new WeakReference<>(uri));
+            URI existing = (ref != null) ? ref.get() : null;
             if (existing == null) {
                 return uri;
             } else {
