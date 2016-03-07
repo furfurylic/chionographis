@@ -284,35 +284,35 @@ public final class Transform extends Sink implements SinkDriver {
     private class Stylesheet {
 
         private SAXTransformerFactory tfac_;
-        private Templates stylesheet_;
+        private Templates compiledStylesheet_;
         private CachingResolver resolver_;
 
         public Transformer newTransformer() throws TransformerConfigurationException {
             ensureStylesheetCompiled();
-            Transformer transformer = stylesheet_.newTransformer();
+            Transformer transformer = compiledStylesheet_.newTransformer();
             configureTransformer(transformer);
             return transformer;
         }
 
         public TransformerHandler newTransformerHandler() throws TransformerConfigurationException {
             ensureStylesheetCompiled();
-            TransformerHandler styler = tfac_.newTransformerHandler(stylesheet_);
+            TransformerHandler styler = tfac_.newTransformerHandler(compiledStylesheet_);
             configureTransformer(styler.getTransformer());
             return styler;
         }
 
         private void ensureStylesheetCompiled() throws TransformerConfigurationException {
-            if (stylesheet_ == null) {
+            if (compiledStylesheet_ == null) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 String styleSystemID = styleURI_.toString();
-                sinks_.log(this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+                sinks_.log(Transform.this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
                 if (usesCache_) {
                     resolver_ = new CachingResolver(
                         u -> sinks_.log(Transform.this, "Caching " + u, LogLevel.DEBUG),
                         u -> sinks_.log(Transform.this, "Reusing " + u, LogLevel.DEBUG));
                     tfac_.setURIResolver(resolver_);
                 }
-                stylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
+                compiledStylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
             }
         }
 
