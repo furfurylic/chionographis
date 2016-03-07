@@ -208,11 +208,18 @@ public final class Output extends Sink {
         destMapping_ = null;
         if (mapper_ != null) {
             // There is a mapper and the output path will be decided later using it.
-            destMapping_ = s -> Arrays.stream(mapper_.mapFileName(s))
-                                    .map(destDir_::resolve)
-                                    .map(Path::toFile)
-                                    .collect(Collectors.toSet());
-            // TODO: what if s is null? (All filter passes null)
+            destMapping_ = s -> {
+                    if (s != null) {
+                        String[] mapped = mapper_.mapFileName(s);
+                        if (mapped != null) {
+                            return Arrays.stream(mapped)
+                                         .map(destDir_::resolve)
+                                         .map(Path::toFile)
+                                         .collect(Collectors.toSet());
+                        }
+                    }
+                    return null;
+                };
         } else if (referents_.isEmpty()) {
             // There is no mapper and the output path has been already decided.
             assert dest_ != null;
