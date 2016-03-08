@@ -162,7 +162,7 @@ public final class Output extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
         // Configure destDir_ to be an absolute path.
         if (destDir_ == null) {
             destDir_ = baseDir.toPath();
@@ -225,6 +225,8 @@ public final class Output extends Sink {
             assert dest_ != null;
             destMapping_ = s -> Collections.singleton(dest_.toFile());
         }
+
+        force_ = force_ || force;
     }
 
     @Override
@@ -295,7 +297,13 @@ public final class Output extends Sink {
             } else {
                 currentDests_.add(destDir_.resolve(referredContents.get(0)).toFile());
             }
-            if (!isOriginalSrcNewer(originalSrcURI, originalSrcFileName, s -> currentDests_)) {
+            if (!force_
+             && !isOriginalSrcNewer(originalSrcURI, originalSrcFileName, s -> currentDests_)) {
+                String files = currentDests_.stream()
+                                            .map(File::getAbsolutePath)
+                                            .reduce((ss, s) -> ss + s)
+                                            .orElse(null);
+                logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
                 return null;
             }
         }
@@ -312,6 +320,7 @@ public final class Output extends Sink {
 
     private boolean isOriginalSrcNewer(URI originalSrcURI, String originalSrcFileName,
             Function<String, Set<File>> destMapping) {
+        assert ! force_;
         if (originalSrcURI == null) {
             // No certain original source available -> Continue processing
             return true;

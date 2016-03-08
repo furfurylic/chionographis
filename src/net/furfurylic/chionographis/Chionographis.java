@@ -263,7 +263,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 identity = TransformerFactory.newInstance().newTransformer();
             }
 
-            sinks_.init(baseDir_.toFile(), namespaceContext);
+            sinks_.init(baseDir_.toFile(), namespaceContext, force_);
             // TODO: pass SAXTransformerFactory
 
             // Tell whether destinations are older.
