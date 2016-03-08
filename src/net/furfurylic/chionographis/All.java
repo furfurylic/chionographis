@@ -110,7 +110,7 @@ public final class All extends Sink implements SinkDriver {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
         rootQ_ = null;
         if (!root_.startsWith("{")) {
             int indexOfColon = root_.indexOf(':');
@@ -128,7 +128,8 @@ public final class All extends Sink implements SinkDriver {
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
-        sinks_.init(baseDir, namespaceContext);
+        force_ = force_ || force;
+        sinks_.init(baseDir, namespaceContext, force_);
     }
 
     @Override
