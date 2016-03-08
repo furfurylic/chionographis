@@ -44,6 +44,7 @@ public final class Snip extends Sink implements SinkDriver {
 
     private Sinks sinks_;
     private String select_;
+    private boolean force_;
 
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
@@ -70,6 +71,10 @@ public final class Snip extends Sink implements SinkDriver {
      */
     public void setSelect(String xpath) {
         select_ = xpath;
+    }
+
+    public void setForce(boolean force) {
+        force_ = force;
     }
 
     /**
@@ -108,8 +113,9 @@ public final class Snip extends Sink implements SinkDriver {
      * {@inheritDoc}
      */
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext) {
-        sinks_.init(baseDir, namespaceContext);
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+        force_ = force_ || force;
+        sinks_.init(baseDir, namespaceContext, force_);
         namespaceContext_ = namespaceContext;
     }
 

@@ -100,8 +100,8 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext) {
-        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext));
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force));
     }
 
     @Override
