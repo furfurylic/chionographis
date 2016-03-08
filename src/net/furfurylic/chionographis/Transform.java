@@ -143,14 +143,15 @@ public final class Transform extends Sink implements SinkDriver {
      * {@inheritDoc}
      */
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
         examineParams(namespaceContext);
 
         styleURI_ = URI.create(style_);
         if (!styleURI_.isAbsolute()) {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
         }
-        sinks_.init(baseDir, namespaceContext);
+        force_ = force_ || force;
+        sinks_.init(baseDir, namespaceContext, force_);
     }
 
     private void examineParams(NamespaceContext namespaceContext) {

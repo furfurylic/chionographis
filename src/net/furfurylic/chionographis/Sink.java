@@ -39,8 +39,9 @@ public abstract class Sink {
      *      which represents an absolute file path and is never {@code null}.
      * @param namespaceContext
      *      the namespace context used to resolve prefixes in the configurations of this object.
+     * @param force TODO
      */
-    abstract void init(File baseDir, NamespaceContext namespaceContext);
+    abstract void init(File baseDir, NamespaceContext namespaceContext, boolean force);
 
     /**
      * Picks sources to include in the processing from candidate sources.
