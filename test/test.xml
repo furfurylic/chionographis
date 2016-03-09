@@ -8,6 +8,8 @@
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
     <antcall target="basic-force-task"/>
+    <antcall target="basic-up-to-date-at-start"/>
+      <antcall target="basic-force-at-start"/>
     <antcall target="transform"/>
     <antcall target="transform-params"/>
     <antcall target="transform-params-ns"/>
@@ -167,7 +169,90 @@
     <delete dir="basic/output-force-task"/>
   </target>
 
-  <target name="transform">
+  <target name="basic-up-to-date-at-start">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="up-to-date-at-start"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="basic/input-${test.title}"/>
+    <property name="dir.output" location="basic/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <copy todir="${dir.output}"><fileset dir="${dir.input}" includes="*.xml"/></copy>
+    <!-- input1: older -->
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <!-- input2: newer -->
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:40 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input*.xml" cache="yes">
+      <output refer="/*/@num" mkdirs="yes">
+        <globmapper from="*" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="output2.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+
+    <fail message="Failed test: ${test.name} (1)">
+      <condition>
+        <not>
+          <islastmodified datetime="01/01/2001 00:01:20 AM" mode="equals">
+            <file file="${dir.output}/output1.xml"/>
+          </islastmodified>
+        </not>
+      </condition>
+    </fail>
+    <fail message="Failed test: ${test.name} (2)">
+      <condition><not><filesmatch file1="${dir.input}/expected2.txt" file2="${dir.output}/actual2.txt"/></not></condition>
+    </fail>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-force-at-start">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="force-at-start"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="basic/input-up-to-date-at-start"/>
+    <property name="dir.output" location="basic/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <copy todir="${dir.output}"><fileset dir="${dir.input}" includes="*.xml"/></copy>
+    <!-- input1 & 2: older -->
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input*.xml" cache="yes" force="yes">
+      <output refer="/*/@num" mkdirs="yes">
+        <globmapper from="*" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="output*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+
+    <fail message="Failed test: ${test.name} (1)">
+      <condition><not><filesmatch file1="${dir.input}/expected1.txt" file2="${dir.output}/actual1.txt"/></not></condition>
+    </fail>
+    <fail message="Failed test: ${test.name} (2)">
+      <condition><not><filesmatch file1="${dir.input}/expected2.txt" file2="${dir.output}/actual2.txt"/></not></condition>
+    </fail>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+    <target name="transform">
     <delete dir="transform/output"/>
 
     <chionographis basedir="transform" includes="input/input.xml">
