@@ -174,7 +174,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             return activeSinks_.get(0).startOne(
                 originalSrcIndex, originalSrcURI, originalSrcFileName, referredContents);
         } else {
-            CompositeHandlerBuilder builder = new CompositeHandlerBuilder();
+            CompositeResultBuilder builder = new CompositeResultBuilder();
             int i = 0;
             for (int j = 0; j < activeSinks_.size(); ++j) {
                 List<String> referredContentsOne;
@@ -184,17 +184,10 @@ final class Sinks extends Sink implements SinkDriver, Logger {
                 } else {
                     referredContentsOne = Collections.emptyList();
                 }
-                Result result = activeSinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcURI, originalSrcFileName, referredContentsOne);
-                if (result != null) {
-                    builder.add(result);
-                }
+                builder.add(activeSinks_.get(j).startOne(
+                    originalSrcIndex, originalSrcURI, originalSrcFileName, referredContentsOne));
             }
-            if (builder.count() > 0) {
-                return new SAXResult(builder.newCompositeHandler());
-            } else {
-                return null;
-            }
+            return builder.newCompositeResult();
         }
     }
 
@@ -220,51 +213,70 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             sinks_.stream().forEach(Sink::finishBundle);
         } else {
             IntStream.range(0, includes_.length)
-            .filter(i -> IntStream.range(0, includes_[i].length)
-                            .anyMatch(j -> includes_[i][j]))
-            .mapToObj(i -> sinks_.get(i))
-            .forEach(Sink::finishBundle);
+                     .filter(i -> IntStream.range(0, includes_[i].length)
+                                           .anyMatch(j -> includes_[i][j]))
+                     .mapToObj(i -> sinks_.get(i))
+                     .forEach(Sink::finishBundle);
         }
     }
 
-    private static final class CompositeHandlerBuilder {
+    private static final class CompositeResultBuilder {
 
-        public interface CompositeHandler extends ContentHandler, LexicalHandler {
-        }
+        private List<Result> results_ = new ArrayList<>();
 
-        private ArrayList<ContentHandler> contentHandlers_ = new ArrayList<>();
-        private ArrayList<LexicalHandler> lexicalHandlers_ = new ArrayList<>();
-
-        public CompositeHandlerBuilder() {
+        public CompositeResultBuilder() {
         }
 
         public void add(Result result) {
+            if (result != null) {
+                results_.add(result);
+            }
+        }
+
+        public Result newCompositeResult() {
+            if (results_.isEmpty()) {
+                return null;
+            }
+            if (results_.size() == 1) {
+                return results_.get(0);
+            }
+
             try {
-                SAXTransformerFactory tfac = (SAXTransformerFactory) TransformerFactory.newInstance();
-                TransformerHandler identity = tfac.newTransformerHandler();
-                identity.setResult(result);
-                contentHandlers_.add(identity);
-                lexicalHandlers_.add(identity);
+                List<ContentHandler> contentHandlers = new ArrayList<>();
+                List<LexicalHandler> lexicalHandlers = new ArrayList<>();
+                SAXTransformerFactory tfac = null;
+                for (Result result : results_) {
+                    if (result instanceof SAXResult) {
+                        SAXResult saxResult = (SAXResult) result;
+                        contentHandlers.add(saxResult.getHandler());
+                        if (saxResult.getLexicalHandler() != null) {
+                            lexicalHandlers.add(saxResult.getLexicalHandler());
+                        } else if (saxResult.getHandler() instanceof LexicalHandler) {
+                            lexicalHandlers.add((LexicalHandler) saxResult.getHandler());
+                        }
+                    } else {
+                        if (tfac == null) {
+                            tfac = (SAXTransformerFactory) TransformerFactory.newInstance();
+                        }
+                        TransformerHandler identity = tfac.newTransformerHandler();
+                        identity.setResult(result);
+                        contentHandlers.add(identity);
+                        lexicalHandlers.add(identity);
+                    }
+                }
+                return new SAXResult(new CompositeHandler(contentHandlers, lexicalHandlers));
             } catch (TransformerConfigurationException e) {
                 throw new BuildException(e);
             }
         }
 
-        public int count() {
-            return contentHandlers_.size();
-        }
-
-        public CompositeHandler newCompositeHandler() {
-            return new CompositeHandlerImpl(contentHandlers_, lexicalHandlers_);
-        }
-
-        private static class CompositeHandlerImpl implements CompositeHandler {
+        private static class CompositeHandler implements ContentHandler, LexicalHandler {
 
             private List<ContentHandler> contentHandlers_;
             private List<LexicalHandler> lexicalHandlers_;
 
-            public CompositeHandlerImpl(List<ContentHandler> contentHandlers,
-                List<LexicalHandler> lexicalHandlers) {
+            public CompositeHandler(List<ContentHandler> contentHandlers,
+                    List<LexicalHandler> lexicalHandlers) {
                 contentHandlers_ = contentHandlers;
                 lexicalHandlers_ = lexicalHandlers;
             }
