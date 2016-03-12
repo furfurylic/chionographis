@@ -9,12 +9,12 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -49,10 +49,10 @@ public final class Transform extends Sink implements SinkDriver {
     private String style_ = null;
     private boolean usesCache_ = false;
     private boolean force_ = false;
-    private int paramCount_ = 0;
+    private List<Param> params_ = Collections.emptyList();
 
     private URI styleURI_;
-    private Map<String, Object> params_ = Collections.emptyMap();
+    private Map<String, Object> paramMap_ = null;
 
     private Stylesheet stylesheet_ = new Stylesheet();
     private Runnable finisher_;
@@ -89,22 +89,18 @@ public final class Transform extends Sink implements SinkDriver {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        ++paramCount_;
-        return new Param(this::receiveParam);
-    }
-
-    private void receiveParam(String name, Object value) {
-        if (name.isEmpty()) {
-            sinks_.log(this, "Parameters with empty names are not acceptable", LogLevel.ERR);
-            throw new BuildException();
-        }
+        Param param = new Param(sinks_);
         if (params_.isEmpty()) {
-            params_ = new TreeMap<>();
+            params_ = Collections.singletonList(param);
+        } else {
+            if (params_.size() == 1) {
+                Param first = params_.get(0);
+                params_ = new ArrayList<>();
+                params_.add(first);
+            }
+            params_.add(param);
         }
-        if (params_.put(name, value) != null) {
-            sinks_.log(this, "Parameter " + name + " added twice", LogLevel.ERR);
-            throw new BuildException();
-        }
+        return param;
     }
 
     /**
@@ -144,50 +140,38 @@ public final class Transform extends Sink implements SinkDriver {
      */
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        examineParams(namespaceContext);
+        setUpParamMap(namespaceContext);
 
         styleURI_ = URI.create(style_);
         if (!styleURI_.isAbsolute()) {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
         }
+
         force_ = force_ || force;
+
         sinks_.init(baseDir, namespaceContext, force_);
     }
 
-    private void examineParams(NamespaceContext namespaceContext) {
-        int badParamCount = paramCount_ - params_.size();
-        if (badParamCount > 0) {
-            sinks_.log(this,
-                badParamCount + " parameters left not fully configured", LogLevel.ERR);
-            Optional<String> paramNames = params_.entrySet().stream()
-                                            .filter(e -> e.getValue() == null)
-                                            .map(e -> e.getKey())
-                                            .reduce((r, s) -> r += ", " + s);
-            if (paramNames.isPresent()) {
-                sinks_.log(this,
-                    "  Parameters without values are: " + paramNames.get(), LogLevel.ERR);
-            }
-            throw new BuildException();
+    private void setUpParamMap(NamespaceContext namespaceContext) {
+        if (params_.isEmpty()) {
+            paramMap_ = Collections.emptyMap();
+            return;
         }
-        Map<String, Object> resolvedParams_ = new TreeMap<>();
-        for (Map.Entry<String, Object> e : params_.entrySet()) {
-            String name = e.getKey();
-            if (!name.startsWith("{")) {
-                int indexOfColon = name.indexOf(':');
-                if (indexOfColon != -1) {
-                    String prefix = name.substring(0, indexOfColon);
-                    String localName = name.substring(indexOfColon + 1);
-                    String namespaceURI = namespaceContext.getNamespaceURI(prefix);
-                    name = '{' + namespaceURI + '}' + localName;
-                }
-            }
-            if (resolvedParams_.put(name, e.getValue()) != null) {
-                sinks_.log(this, "Parameter " + name + " added twice", LogLevel.ERR);
+        if (params_.size() == 1) {
+            Map.Entry<String, Object> spec = params_.get(0).yield(namespaceContext);
+            paramMap_ = Collections.singletonMap(spec.getKey(), spec.getValue());
+            return;
+        }
+
+        paramMap_ = new TreeMap<>();
+        for (Param param : params_) {
+            Map.Entry<String, Object> entry = param.yield(namespaceContext);
+            if (paramMap_.put(entry.getKey(), entry.getValue()) != null) {
+                sinks_.log(this,
+                    "Param named " + entry.getKey() + " added twice", LogLevel.ERR);
                 throw new BuildException();
             }
-            sinks_.log(this, "Parameter added: " + name + '=' + e.getValue(), LogLevel.VERBOSE);
         }
-        params_ = resolvedParams_;
     }
 
     @Override
@@ -318,7 +302,7 @@ public final class Transform extends Sink implements SinkDriver {
         }
 
         private void configureTransformer(Transformer transformer) {
-            for (Map.Entry<String, Object> param : params_.entrySet()) {
+            for (Map.Entry<String, Object> param : paramMap_.entrySet()) {
                 transformer.setParameter(param.getKey(), param.getValue());
             }
             if (usesCache_) {

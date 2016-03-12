@@ -7,7 +7,13 @@
 
 package net.furfurylic.chionographis;
 
-import java.util.function.BiConsumer;
+import java.util.AbstractMap;
+import java.util.Map;
+
+import javax.xml.namespace.NamespaceContext;
+
+import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.LogLevel;
 
 /**
  * An object of this class represents one stylesheet parameter applied to the transformation
@@ -17,11 +23,13 @@ import java.util.function.BiConsumer;
  */
 public final class Param {
 
-    private String nameOrValue_;
-    private BiConsumer<String, Object> receiver_;
+    private Logger logger_;
 
-    Param(BiConsumer<String, Object> receiver) {
-        receiver_ = receiver;
+    private String name_ = null;
+    private Object value_ = null;
+
+    Param(Logger logger) {
+        logger_ = logger;
     }
 
     /**
@@ -39,8 +47,12 @@ public final class Param {
      *      the name of this parameter.
      */
     public void setName(String name) {
-        receiver_.accept(name, nameOrValue_);
-        nameOrValue_ = name;
+        if (name.isEmpty()) {
+            logger_.log(this,
+                "Stylesheet parameters with empty names are not acceptable", LogLevel.ERR);
+            throw new BuildException();
+        }
+        name_ = name;
     }
 
     /**
@@ -51,9 +63,35 @@ public final class Param {
      *      the value of this parameter.
      */
     public void addText(String value) {
-        if (nameOrValue_ != null) {
-            receiver_.accept(nameOrValue_, value);
+        value_ = value;
+    }
+
+    Map.Entry<String, Object> yield(NamespaceContext namespaceContext) {
+        if (name_ == null) {
+            String message = "Incomplete stylesheet parameter found";
+            if (value_ != null) {
+                message += ": value=" + value_;
+            }
+            logger_.log(this, message, LogLevel.ERR);
+            throw new BuildException();
         }
-        nameOrValue_ = value;
+        if (value_ == null) {
+            String message = "Incomplete stylesheet parameter found: name=" + name_;
+            logger_.log(this, message, LogLevel.ERR);
+            throw new BuildException();
+        }
+
+        String name = name_;
+        if (!name.startsWith("{")) {
+            int indexOfColon = name.indexOf(':');
+            if (indexOfColon != -1) {
+                String prefix = name.substring(0, indexOfColon);
+                String localName = name.substring(indexOfColon + 1);
+                String namespaceURI = namespaceContext.getNamespaceURI(prefix);
+                name = '{' + namespaceURI + '}' + localName;
+            }
+        }
+
+        return new AbstractMap.SimpleEntry<>(name, value_);
     }
 }
