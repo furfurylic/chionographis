@@ -471,9 +471,9 @@
         <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
 
         <!-- Shall not be processed -->
-        <chionographis basedir="${test.prefix}" includes="output-${dir.output}/input*.xml">
+        <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml">
             <all root="q" force="no">
-                <output dest="output-${dir.output}/output.xml"/>
+                <output dest="output-${test.title}/output.xml"/>
             </all>
         </chionographis>
 
