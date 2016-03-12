@@ -37,13 +37,13 @@ public final class Namespace {
     /**
      * Sets the namespace URI.
      *
-     * @param namespaceURI
+     * @param uri
      *      the namespace URI.
      */
-    public void addText(String namespaceURI) {
+    public void setURI(String uri) {
         if (prefixOrNamespaceURI_ != null) {
-            receiver_.accept(prefixOrNamespaceURI_, namespaceURI);
+            receiver_.accept(prefixOrNamespaceURI_, uri);
         }
-        prefixOrNamespaceURI_ = namespaceURI;
+        prefixOrNamespaceURI_ = uri;
     }
 }

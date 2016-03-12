@@ -50,7 +50,7 @@ public final class Param {
      * @param value
      *      the value of this parameter.
      */
-    public void setValue(String value) {
+    public void addText(String value) {
         if (nameOrValue_ != null) {
             receiver_.accept(nameOrValue_, value);
         }
