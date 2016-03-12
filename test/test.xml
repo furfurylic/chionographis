@@ -10,6 +10,8 @@
         <antcall target="basic-force-task"/>
         <antcall target="basic-up-to-date-at-start"/>
         <antcall target="basic-force-at-start"/>
+        <antcall target="basic-meta"/>
+        <antcall target="basic-meta-refer-content"/>
         <antcall target="transform"/>
         <antcall target="transform-params"/>
         <antcall target="transform-params-ns"/>
@@ -279,6 +281,54 @@
         </xslt>
         <assertfileeq name="${test.name}" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
         <assertfileeq name="${test.name}" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="basic-meta">
+        <property name="test.prefix" value="basic"/>
+        <property name="test.title" value="meta"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis srcdir="${dir.input}" includes="*.xml">
+            <meta type="file-name"/>
+            <meta type="file-title"/>
+            <output dest="${dir.output}/output.xml" mkdirs="yes"/>
+        </chionographis>
+
+        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+            <globmapper from="output*.xml" to="actual*.txt"/>
+        </xslt>
+        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="basic-meta-refer-content">
+        <property name="test.prefix" value="basic"/>
+        <property name="test.title" value="meta-refer-content"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-meta"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis srcdir="${dir.input}" includes="*.xml">
+            <meta type="file-name"/>
+            <meta type="file-title"/>
+            <output destdir="${dir.output}" refer="local-name(/*)" mkdirs="yes">
+                <globmapper from="in*" to="out*.xml"/>
+            </output>
+        </chionographis>
+
+        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+            <globmapper from="output*.xml" to="actual*.txt"/>
+        </xslt>
+        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
