@@ -313,8 +313,8 @@
 
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
             <transform style="input/flatten-nons.xsl">
-                <param name="p1" value="v1"/>
-                <param name="p2" value="v2"/>
+                <param name="p1">v1</param>
+                <param name="p2">v2</param>
                 <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
             </transform>
         </chionographis>
@@ -334,10 +334,10 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
-            <namespace prefix="p">http://www.furfurylic.net/chionographis/test/transform/ns</namespace>
+            <namespace prefix="p" uri="http://www.furfurylic.net/chionographis/test/transform/ns"/>
             <transform style="input/flatten-ns.xsl">
-                <param name="p:p1" value="v1"/>
-                <param name="{http://www.furfurylic.net/chionographis/test/transform/ns}p2" value="v2"/>
+                <param name="p:p1">v1</param>
+                <param name="{http://www.furfurylic.net/chionographis/test/transform/ns}p2">v2</param>
                 <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
             </transform>
         </chionographis>
@@ -492,7 +492,7 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}" includes="input-${test.title}/*.xml">
-            <namespace prefix="all">http://www.furfurylic.net/chionographis/test/all/ns/task1</namespace>
+            <namespace prefix="all" uri="http://www.furfurylic.net/chionographis/test/all/ns/task1"/>
             <all root="all:p">
                 <all root="{http://www.furfurylic.net/chionographis/test/all/ns/task2}q">
                     <output dest="output-${test.title}/output.xml" mkdirs="yes"/>
@@ -597,7 +597,7 @@
         <delete dir="${dir.output}"/>
 
         <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml">
-            <namespace prefix="q">http://www.furfurylic.net/chionographis/test</namespace>
+            <namespace prefix="q" uri="http://www.furfurylic.net/chionographis/test"/>
             <snip select="//q:a[2]">
                 <output destdir="${test.prefix}/output-${test.title}" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
             </snip>
