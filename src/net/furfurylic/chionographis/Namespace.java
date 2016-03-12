@@ -7,7 +7,11 @@
 
 package net.furfurylic.chionographis;
 
-import java.util.function.BiConsumer;
+import java.util.AbstractMap;
+import java.util.Map;
+
+import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.LogLevel;
 
 /**
  * This class represents one prefix-namespace URI mapping entry.
@@ -16,11 +20,13 @@ import java.util.function.BiConsumer;
  */
 public final class Namespace {
 
-    private String prefixOrNamespaceURI_;
-    private BiConsumer<String, String> receiver_;
+    private Logger logger_;
 
-    Namespace(BiConsumer<String, String> receiver) {
-        receiver_ = receiver;
+    private String prefix_ = null;
+    private String namespaceURI_ = null;
+
+    Namespace(Logger logger) {
+        logger_ = logger;
     }
 
     /**
@@ -30,8 +36,15 @@ public final class Namespace {
      *      the namespace prefix.
      */
     public void setPrefix(String prefix) {
-        receiver_.accept(prefix, prefixOrNamespaceURI_);
-        prefixOrNamespaceURI_ = prefix;
+        if (prefix.isEmpty()) {
+            logger_.log(this, "Empty namespace prefixes are not acceptable", LogLevel.ERR);
+            throw new BuildException();
+        }
+        if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
+            logger_.log(this, "Bad namespace prefix: " + prefix, LogLevel.ERR);
+            throw new BuildException();
+        }
+        prefix_ = prefix;
     }
 
     /**
@@ -41,9 +54,24 @@ public final class Namespace {
      *      the namespace URI.
      */
     public void setURI(String uri) {
-        if (prefixOrNamespaceURI_ != null) {
-            receiver_.accept(prefixOrNamespaceURI_, uri);
+        namespaceURI_ = uri;
+    }
+
+    Map.Entry<String, String> yield() {
+        if (prefix_ == null) {
+            String message = "Incomplete namespace prefix config found";
+            if (namespaceURI_ != null) {
+                message += ": URI=" + namespaceURI_;
+            }
+            logger_.log(this, message, LogLevel.ERR);
+            throw new BuildException();
         }
-        prefixOrNamespaceURI_ = uri;
+        if (namespaceURI_ == null) {
+            String message = "Incomplete namespace prefix config found: prefix=" + prefix_;
+            logger_.log(this, message, LogLevel.ERR);
+            throw new BuildException();
+        }
+
+        return new AbstractMap.SimpleImmutableEntry<String, String>(prefix_, namespaceURI_);
     }
 }

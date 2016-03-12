@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -70,10 +69,9 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     private boolean usesCache_ = false;
     private boolean force_ = false;
     private boolean verbose_ = false;
-    private int prefixCount_ = 0;
 
-    private Map<String, String> prefixMap_ = Collections.emptyMap();
-    private List<Meta> metas_;
+    private List<Namespace> namespaces_ = Collections.emptyList();
+    private List<Meta> metas_ = Collections.emptyList();
     private Sinks sinks_ = new Sinks(new ChionographisLogger());
 
     /**
@@ -128,6 +126,21 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         verbose_ = verbose;
     }
 
+    public Meta createMeta() {
+        Meta meta = new Meta(sinks_);
+        if (metas_.isEmpty()) {
+            metas_ = Collections.singletonList(meta);
+        } else {
+            if (metas_.size() == 1) {
+                Meta first = metas_.get(0);
+                metas_ = new ArrayList<>();
+                metas_.add(first);
+            }
+            metas_.add(meta);
+        }
+        return meta;
+    }
+
     /**
      * Adds a prefix-namespace URI mapping entry to this task.
      *
@@ -145,43 +158,18 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        ++prefixCount_;
-        return new Namespace(this::receiveNamespace);
-    }
-
-    /**
-     * Receives a possibly imperfect prefix-namespace mapping entry.
-     *
-     * <p>This method is invoked by {@link Namespace#setPrefix(String)}.</p>
-     *
-     * <p>One prefix can be invoked twice at most, and then in the first call <i>namespaceURI</i>
-     * must be {@code null}.</p>
-     *
-     * @param prefix
-     *      the namespace prefix, which shall not be {@code null}.
-     * @param namespaceURI
-     *      the namespace URI, which may be {@code null}.
-     */
-    private void receiveNamespace(String prefix, String namespaceURI) {
-        if (prefix.isEmpty()) {
-            sinks_.log(this, "Empty namespace prefixes are not acceptable", LogLevel.ERR);
-            throw new BuildException();
+        Namespace namespace = new Namespace(sinks_);
+        if (namespaces_.isEmpty()) {
+            namespaces_ = Collections.singletonList(namespace);
+        } else {
+            if (namespaces_.size() == 1) {
+                Namespace first = namespaces_.get(0);
+                namespaces_ = new ArrayList<>();
+                namespaces_.add(first);
+            }
+            namespaces_.add(namespace);
         }
-        if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
-            sinks_.log(this, "Bad namespace prefix: " + prefix, LogLevel.ERR);
-            throw new BuildException();
-        }
-        if (prefixMap_.isEmpty()) {
-            prefixMap_ = new HashMap<>();
-        }
-        if (prefixMap_.put(prefix, namespaceURI) != null) {
-            sinks_.log(this, "Namespace prefix " + prefix + " mapped twice", LogLevel.ERR);
-            throw new BuildException();
-        }
-        if (namespaceURI != null) {
-            sinks_.log(this,
-                "Namespace prefix added: " + prefix + '=' + namespaceURI, LogLevel.VERBOSE);
-        }
+        return namespace;
     }
 
     /**
@@ -216,15 +204,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         return sinks_.createOutput();
     }
 
-    public Meta createMeta() {
-        if (metas_ == null) {
-            metas_ = new ArrayList<>();
-        }
-        Meta meta = new Meta();
-        metas_.add(meta);
-        return meta;
-    }
-
     // TODO: Make this task able to accept soures other than files
 
     /**
@@ -232,8 +211,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      */
     @Override
     public void execute() {
-        Map<String, Function<URI, String>> metaMap = createMetaFuncMap();
-
         // Arrange various directories.
         File projectBaseDir = getProject().getBaseDir();
         if (projectBaseDir == null) {
@@ -268,6 +245,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                                  .toArray(URI[]::new);
         }
         sinks_.log(this, includedURIs.length + " input sources found", LogLevel.INFO);
+
+        Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
 
         // Set up namespace context.
         NamespaceContext namespaceContext = createNamespaceContext();
@@ -336,9 +315,9 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         sinks_.log(this, "  Referred source data: "
                             + String.join(", ", referredContents), LogLevel.DEBUG);
 
-                        if (metaMap != null) {
+                        if (!metaFuncMap.isEmpty()) {
                             DocumentFragment metas = document.createDocumentFragment();
-                            addMetaInformation(metaMap, includedURI, (target, data) ->
+                            addMetaInformation(metaFuncMap, includedURI, (target, data) ->
                                 metas.appendChild(
                                     document.createProcessingInstruction(target, data)));
                             Element docElem = document.getDocumentElement();
@@ -351,9 +330,9 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         XMLReader reader = parser.getXMLReader();
                         sinks_.log(this,
                             "  Referral to the source contents not required", LogLevel.DEBUG);
-                        if (metaMap != null) {
+                        if (!metaFuncMap.isEmpty()) {
                             reader = new MetaFilter(reader,
-                                c -> addMetaInformation(metaMap, includedURI, c));
+                                c -> addMetaInformation(metaFuncMap, includedURI, c));
                         }
                         reader.setEntityResolver(resolver);
                         InputSource input = new InputSource(systemID);
@@ -388,43 +367,52 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     }
 
     private Map<String, Function<URI, String>> createMetaFuncMap() {
-        Map<String, Function<URI, String>> metaMap = null;
-        if (metas_ != null) {
-            metaMap = new TreeMap<>();
-            for (Meta meta : metas_) {
-                Map.Entry<String, Function<URI, String>> entry;
-                try {
-                    entry = meta.yield();
-                } catch (BuildException e) {
-                    sinks_.log(this, e.getMessage(), LogLevel.ERR);
-                    throw e;
-                }
-                if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
-                    sinks_.log(this,
-                        "Meta-information name " + entry.getKey() + " added twice", LogLevel.ERR);
-                    throw new BuildException();
-                }
+        if (metas_.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        if (metas_.size() == 1) {
+            Map.Entry<String, Function<URI, String>> spec = metas_.get(0).yield();
+            return Collections.singletonMap(spec.getKey(), spec.getValue());
+        }
+
+        Map<String, Function<URI, String>> metaMap = new TreeMap<>();
+        for (Meta meta : metas_) {
+            Map.Entry<String, Function<URI, String>> entry;
+            try {
+                entry = meta.yield();
+            } catch (BuildException e) {
+                sinks_.log(this, e.getMessage(), LogLevel.ERR);
+                throw e;
+            }
+            if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
+                sinks_.log(this,
+                    "Meta-information name " + entry.getKey() + " added twice", LogLevel.ERR);
+                throw new BuildException();
             }
         }
         return metaMap;
     }
 
     private NamespaceContext createNamespaceContext() {
-        int unmappedNameCount = prefixCount_ - prefixMap_.size();
-        if (unmappedNameCount > 0) {
-            sinks_.log(this,
-                unmappedNameCount + " namespace prefixes left not fully configured", LogLevel.ERR);
-            Optional<String> paramNames = prefixMap_.entrySet().stream()
-                                            .filter(e -> e.getValue() == null)
-                                            .map(e -> e.getKey())
-                                            .reduce((r, s) -> r += ", " + s);
-            if (paramNames.isPresent()) {
-                sinks_.log(this,
-                    "  Namespace prefixes without names are: " + paramNames.get(), LogLevel.ERR);
-            }
-            throw new BuildException();
+        if (namespaces_.isEmpty()) {
+            return new PrefixMap(Collections.emptyMap());
         }
-        return new PrefixMap(prefixMap_);
+        if (namespaces_.size() == 1) {
+            Map.Entry<String, String> spec = namespaces_.get(0).yield();
+            return new PrefixMap(
+                Collections.singletonMap(spec.getKey(), spec.getValue()));
+        }
+
+        Map<String, String> namespaceMap = new HashMap<>();
+        for (Namespace namespace : namespaces_) {
+            Map.Entry<String, String> spec = namespace.yield();
+            if (namespaceMap.put(spec.getKey(), spec.getValue()) != null) {
+                sinks_.log(this,
+                    "Namespace prefix " + spec.getKey() + " added twice", LogLevel.ERR);
+                    throw new BuildException();
+            }
+        }
+        return new PrefixMap(namespaceMap);
     }
 
     private void addMetaInformation(Map<String, Function<URI, String>> metaFuncMap, URI sourceURI, BiConsumer<String, String> consumer) {
