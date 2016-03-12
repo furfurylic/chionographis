@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
@@ -20,6 +21,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -43,10 +48,14 @@ import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
+import org.w3c.dom.DocumentFragment;
+import org.w3c.dom.Element;
+import org.xml.sax.Attributes;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLFilterImpl;
 
 /**
  * An Ant task class that performs cascading transformation to XML documents.
@@ -64,6 +73,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     private int prefixCount_ = 0;
 
     private Map<String, String> prefixMap_ = Collections.emptyMap();
+    private List<Meta> metas_;
     private Sinks sinks_ = new Sinks(new ChionographisLogger());
 
     /**
@@ -206,6 +216,15 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         return sinks_.createOutput();
     }
 
+    public Meta createMeta() {
+        if (metas_ == null) {
+            metas_ = new ArrayList<>();
+        }
+        Meta meta = new Meta();
+        metas_.add(meta);
+        return meta;
+    }
+
     // TODO: Make this task able to accept soures other than files
 
     /**
@@ -213,6 +232,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
      */
     @Override
     public void execute() {
+        Map<String, Function<URI, String>> metaMap = createMetaFuncMap();
+
         // Arrange various directories.
         File projectBaseDir = getProject().getBaseDir();
         if (projectBaseDir == null) {
@@ -291,8 +312,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             int count = 0;
             sinks_.startBundle();
             for (int i = 0; i < includedFiles.length; ++i) {
-                String includedFile = includedFiles[i];
-                String systemID = srcDir_.resolve(includedFile).toUri().toString();
+                URI includedURI = includedURIs[i];
+                String systemID = includedURI.toString();
                 if ((includes != null) && !includes[i]) {
                     sinks_.log(this, "Skipping " + systemID, LogLevel.DEBUG);
                     continue;
@@ -300,8 +321,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 ++count;
                 try {
                     sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-
-                    List<XPathExpression> referents = sinks_.referents(i, includedURIs[i], includedFile);
+                    List<XPathExpression> referents = sinks_.referents(i, includedURI, includedFiles[i]);
                     List<String> referredContents = Collections.emptyList();
                     Source source;
                     if (!referents.isEmpty()) {
@@ -315,19 +335,33 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         referredContents = Referral.extract(document, referents);
                         sinks_.log(this, "  Referred source data: "
                             + String.join(", ", referredContents), LogLevel.DEBUG);
+
+                        if (metaMap != null) {
+                            DocumentFragment metas = document.createDocumentFragment();
+                            addMetaInformation(metaMap, includedURI, (target, data) ->
+                                metas.appendChild(
+                                    document.createProcessingInstruction(target, data)));
+                            Element docElem = document.getDocumentElement();
+                            docElem.insertBefore(metas, docElem.getFirstChild());
+                        }
+
                         source = new DOMSource(document, systemID);
 
                     } else {
                         XMLReader reader = parser.getXMLReader();
                         sinks_.log(this,
                             "  Referral to the source contents not required", LogLevel.DEBUG);
+                        if (metaMap != null) {
+                            reader = new MetaFilter(reader,
+                                c -> addMetaInformation(metaMap, includedURI, c));
+                        }
                         reader.setEntityResolver(resolver);
                         InputSource input = new InputSource(systemID);
                         source = new SAXSource(reader, input);
                     }
 
                     // Do processing.
-                    Result result = sinks_.startOne(i, includedURIs[i], includedFile, referredContents);
+                    Result result = sinks_.startOne(i, includedURI, includedFiles[i], referredContents);
                     if (result != null) {
                         identity.transform(source, result);
                         sinks_.finishOne();
@@ -353,6 +387,28 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         }
     }
 
+    private Map<String, Function<URI, String>> createMetaFuncMap() {
+        Map<String, Function<URI, String>> metaMap = null;
+        if (metas_ != null) {
+            metaMap = new TreeMap<>();
+            for (Meta meta : metas_) {
+                Map.Entry<String, Function<URI, String>> entry;
+                try {
+                    entry = meta.yield();
+                } catch (BuildException e) {
+                    sinks_.log(this, e.getMessage(), LogLevel.ERR);
+                    throw e;
+                }
+                if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
+                    sinks_.log(this,
+                        "Meta-information name " + entry.getKey() + " added twice", LogLevel.ERR);
+                    throw new BuildException();
+                }
+            }
+        }
+        return metaMap;
+    }
+
     private NamespaceContext createNamespaceContext() {
         int unmappedNameCount = prefixCount_ - prefixMap_.size();
         if (unmappedNameCount > 0) {
@@ -369,6 +425,50 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             throw new BuildException();
         }
         return new PrefixMap(prefixMap_);
+    }
+
+    private void addMetaInformation(Map<String, Function<URI, String>> metaFuncMap, URI sourceURI, BiConsumer<String, String> consumer) {
+        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncMap.entrySet()) {
+            String target = metaFunc.getKey();
+            String data = metaFunc.getValue().apply(sourceURI);
+            sinks_.log(this, "Adding processing instruction; target=" + target + ", data=" + data,
+                LogLevel.DEBUG);
+            consumer.accept(target, data);
+        }
+    }
+
+    private static final class MetaFilter extends XMLFilterImpl {
+
+        private Consumer<BiConsumer<String, String>> adder_;
+
+        public MetaFilter(XMLReader parent, Consumer<BiConsumer<String, String>> adder) {
+            super(parent);
+            adder_ = adder;
+        }
+
+        @Override
+        public void startElement(String uri, String localName, String qName, Attributes atts)
+                throws SAXException {
+            super.startElement(uri, localName, qName, atts);
+            if (adder_ != null) {
+                try {
+                    adder_.accept(this::processingInstructionHacked);
+                } catch (BuildException e) {
+                    if ((e.getCause() != null) && (e.getCause() instanceof SAXException)) {
+                        throw (SAXException) e.getCause();
+                    }
+                }
+                adder_ = null;
+            }
+        }
+
+        private void processingInstructionHacked(String target, String data) {
+            try {
+                processingInstruction(target, data);
+            } catch (SAXException e) {
+                throw new BuildException(e);
+            }
+        }
     }
 
     private final class ChionographisLogger implements Logger {
