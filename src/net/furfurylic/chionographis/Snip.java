@@ -53,6 +53,7 @@ public final class Snip extends Sink implements SinkDriver {
     private int currentIndex_;
     private URI currentSrcURI_;
     private String currentSrcFileName_;
+    private long currentSrcLastModifiedTime_;
 
     Snip(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -132,10 +133,11 @@ public final class Snip extends Sink implements SinkDriver {
 
     @Override
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
-            List<String> notUsed) {
+            long originalSrcLastModifiedTime, List<String> notUsed) {
         currentIndex_ = originalSrcIndex;
         currentSrcURI_ = originalSrcURI;
         currentSrcFileName_ = originalSrcFileName;
+        currentSrcLastModifiedTime_ = originalSrcLastModifiedTime;
         document_ = newDocument();
         return new DOMResult(document_);
     }
@@ -185,7 +187,7 @@ public final class Snip extends Sink implements SinkDriver {
 
                     // Open sink's result
                     Result result = sinks_.startOne(currentIndex_, currentSrcURI_, currentSrcFileName_,
-                        referredContents);
+                        currentSrcLastModifiedTime_, referredContents);
 
                     if (result != null) {
                         // Send fragment to sink

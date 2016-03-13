@@ -202,7 +202,11 @@ public final class Transform extends Sink implements SinkDriver {
 
     @Override
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
-            List<String> notUsed) {
+            long originalSrcFileLastModifiedTime, List<String> notUsed) {
+        long lastModified = styleURI_.getScheme().equalsIgnoreCase("file") ?
+            Math.max(originalSrcFileLastModifiedTime, new File(styleURI_).lastModified()) :
+            Long.MAX_VALUE;
+
         try {
             List<XPathExpression> referents =
                 sinks_.referents(originalSrcIndex, originalSrcURI, originalSrcFileName);
@@ -222,7 +226,7 @@ public final class Transform extends Sink implements SinkDriver {
                         + String.join(", ", referredContents), LogLevel.DEBUG);
                     Result openedResult =
                         sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
-                            referredContents);
+                            lastModified, referredContents);
                     if (openedResult != null) {
                         try {
                             stylesheet_.newTransformer()
@@ -238,7 +242,7 @@ public final class Transform extends Sink implements SinkDriver {
                 sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                 Result openedResult =
                     sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
-                        Collections.emptyList());
+                        lastModified, Collections.emptyList());
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
                     styler.setResult(openedResult);

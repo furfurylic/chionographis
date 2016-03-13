@@ -164,7 +164,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
-            List<String> referredContents) {
+            long originalSrcFileLastModifiedTime, List<String> referredContents) {
         if (activeSinks_ == null) {
             prepareActiveSinks(originalSrcIndex);
         }
@@ -172,7 +172,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             return null;
         } else if (activeSinks_.size() == 1) {
             return activeSinks_.get(0).startOne(
-                originalSrcIndex, originalSrcURI, originalSrcFileName, referredContents);
+                originalSrcIndex, originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, referredContents);
         } else {
             CompositeResultBuilder builder = new CompositeResultBuilder();
             int i = 0;
@@ -184,8 +184,13 @@ final class Sinks extends Sink implements SinkDriver, Logger {
                 } else {
                     referredContentsOne = Collections.emptyList();
                 }
-                builder.add(activeSinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcURI, originalSrcFileName, referredContentsOne));
+                Result result = activeSinks_.get(j).startOne(
+                    originalSrcIndex, originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
+                if (result != null) {
+                    builder.add(result);
+                } else {
+                    activeSinks_.set(j,  null);
+                }
             }
             return builder.newCompositeResult();
         }
@@ -193,12 +198,13 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     void finishOne() {
-        activeSinks_.stream().forEach(Sink::finishOne);
+        activeSinks_.stream().filter(s -> s != null).forEach(Sink::finishOne);
     }
 
     @Override
     void abortOne() {
         Optional<RuntimeException> ex = activeSinks_.stream()
+            .filter(s -> s != null)
             .map(s -> { try { s.abortOne(); return null; } catch (RuntimeException e) { return e; } })
             .filter(e -> e != null)
             .findAny();

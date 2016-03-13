@@ -18,15 +18,23 @@ import java.util.stream.IntStream;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.namespace.QName;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.Locator;
@@ -50,6 +58,10 @@ public final class All extends Sink implements SinkDriver {
 
     private QName rootQ_;
     private AllHandler handler_;
+
+    private Document document_;
+    private Document currentDocument_;
+    long lastModifiedTime_;
 
     All(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -153,44 +165,74 @@ public final class All extends Sink implements SinkDriver {
     void startBundle() {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
-        Result result = sinks_.startOne(-1, null, null, Collections.emptyList());
-        if (result == null) {
-            handler_ = null;
-            return;
-        }
-        if (result instanceof SAXResult) {
-            SAXResult saxResult = (SAXResult) result;
-            handler_ = new AllHandler(saxResult.getHandler(), saxResult.getLexicalHandler());
-        } else {
+//        List<XPathExpression> referents = sinks_.referents(-1, null, null);
+//        if (referents.isEmpty()) {
+//            document_ = null;
+//            Result result = sinks_.startOne(-1, null, null, Long.MAX_VALUE, Collections.emptyList());
+//            if (result == null) {
+//                handler_ = null;
+//                return;
+//            }
+//            if (result instanceof SAXResult) {
+//                SAXResult saxResult = (SAXResult) result;
+//                handler_ = new AllHandler(saxResult.getHandler(), saxResult.getLexicalHandler());
+//            } else {
+//                try {
+//                    TransformerHandler identity = ((SAXTransformerFactory) TransformerFactory
+//                        .newInstance()).newTransformerHandler();
+//                    identity.setResult(result);
+//                    handler_ = new AllHandler(identity, identity);
+//                } catch (TransformerException e) {
+//                    throw new BuildException(e);
+//                }
+//            }
+//            try {
+//                handler_.getHandler().setDocumentLocator(handler_);
+//                handler_.getHandler().startDocument();
+//                AttributesImpl atts = new AttributesImpl();
+//                if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+//                    handler_.getHandler().startPrefixMapping(
+//                        rootQ_.getPrefix(), rootQ_.getNamespaceURI());
+//                    atts.addAttribute("", rootQ_.getPrefix(), "xmlns:" + rootQ_.getPrefix(),
+//                        "CDATA", rootQ_.getNamespaceURI());
+//                }
+//                handler_.getHandler().startElement(
+//                    rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_, atts);
+//            } catch (SAXException e) {
+//                throw new BuildException(e);
+//            }
+//        } else {
             try {
-                TransformerHandler identity = ((SAXTransformerFactory) TransformerFactory
-                    .newInstance()).newTransformerHandler();
-                identity.setResult(result);
-                handler_ = new AllHandler(identity, identity);
-            } catch (TransformerException e) {
+                DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                dbfac.setNamespaceAware(true);
+                DocumentBuilder builder = dbfac.newDocumentBuilder();
+                document_ = builder.newDocument();
+                Element docElement = document_.createElementNS(rootQ_.getNamespaceURI(), root_);
+                if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+                    docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + rootQ_.getPrefix(), rootQ_.getNamespaceURI());
+                }
+                document_.appendChild(docElement);
+                lastModifiedTime_ = Long.MIN_VALUE;
+            } catch (ParserConfigurationException e) {
                 throw new BuildException(e);
             }
-        }
-        try {
-            handler_.getHandler().setDocumentLocator(handler_);
-            handler_.getHandler().startDocument();
-            AttributesImpl atts = new AttributesImpl();
-            if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                handler_.getHandler().startPrefixMapping(
-                    rootQ_.getPrefix(), rootQ_.getNamespaceURI());
-                atts.addAttribute("", rootQ_.getPrefix(), "xmlns:" + rootQ_.getPrefix(),
-                    "CDATA", rootQ_.getNamespaceURI());
-            }
-            handler_.getHandler().startElement(
-                rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_, atts);
-        } catch (SAXException e) {
-            throw new BuildException(e);
-        }
+//        }
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName, List<String> notUsed) {
-        if (handler_ != null) {
+    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
+        if (document_ != null) {
+            try {
+                lastModifiedTime_ = Math.max(originalSrcIndex, lastModifiedTime_);
+                DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                dbfac.setNamespaceAware(true);
+                DocumentBuilder builder = dbfac.newDocumentBuilder();
+                currentDocument_ = builder.newDocument();
+                return new DOMResult(currentDocument_);
+            } catch (ParserConfigurationException e) {
+                throw new BuildException(e);
+            }
+        } else if (handler_ != null) {
             sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
             return new SAXResult(handler_);
         } else {
@@ -200,6 +242,9 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     void finishOne() {
+        if (document_ != null) {
+            document_.getDocumentElement().appendChild(document_.adoptNode(currentDocument_.getDocumentElement()));
+        }
     }
 
     @Override
@@ -213,7 +258,23 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     void finishBundle() {
-        if (handler_ != null) {
+        if (document_ != null) {
+            List<XPathExpression> referents = sinks_.referents(-1, null, null);
+            List<String> referredContents = Referral.extract(document_, referents);
+            Result result = sinks_.startOne(-1, null, null, lastModifiedTime_, referredContents);
+            if (result != null) {
+                try {
+                    // Send fragment to sink
+                    TransformerFactory.newInstance().newTransformer().transform(
+                        new DOMSource(document_), result);
+
+                    // Finish sink
+                    sinks_.finishOne();
+                } catch (TransformerException e) {
+                    throw new BuildException(e);
+                }
+            }
+        } else if (handler_ != null) {
             try {
                 handler_.getHandler().endElement(
                     rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_);
@@ -249,9 +310,9 @@ public final class All extends Sink implements SinkDriver {
             if (lexicalHandler != null) {
                 lexicalHandler_ = lexicalHandler;
             } else if (contentHandler instanceof LexicalHandler){
-                lexicalHandler = (LexicalHandler) contentHandler;
+                lexicalHandler_ = (LexicalHandler) contentHandler;
             } else {
-                lexicalHandler = new LexicalHandler() {
+                lexicalHandler_ = new LexicalHandler() {
                     @Override
                     public void startEntity(String name) throws SAXException {
                     }
