@@ -158,17 +158,19 @@ public final class Transform extends Sink implements SinkDriver {
             return;
         }
         if (params_.size() == 1) {
-            Map.Entry<String, Object> spec = params_.get(0).yield(namespaceContext);
-            paramMap_ = Collections.singletonMap(spec.getKey(), spec.getValue());
+            Map.Entry<String, Object> entry = params_.get(0).yield(namespaceContext);
+            sinks_.log(this, "Adding a stylesheet parameter: " + entry, LogLevel.VERBOSE);
+            paramMap_ = Collections.singletonMap(entry.getKey(), entry.getValue());
             return;
         }
 
         paramMap_ = new TreeMap<>();
         for (Param param : params_) {
             Map.Entry<String, Object> entry = param.yield(namespaceContext);
+            sinks_.log(this, "Adding a stylesheet parameter: " + entry, LogLevel.VERBOSE);
             if (paramMap_.put(entry.getKey(), entry.getValue()) != null) {
                 sinks_.log(this,
-                    "Param named " + entry.getKey() + " added twice", LogLevel.ERR);
+                    "Stylesheet parameter named " + entry.getKey() + " added twice", LogLevel.ERR);
                 throw new BuildException();
             }
         }
