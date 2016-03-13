@@ -250,7 +250,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             boolean[] includes = null;
             if (!force_) {
                 boolean[] examined = sinks_.preexamineBundle(
-                    includedURIs, includedFiles, Collections.<URI>emptySet());
+                    includedFiles, includedFileLastModifiedTimes);
                 if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
                     sinks_.log(this, "No input sources processed", LogLevel.INFO);
                     sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
@@ -279,7 +279,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 ++count;
                 try {
                     sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                    List<XPathExpression> referents = sinks_.referents(i, includedURI, includedFiles[i]);
+                    List<XPathExpression> referents = sinks_.referents(i, includedFiles[i]);
                     List<String> referredContents = Collections.emptyList();
                     Source source;
                     if (!referents.isEmpty()) {
@@ -313,7 +313,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     }
 
                     // Do processing.
-                    Result result = sinks_.startOne(i, includedURI, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
+                    Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
                     if (result != null) {
                         identity.reset();
                         identity.setOutputProperty(OutputKeys.METHOD, "xml");

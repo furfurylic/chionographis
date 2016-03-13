@@ -12,10 +12,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 import javax.xml.namespace.NamespaceContext;
@@ -52,6 +50,7 @@ public final class Transform extends Sink implements SinkDriver {
     private List<Param> params_ = Collections.emptyList();
 
     private URI styleURI_;
+    private long styleLastModified_;
     private Map<String, Object> paramMap_ = null;
 
     private Stylesheet stylesheet_ = new Stylesheet();
@@ -147,6 +146,12 @@ public final class Transform extends Sink implements SinkDriver {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
         }
 
+        if (styleURI_.getScheme().equalsIgnoreCase("file")) {
+            styleLastModified_ = new File(styleURI_).lastModified();
+        } else {
+            styleLastModified_ = Long.MAX_VALUE;
+        }
+
         force_ = force_ || force;
 
         sinks_.init(baseDir, namespaceContext, force_);
@@ -177,22 +182,19 @@ public final class Transform extends Sink implements SinkDriver {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> stylesheetURIs) {
+    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+        boolean[] includes;
         if (force_) {
-            boolean[] result = new boolean[originalSrcURIs.length];
-            Arrays.fill(result, true);
-            return result;
-        }
-
-        if (stylesheetURIs.isEmpty()) {
-            stylesheetURIs = Collections.<URI>singleton(styleURI_);
+            includes = new boolean[originalSrcFileNames.length];
+            Arrays.fill(includes, true);
         } else {
-            stylesheetURIs = new HashSet<>(stylesheetURIs);
-            stylesheetURIs.add(styleURI_);
-            stylesheetURIs = Collections.unmodifiableSet(stylesheetURIs);
+            long[] lastModifiedTimes =
+                Arrays.stream(originalSrcLastModifiedTimes)
+                      .map(l -> Math.max(l, styleLastModified_))
+                      .toArray();
+            includes = sinks_.preexamineBundle(originalSrcFileNames, lastModifiedTimes);
         }
-        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
+        return includes;
     }
 
     @Override
@@ -201,7 +203,7 @@ public final class Transform extends Sink implements SinkDriver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+    Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcFileLastModifiedTime, List<String> notUsed) {
         long lastModified = styleURI_.getScheme().equalsIgnoreCase("file") ?
             Math.max(originalSrcFileLastModifiedTime, new File(styleURI_).lastModified()) :
@@ -209,7 +211,7 @@ public final class Transform extends Sink implements SinkDriver {
 
         try {
             List<XPathExpression> referents =
-                sinks_.referents(originalSrcIndex, originalSrcURI, originalSrcFileName);
+                sinks_.referents(originalSrcIndex, originalSrcFileName);
             if (!referents.isEmpty()) {
                 sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                 Document document;
@@ -225,7 +227,7 @@ public final class Transform extends Sink implements SinkDriver {
                     sinks_.log(this, "  Referred source data: "
                         + String.join(", ", referredContents), LogLevel.DEBUG);
                     Result openedResult =
-                        sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
+                        sinks_.startOne(originalSrcIndex, originalSrcFileName,
                             lastModified, referredContents);
                     if (openedResult != null) {
                         try {
@@ -241,7 +243,7 @@ public final class Transform extends Sink implements SinkDriver {
             } else {
                 sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                 Result openedResult =
-                    sinks_.startOne(originalSrcIndex, originalSrcURI, originalSrcFileName,
+                    sinks_.startOne(originalSrcIndex, originalSrcFileName,
                         lastModified, Collections.emptyList());
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
