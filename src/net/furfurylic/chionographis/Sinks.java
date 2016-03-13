@@ -105,11 +105,10 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-                Set<URI> additionalURIs) {
+    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
-            .map(s -> s.preexamineBundle(originalSrcURIs, originalSrcFileNames, additionalURIs))
+            .map(s -> s.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes))
             .toArray(boolean[][]::new);
 
         boolean[] results = new boolean[includes_[0].length];
@@ -133,11 +132,11 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    List<XPathExpression> referents(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName) {
+    List<XPathExpression> referents(int originalSrcIndex, String originalSrcFileName) {
         prepareActiveSinks(originalSrcIndex);
         referentCounts_ = null;
         List<List<XPathExpression>> referents = activeSinks_.stream()
-                .map(s -> s.referents(originalSrcIndex, originalSrcURI, originalSrcFileName))
+                .map(s -> s.referents(originalSrcIndex, originalSrcFileName))
                 .collect(Collectors.toList());
         if (referents.stream().noneMatch(r -> !r.isEmpty())) {
             return Collections.<XPathExpression>emptyList();
@@ -153,7 +152,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     private void prepareActiveSinks(int originalSrcIndex) {
         if ((includes_ == null) || (originalSrcIndex < 0)) {
-            activeSinks_ = sinks_;
+            activeSinks_ = new ArrayList<>(sinks_);
         } else {
             activeSinks_ = IntStream.range(0, includes_.length)
                 .filter(i -> includes_[i][originalSrcIndex])
@@ -163,7 +162,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+    Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcFileLastModifiedTime, List<String> referredContents) {
         if (activeSinks_ == null) {
             prepareActiveSinks(originalSrcIndex);
@@ -172,7 +171,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             return null;
         } else if (activeSinks_.size() == 1) {
             return activeSinks_.get(0).startOne(
-                originalSrcIndex, originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, referredContents);
+                originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContents);
         } else {
             CompositeResultBuilder builder = new CompositeResultBuilder();
             int i = 0;
@@ -185,7 +184,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
                     referredContentsOne = Collections.emptyList();
                 }
                 Result result = activeSinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
+                    originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
                 if (result != null) {
                     builder.add(result);
                 } else {

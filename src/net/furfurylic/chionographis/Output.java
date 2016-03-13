@@ -11,17 +11,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
-import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 import javax.xml.namespace.NamespaceContext;
@@ -49,7 +46,6 @@ public final class Output extends Sink {
     private FileNameMapper mapper_;
 
     private Logger logger_;
-    private long stylesheetLastModified_ = Long.MAX_VALUE;
     private Function<String, Set<File>> destMapping_;
     private List<XPathExpression> referents_;
 
@@ -230,36 +226,16 @@ public final class Output extends Sink {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> stylesheetURIs) {
+    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         boolean[] includes = new boolean[originalSrcFileNames.length];
-
-        if (force_) {
+        if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
-            return includes;
-        }
-
-        ToLongFunction<URI> getConservativeLastModified = u -> {
-            if (u.getScheme().equalsIgnoreCase("file")) {
-                return new File(u).lastModified();
-            } else {
-                return Long.MAX_VALUE;
+        } else {
+            assert destMapping_ != null;
+            for (int i = 0; i < originalSrcFileNames.length; ++i) {
+                includes[i] = isOriginalSrcNewer(
+                    originalSrcLastModifiedTimes[i], destMapping_.apply(originalSrcFileNames[i]));
             }
-        };
-        stylesheetLastModified_ = stylesheetURIs.stream()
-                                                .mapToLong(getConservativeLastModified)
-                                                .max()
-                                                .orElse(Long.MIN_VALUE);
-
-        if (!referents_.isEmpty()) {
-            Arrays.fill(includes, true);
-            return includes;
-        }
-
-        assert(destMapping_ != null);
-        for (int i = 0; i < originalSrcURIs.length; ++i) {
-            includes[i] = isOriginalSrcNewer(
-                originalSrcURIs[i], originalSrcFileNames[i], Math.max(stylesheetLastModified_, new File(originalSrcURIs[i]).lastModified()), destMapping_);
         }
         return includes;
     }
@@ -270,12 +246,12 @@ public final class Output extends Sink {
     }
 
     @Override
-    List<XPathExpression> referents(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName) {
+    List<XPathExpression> referents(int originalSrcIndex, String originalSrcFileName) {
         return referents_;
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
+    Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcFileLastModifiedTime, List<String> referredContents) {
         // Initialize currentDests_ as empty.
         if (currentDests_ == null) {
@@ -299,10 +275,10 @@ public final class Output extends Sink {
             }
         }
         if (!force_
-         && !isOriginalSrcNewer(originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, s -> currentDests_)) {
+         && !isOriginalSrcNewer(originalSrcFileLastModifiedTime, currentDests_)) {
             String files = currentDests_.stream()
                                         .map(File::getAbsolutePath)
-                                        .reduce((ss, s) -> ss + s)
+                                        .reduce((ss, s) -> ss + ", " + s)
                                         .orElse(null);
             logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
             return null;
@@ -318,28 +294,11 @@ public final class Output extends Sink {
         return new StreamResult(currentContent_);
     }
 
-    private boolean isOriginalSrcNewer(URI originalSrcURI, String originalSrcFileName,
-            long originalSrcFileLastModifiedTime, Function<String, Set<File>> destMapping) {
-        assert ! force_;
-        //if (originalSrcURI == null) {
-        //    // No certain original source available -> Continue processing
-        //    return true;
-        //}
-        //if (stylesheetLastModified_ == Long.MAX_VALUE) {
-        //    // Stylesheets are non-file resources -> Continue processing
-        //    return true;
-        //}
-        //if (!originalSrcURI.getScheme().equalsIgnoreCase("file")) {
-        //    // The original source is a non-file resource -> Continue processing
-        //    return true;
-        //}
-
-        //long srcLastModified = new File(originalSrcURI).lastModified();
-        long lastModified = originalSrcFileLastModifiedTime;//Math.max(srcLastModified, stylesheetLastModified_);
-        Collection<File> dests = destMapping.apply(originalSrcFileName);
+    private boolean isOriginalSrcNewer(long originalSrcFileLastModifiedTime, Set<File> dests) {
+        assert !force_;
         return dests.stream()
-                     .anyMatch(f -> (!f.exists()
-                                  || (f.lastModified() < lastModified)));
+                    .anyMatch(f -> (!f.exists()
+                                 || (f.lastModified() < originalSrcFileLastModifiedTime)));
     }
 
     @Override
