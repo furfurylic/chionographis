@@ -70,7 +70,7 @@ public abstract class Sink {
      *      to be included in the process, i.e., the corresponding output is already up-to-date.
      */
     abstract boolean[] preexamineBundle(
-        URI[] originalSrcURIs, String[] originalSrcFileNames, Set<URI> stylesheetURIs);
+        String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes);
 
     abstract void startBundle();
 
@@ -104,8 +104,7 @@ public abstract class Sink {
      *      XPath expressions which point the input document contents required by this object,
      *      or an empty list if this object requires none.
      */
-    List<XPathExpression> referents(int originalSrcIndex,
-            URI originalSrcURI, String originalSrcFileName) {
+    List<XPathExpression> referents(int originalSrcIndex, String originalSrcFileName) {
         return Collections.emptyList();
     }
 
@@ -146,7 +145,7 @@ public abstract class Sink {
      *      an TrAX {@code Result} object which receives the input document.
      */
     abstract Result startOne(int originalSrcIndex,
-        URI originalSrcURI, String originalSrcFileName,
+        String originalSrcFileName, long originalSrcFileLastModifiedTime,
         List<String> referredContents);
 
     /**

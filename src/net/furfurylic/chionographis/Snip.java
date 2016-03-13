@@ -8,10 +8,8 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.net.URI;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -51,8 +49,8 @@ public final class Snip extends Sink implements SinkDriver {
 
     private Document document_;
     private int currentIndex_;
-    private URI currentSrcURI_;
     private String currentSrcFileName_;
+    private long currentSrcLastModifiedTime_;
 
     Snip(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -120,9 +118,8 @@ public final class Snip extends Sink implements SinkDriver {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> stylesheetURIs) {
-        return sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
+    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+        return sinks_.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes);
     }
 
     @Override
@@ -131,11 +128,11 @@ public final class Snip extends Sink implements SinkDriver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
-            List<String> notUsed) {
+    Result startOne(int originalSrcIndex, String originalSrcFileName,
+            long originalSrcLastModifiedTime, List<String> notUsed) {
         currentIndex_ = originalSrcIndex;
-        currentSrcURI_ = originalSrcURI;
         currentSrcFileName_ = originalSrcFileName;
+        currentSrcLastModifiedTime_ = originalSrcLastModifiedTime;
         document_ = newDocument();
         return new DOMResult(document_);
     }
@@ -172,7 +169,7 @@ public final class Snip extends Sink implements SinkDriver {
 
                     // Search the source contents if necessary
                     List<XPathExpression> referents =
-                        sinks_.referents(currentIndex_, currentSrcURI_, currentSrcFileName_);
+                        sinks_.referents(currentIndex_, currentSrcFileName_);
                     List<String> referredContents = Collections.emptyList();
                     if (!referents.isEmpty()) {
                         sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
@@ -184,8 +181,8 @@ public final class Snip extends Sink implements SinkDriver {
                     }
 
                     // Open sink's result
-                    Result result = sinks_.startOne(currentIndex_, currentSrcURI_, currentSrcFileName_,
-                        referredContents);
+                    Result result = sinks_.startOne(currentIndex_, currentSrcFileName_,
+                        currentSrcLastModifiedTime_, referredContents);
 
                     if (result != null) {
                         // Send fragment to sink
