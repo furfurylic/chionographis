@@ -419,8 +419,11 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             return Collections.emptyMap();
         }
         if (metas_.size() == 1) {
-            Map.Entry<String, Function<URI, String>> spec = metas_.get(0).yield();
-            return Collections.singletonMap(spec.getKey(), spec.getValue());
+            Map.Entry<String, Function<URI, String>> entry = metas_.get(0).yield();
+            sinks_.log(this,
+                "Adding a meta-information instruction: name=" + entry.getKey(),
+                LogLevel.VERBOSE);
+            return Collections.singletonMap(entry.getKey(), entry.getValue());
         }
 
         Map<String, Function<URI, String>> metaMap = new TreeMap<>();
@@ -432,9 +435,13 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 sinks_.log(this, e.getMessage(), LogLevel.ERR);
                 throw e;
             }
+            sinks_.log(this,
+                "Adding a meta-information instruction: name=" + entry.getKey(),
+                LogLevel.VERBOSE);
             if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
                 sinks_.log(this,
-                    "Meta-information name " + entry.getKey() + " added twice", LogLevel.ERR);
+                    "Meta-information instruction named " + entry.getKey() + " added twice",
+                    LogLevel.ERR);
                 throw new BuildException();
             }
         }
@@ -447,6 +454,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         }
         if (namespaces_.size() == 1) {
             Map.Entry<String, String> spec = namespaces_.get(0).yield();
+            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, LogLevel.VERBOSE);
             return new PrefixMap(
                 Collections.singletonMap(spec.getKey(), spec.getValue()));
         }
@@ -454,10 +462,12 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         Map<String, String> namespaceMap = new HashMap<>();
         for (Namespace namespace : namespaces_) {
             Map.Entry<String, String> spec = namespace.yield();
+            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, LogLevel.VERBOSE);
             if (namespaceMap.put(spec.getKey(), spec.getValue()) != null) {
                 sinks_.log(this,
-                    "Namespace prefix " + spec.getKey() + " added twice", LogLevel.ERR);
-                    throw new BuildException();
+                    "Namespace prefix " + spec.getKey() + " added twice",
+                    LogLevel.ERR);
+                throw new BuildException();
             }
         }
         return new PrefixMap(namespaceMap);

@@ -385,10 +385,11 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
-            <namespace prefix="p" uri="http://www.furfurylic.net/chionographis/test/transform/ns"/>
+            <namespace prefix="p1" uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
+            <namespace prefix="p2" uri="http://www.furfurylic.net/chionographis/test/transform/ns/2"/>
             <transform style="input/flatten-ns.xsl">
-                <param name="p:p1">v1</param>
-                <param name="{http://www.furfurylic.net/chionographis/test/transform/ns}p2">v2</param>
+                <param name="p1:p">v1</param>
+                <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
                 <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
             </transform>
         </chionographis>
