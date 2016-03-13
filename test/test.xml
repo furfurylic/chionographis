@@ -26,6 +26,7 @@
         <antcall target="snip-2"/>
         <antcall target="snip-ns"/>
         <antcall target="crossing-cache"/>
+        <antcall target="crossing-cache-refer-content"/>
     </target>
 
     <macrodef name="assertfileeq">
@@ -235,7 +236,7 @@
         <!-- input2: newer -->
         <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:40 AM"/>
 
-        <chionographis basedir="${dir.output}" includes="input*.xml" cache="yes">
+        <chionographis basedir="${dir.output}" includes="input*.xml">
             <output refer="/*/@num" mkdirs="yes">
                 <globmapper from="*" to="output*.xml"/>
             </output>
@@ -680,6 +681,33 @@
         </chionographis>
 
         <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+        <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="crossing-cache-refer-content">
+        <property name="test.prefix" value="crossing"/>
+        <property name="test.title" value="cache-refer-content"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-cache"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis basedir="${dir.input}" includes="input.xml" cache="yes" verbose="yes">
+            <output destdir="../output-${test.title}" refer="count(/*/*)" mkdirs="yes">
+                <globmapper from="*" to="output*.xml"/>
+            </output>
+            <transform style="style2.xsl" cache="yes">
+                <output dest="../output-${test.title}/actual2.txt" mkdirs="yes"/>
+            </transform>
+        </chionographis>
+
+        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+            <globmapper from="output*.xml" to="actual*.txt"/>
+        </xslt>
+        <assertfileeq name="${test.name} - 0" expected="${dir.input}/expected0.txt" actual="${dir.output}/actual0.txt"/>
         <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
 
         <delete dir="${dir.output}"/>

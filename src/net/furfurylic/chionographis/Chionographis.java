@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -33,6 +34,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
@@ -212,21 +214,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     @Override
     public void execute() {
         // Arrange various directories.
-        File projectBaseDir = getProject().getBaseDir();
-        if (projectBaseDir == null) {
-            projectBaseDir = new File("");
-        }
-        Path baseDirPathAbsolute = projectBaseDir.getAbsoluteFile().toPath();
-        if (baseDir_ == null) {
-            baseDir_ = baseDirPathAbsolute;
-        } else {
-            baseDir_ = baseDirPathAbsolute.resolve(baseDir_);
-        }
-        if (srcDir_ == null) {
-            srcDir_ = baseDir_;
-        } else {
-            srcDir_ = baseDir_.resolve(srcDir_);
-        }
+        setUpDirectories();
 
         // Find files to process.
         String[] includedFiles;
@@ -246,25 +234,12 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         }
         sinks_.log(this, includedURIs.length + " input sources found", LogLevel.INFO);
 
-        Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
-
         // Set up namespace context.
+        Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
         NamespaceContext namespaceContext = createNamespaceContext();
 
         try {
-            // Set up XML engines.
-            SAXParser parser;
-            Transformer identity;
-            {
-                SAXParserFactory pfac = SAXParserFactory.newInstance();
-                pfac.setNamespaceAware(true);
-                pfac.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
-                parser = pfac.newSAXParser();
-                identity = TransformerFactory.newInstance().newTransformer();
-            }
-
             sinks_.init(baseDir_.toFile(), namespaceContext, force_);
-            // TODO: pass SAXTransformerFactory
 
             // Tell whether destinations are older.
             boolean[] includes = null;
@@ -275,18 +250,17 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     sinks_.log(this, "No input sources processed", LogLevel.INFO);
                     sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
                     Arrays.stream(includedURIs)
-                        .forEach(u -> sinks_.log(this, "    " + u.toString(), LogLevel.DEBUG));
+                          .forEach(u -> sinks_.log(this, "    " + u, LogLevel.DEBUG));
                     return;
                 }
                 includes = examined;
             }
 
-            EntityResolver resolver = null;
-            if (usesCache_) {
-                resolver = new CachingResolver(
-                    u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
-                    u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
-            }
+            // Set up XML engines.
+            EntityResolver resolver = createEntityResolver();
+            Supplier<XMLReader> reader = createXMLReaderSupplier(resolver);
+            Supplier<DocumentBuilder> builder = createDocumentBuilderSupplier(resolver);
+            Transformer identity = TransformerFactory.newInstance().newTransformer();
 
             int count = 0;
             sinks_.startBundle();
@@ -306,11 +280,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     if (!referents.isEmpty()) {
                         sinks_.log(this,
                             "  Referral to the source contents required", LogLevel.DEBUG);
-                        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                        dbfac.setNamespaceAware(true);
-                        DocumentBuilder builder = dbfac.newDocumentBuilder();
-                        builder.setEntityResolver(resolver);
-                        Document document = builder.parse(systemID);
+                        Document document = builder.get().parse(systemID);
                         referredContents = Referral.extract(document, referents);
                         sinks_.log(this, "  Referred source data: "
                             + String.join(", ", referredContents), LogLevel.DEBUG);
@@ -327,31 +297,31 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         source = new DOMSource(document, systemID);
 
                     } else {
-                        XMLReader reader = parser.getXMLReader();
+                        XMLReader xmlReader = reader.get();
                         sinks_.log(this,
                             "  Referral to the source contents not required", LogLevel.DEBUG);
                         if (!metaFuncMap.isEmpty()) {
-                            reader = new MetaFilter(reader,
+                            xmlReader = new MetaFilter(xmlReader,
                                 c -> addMetaInformation(metaFuncMap, includedURI, c));
                         }
-                        reader.setEntityResolver(resolver);
-                        InputSource input = new InputSource(systemID);
-                        source = new SAXSource(reader, input);
+                        source = new SAXSource(xmlReader, new InputSource(systemID));
                     }
 
                     // Do processing.
                     Result result = sinks_.startOne(i, includedURI, includedFiles[i], referredContents);
                     if (result != null) {
+                        identity.reset();
+                        identity.setOutputProperty(OutputKeys.METHOD, "xml");
                         identity.transform(source, result);
                         sinks_.finishOne();
                     }
 
-                    parser.reset();
-                    identity.reset();
-
-                } catch (TransformerException | IOException e) {
+                } catch (TransformerException | IOException | BuildException e) {
                     sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
                     sinks_.abortOne();
+                    if (e instanceof FatalityException) {
+                        throw new BuildException(e.getCause());
+                    }
                 }
             }
             if (count > 0) {
@@ -361,9 +331,87 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 sinks_.log(this, "No input sources processed", LogLevel.INFO);
             }
             sinks_.finishBundle();
-        } catch (SAXException | ParserConfigurationException | TransformerException e) {
+        } catch (FatalityException e) {
+            throw new BuildException(e.getCause());
+        } catch (SAXException | TransformerException e) {
             throw new BuildException(e);
         }
+    }
+
+    private void setUpDirectories() {
+        File projectBaseDir = getProject().getBaseDir();
+        if (projectBaseDir == null) {
+            projectBaseDir = new File("");
+        }
+        Path baseDirPathAbsolute = projectBaseDir.getAbsoluteFile().toPath();
+        if (baseDir_ == null) {
+            baseDir_ = baseDirPathAbsolute;
+        } else {
+            baseDir_ = baseDirPathAbsolute.resolve(baseDir_);
+        }
+        if (srcDir_ == null) {
+            srcDir_ = baseDir_;
+        } else {
+            srcDir_ = baseDir_.resolve(srcDir_);
+        }
+    }
+
+    private EntityResolver createEntityResolver() {
+        EntityResolver resolver = null;
+        if (usesCache_) {
+            resolver = new CachingResolver(
+                u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
+                u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
+        }
+        return resolver;
+    }
+
+    private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {
+        Supplier<XMLReader> reader = new One<XMLReader, SAXParser>(
+            () -> {
+                SAXParserFactory pfac = SAXParserFactory.newInstance();
+                pfac.setNamespaceAware(true);
+                try {
+                    pfac.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
+                    return pfac.newSAXParser();
+                } catch (ParserConfigurationException | SAXException e) {
+                    throw new FatalityException(e);
+                }
+            },
+            p -> {
+                try {
+                    p.reset();
+                    XMLReader xmlReader = p.getXMLReader();
+                    if (resolver != null) {
+                        xmlReader.setEntityResolver(resolver);
+                    }
+                    return xmlReader;
+                } catch (SAXException e) {
+                    throw new FatalityException(e);
+                }
+            });
+        return reader;
+    }
+
+    private static Supplier<DocumentBuilder> createDocumentBuilderSupplier(EntityResolver resolver) {
+        Supplier<DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
+            () -> {
+                try {
+                    DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                    dbfac.setNamespaceAware(true);
+                    return dbfac.newDocumentBuilder();
+                } catch (ParserConfigurationException e) {
+                    throw new FatalityException(e);
+                }
+            },
+            b -> {
+                b.reset();
+                if (resolver != null) {
+                    b.setEntityResolver(resolver);
+                }
+                return b;
+            });
+        return builder;
     }
 
     private Map<String, Function<URI, String>> createMetaFuncMap() {
@@ -425,7 +473,51 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         }
     }
 
+    private static class FatalityException extends BuildException {
+
+        private static final long serialVersionUID = 333446244602547133L;
+
+        public FatalityException(Throwable cause) {
+            super(cause);
+        }
+    }
+
+    private static final class One<T, U> implements Supplier<T> {
+
+
+        private Supplier<U> factory_;
+        private Function<U, T> resetter_;
+        private U one_;
+
+        public One(Supplier<U> factory, Function<U, T> resetter) {
+            factory_ = factory;
+            resetter_ = resetter;
+        }
+
+        @Override
+        public T get() {
+            if (one_ == null) {
+                one_ = factory_.get();
+            }
+            return resetter_.apply(one_);
+        }
+    }
+
     private static final class MetaFilter extends XMLFilterImpl {
+
+        private static final class HackedSAXException extends RuntimeException {
+
+            private static final long serialVersionUID = -6266539332239469415L;
+
+            public HackedSAXException(SAXException cause) {
+                super(cause);
+            }
+
+            @Override
+            public SAXException getCause() {
+                return (SAXException) super.getCause();
+            }
+        }
 
         private Consumer<BiConsumer<String, String>> adder_;
 
@@ -441,10 +533,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             if (adder_ != null) {
                 try {
                     adder_.accept(this::processingInstructionHacked);
-                } catch (BuildException e) {
-                    if ((e.getCause() != null) && (e.getCause() instanceof SAXException)) {
-                        throw (SAXException) e.getCause();
-                    }
+                } catch (HackedSAXException e) {
+                    throw e.getCause();
                 }
                 adder_ = null;
             }
@@ -454,7 +544,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             try {
                 processingInstruction(target, data);
             } catch (SAXException e) {
-                throw new BuildException(e);
+                throw new HackedSAXException(e);
             }
         }
     }
