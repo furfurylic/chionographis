@@ -8,31 +8,27 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.net.URI;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.namespace.QName;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.sax.SAXResult;
-import javax.xml.transform.sax.SAXTransformerFactory;
-import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
-import org.xml.sax.Attributes;
-import org.xml.sax.ContentHandler;
-import org.xml.sax.Locator;
-import org.xml.sax.SAXException;
-import org.xml.sax.ext.LexicalHandler;
-import org.xml.sax.helpers.AttributesImpl;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 /**
  * An <i>All</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} collects
@@ -49,7 +45,10 @@ public final class All extends Sink implements SinkDriver {
     private Sinks sinks_;
 
     private QName rootQ_;
-    private AllHandler handler_;
+
+    private Document document_;
+    private Document currentDocument_;
+    long lastModifiedTime_;
 
     All(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -133,73 +132,60 @@ public final class All extends Sink implements SinkDriver {
     }
 
     @Override
-    boolean[] preexamineBundle(URI[] originalSrcURIs, String[] originalSrcFileNames,
-            Set<URI> stylesheetURIs) {
+    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+        boolean[] includes;
         if (force_) {
-            boolean[] result = new boolean[originalSrcURIs.length];
-            Arrays.fill(result, true);
-            return result;
+            includes = new boolean[originalSrcFileNames.length];
+            Arrays.fill(includes, true);
         } else {
-            boolean[] includes =
-                sinks_.preexamineBundle(originalSrcURIs, originalSrcFileNames, stylesheetURIs);
+            includes =
+                sinks_.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
-            return includes;
         }
+        return includes;
     }
 
     @Override
     void startBundle() {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
-        Result result = sinks_.startOne(-1, null, null, Collections.emptyList());
-        if (result == null) {
-            handler_ = null;
-            return;
-        }
-        if (result instanceof SAXResult) {
-            SAXResult saxResult = (SAXResult) result;
-            handler_ = new AllHandler(saxResult.getHandler(), saxResult.getLexicalHandler());
-        } else {
-            try {
-                TransformerHandler identity = ((SAXTransformerFactory) TransformerFactory
-                    .newInstance()).newTransformerHandler();
-                identity.setResult(result);
-                handler_ = new AllHandler(identity, identity);
-            } catch (TransformerException e) {
-                throw new BuildException(e);
-            }
-        }
         try {
-            handler_.getHandler().setDocumentLocator(handler_);
-            handler_.getHandler().startDocument();
-            AttributesImpl atts = new AttributesImpl();
+            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+            dbfac.setNamespaceAware(true);
+            DocumentBuilder builder = dbfac.newDocumentBuilder();
+            document_ = builder.newDocument();
+            Element docElement = document_.createElementNS(rootQ_.getNamespaceURI(), root_);
             if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                handler_.getHandler().startPrefixMapping(
-                    rootQ_.getPrefix(), rootQ_.getNamespaceURI());
-                atts.addAttribute("", rootQ_.getPrefix(), "xmlns:" + rootQ_.getPrefix(),
-                    "CDATA", rootQ_.getNamespaceURI());
+                docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + rootQ_.getPrefix(), rootQ_.getNamespaceURI());
             }
-            handler_.getHandler().startElement(
-                rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_, atts);
-        } catch (SAXException e) {
+            document_.appendChild(docElement);
+            lastModifiedTime_ = Long.MIN_VALUE;
+        } catch (ParserConfigurationException e) {
             throw new BuildException(e);
         }
     }
 
     @Override
-    Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName, List<String> notUsed) {
-        if (handler_ != null) {
-            sinks_.log(this, "Receiving input source, which is " + originalSrcFileName, LogLevel.DEBUG);
-            return new SAXResult(handler_);
-        } else {
-            return null;
+    Result startOne(int originalSrcIndex, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
+        assert document_ != null;
+        try {
+            lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
+            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+            dbfac.setNamespaceAware(true);
+            DocumentBuilder builder = dbfac.newDocumentBuilder();
+            currentDocument_ = builder.newDocument();
+            return new DOMResult(currentDocument_);
+        } catch (ParserConfigurationException e) {
+            throw new BuildException(e);
         }
     }
 
     @Override
     void finishOne() {
+        assert document_ != null;
+        document_.getDocumentElement().appendChild(document_.adoptNode(currentDocument_.getDocumentElement()));
     }
 
     @Override
@@ -213,205 +199,22 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     void finishBundle() {
-        if (handler_ != null) {
+        assert document_ != null;
+        List<XPathExpression> referents = sinks_.referents(-1, null);
+        List<String> referredContents = Referral.extract(document_, referents);
+        Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
+        if (result != null) {
             try {
-                handler_.getHandler().endElement(
-                    rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), root_);
-                if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                    handler_.getHandler().endPrefixMapping(rootQ_.getPrefix());
-                }
-                handler_.getHandler().endDocument();
-            } catch (SAXException e) {
+                // Send fragment to sink
+                TransformerFactory.newInstance().newTransformer().transform(
+                    new DOMSource(document_), result);
+
+                // Finish sink
+                sinks_.finishOne();
+            } catch (TransformerException e) {
                 throw new BuildException(e);
             }
-            if (handler_.documentCount() == 0) {
-                sinks_.log(this,
-                    "Finishing 1 output containing no input source",
-                    LogLevel.INFO);
-            } else {
-                sinks_.log(this,
-                    "Finishing 1 output containing " + handler_.documentCount() + " input sources ",
-                    LogLevel.VERBOSE);
-            }
-            sinks_.finishOne();
         }
         sinks_.finishBundle();
-    }
-
-    private static final class AllHandler implements ContentHandler, LexicalHandler, Locator {
-        ContentHandler contentHandler_;
-        LexicalHandler lexicalHandler_;
-        Locator currentLocator_;
-        int count_;
-
-        public AllHandler(ContentHandler contentHandler, LexicalHandler lexicalHandler) {
-            contentHandler_ = contentHandler;
-            if (lexicalHandler != null) {
-                lexicalHandler_ = lexicalHandler;
-            } else if (contentHandler instanceof LexicalHandler){
-                lexicalHandler = (LexicalHandler) contentHandler;
-            } else {
-                lexicalHandler = new LexicalHandler() {
-                    @Override
-                    public void startEntity(String name) throws SAXException {
-                    }
-                    @Override
-                    public void startDTD(String name, String publicId, String systemId) throws SAXException {
-                    }
-                    @Override
-                    public void startCDATA() throws SAXException {
-                    }
-                    @Override
-                    public void endEntity(String name) throws SAXException {
-                    }
-                    @Override
-                    public void endDTD() throws SAXException {
-                    }
-                    @Override
-                    public void endCDATA() throws SAXException {
-                    }
-                    @Override
-                    public void comment(char[] ch, int start, int length) throws SAXException {
-                    }
-                };
-            }
-            currentLocator_ = null;
-            count_ = 0;
-        }
-
-        public int documentCount() {
-            return count_;
-        }
-
-        public ContentHandler getHandler() {
-            return contentHandler_;
-        }
-
-        @Override
-        public void setDocumentLocator(Locator locator) {
-            currentLocator_ = locator;
-        }
-
-        @Override
-        public void startDocument() throws SAXException {
-            ++count_;
-        }
-
-        @Override
-        public void endDocument() throws SAXException {
-            currentLocator_ = null;
-        }
-
-        @Override
-        public void startPrefixMapping(String prefix, String uri) throws SAXException {
-            contentHandler_.startPrefixMapping(prefix, uri);
-        }
-
-        @Override
-        public void endPrefixMapping(String prefix) throws SAXException {
-            contentHandler_.endPrefixMapping(prefix);
-        }
-
-        @Override
-        public void startElement(String uri, String localName, String qName, Attributes atts)
-            throws SAXException {
-            contentHandler_.startElement(uri, localName, qName, atts);
-        }
-
-        @Override
-        public void endElement(String uri, String localName, String qName) throws SAXException {
-            contentHandler_.endElement(uri, localName, qName);
-        }
-
-        @Override
-        public void characters(char[] ch, int start, int length) throws SAXException {
-            contentHandler_.characters(ch, start, length);
-        }
-
-        @Override
-        public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
-            contentHandler_.ignorableWhitespace(ch, start, length);
-        }
-
-        @Override
-        public void processingInstruction(String target, String data) throws SAXException {
-            contentHandler_.processingInstruction(target, data);
-        }
-
-        @Override
-        public void skippedEntity(String name) throws SAXException {
-            contentHandler_.skippedEntity(name);
-        }
-
-        @Override
-        public void startDTD(String name, String publicId, String systemId) throws SAXException {
-            lexicalHandler_.startDTD(name, publicId, systemId);
-        }
-
-        @Override
-        public void endDTD() throws SAXException {
-            lexicalHandler_.endDTD();
-        }
-
-        @Override
-        public void startEntity(String name) throws SAXException {
-            lexicalHandler_.startEntity(name);
-        }
-
-        @Override
-        public void endEntity(String name) throws SAXException {
-            lexicalHandler_.endEntity(name);
-        }
-
-        @Override
-        public void startCDATA() throws SAXException {
-            lexicalHandler_.startCDATA();
-        }
-
-        @Override
-        public void endCDATA() throws SAXException {
-            lexicalHandler_.endCDATA();
-        }
-
-        @Override
-        public void comment(char[] ch, int start, int length) throws SAXException {
-            lexicalHandler_.comment(ch, start, length);
-        }
-
-        @Override
-        public String getPublicId() {
-            if (currentLocator_ != null) {
-                return currentLocator_.getPublicId();
-            } else {
-                return null;
-            }
-        }
-
-        @Override
-        public String getSystemId() {
-            if (currentLocator_ != null) {
-                return currentLocator_.getSystemId();
-            } else {
-                return null;
-            }
-        }
-
-        @Override
-        public int getLineNumber() {
-            if (currentLocator_ != null) {
-                return currentLocator_.getLineNumber();
-            } else {
-                return -1;
-            }
-        }
-
-        @Override
-        public int getColumnNumber() {
-            if (currentLocator_ != null) {
-                return currentLocator_.getColumnNumber();
-            } else {
-                return -1;
-            }
-        }
     }
 }
