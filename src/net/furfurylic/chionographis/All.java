@@ -246,7 +246,35 @@ public final class All extends Sink implements SinkDriver {
 
         public AllHandler(ContentHandler contentHandler, LexicalHandler lexicalHandler) {
             contentHandler_ = contentHandler;
-            lexicalHandler_ = lexicalHandler;
+            if (lexicalHandler != null) {
+                lexicalHandler_ = lexicalHandler;
+            } else if (contentHandler instanceof LexicalHandler){
+                lexicalHandler = (LexicalHandler) contentHandler;
+            } else {
+                lexicalHandler = new LexicalHandler() {
+                    @Override
+                    public void startEntity(String name) throws SAXException {
+                    }
+                    @Override
+                    public void startDTD(String name, String publicId, String systemId) throws SAXException {
+                    }
+                    @Override
+                    public void startCDATA() throws SAXException {
+                    }
+                    @Override
+                    public void endEntity(String name) throws SAXException {
+                    }
+                    @Override
+                    public void endDTD() throws SAXException {
+                    }
+                    @Override
+                    public void endCDATA() throws SAXException {
+                    }
+                    @Override
+                    public void comment(char[] ch, int start, int length) throws SAXException {
+                    }
+                };
+            }
             currentLocator_ = null;
             count_ = 0;
         }
