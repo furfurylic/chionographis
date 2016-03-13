@@ -59,7 +59,7 @@ public final class Namespace {
 
     Map.Entry<String, String> yield() {
         if (prefix_ == null) {
-            String message = "Incomplete namespace prefix config found";
+            String message = "Incomplete namespace prefix mapping found";
             if (namespaceURI_ != null) {
                 message += ": URI=" + namespaceURI_;
             }
@@ -67,7 +67,7 @@ public final class Namespace {
             throw new BuildException();
         }
         if (namespaceURI_ == null) {
-            String message = "Incomplete namespace prefix config found: prefix=" + prefix_;
+            String message = "Incomplete namespace prefix mapping found: prefix=" + prefix_;
             logger_.log(this, message, LogLevel.ERR);
             throw new BuildException();
         }
