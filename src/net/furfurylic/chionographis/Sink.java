@@ -146,7 +146,7 @@ public abstract class Sink {
      *      an TrAX {@code Result} object which receives the input document.
      */
     abstract Result startOne(int originalSrcIndex,
-        URI originalSrcURI, String originalSrcFileName,
+        URI originalSrcURI, String originalSrcFileName, long originalSrcFileLastModifiedTime,
         List<String> referredContents);
 
     /**

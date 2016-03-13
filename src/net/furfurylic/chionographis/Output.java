@@ -259,7 +259,7 @@ public final class Output extends Sink {
         assert(destMapping_ != null);
         for (int i = 0; i < originalSrcURIs.length; ++i) {
             includes[i] = isOriginalSrcNewer(
-                originalSrcURIs[i], originalSrcFileNames[i], destMapping_);
+                originalSrcURIs[i], originalSrcFileNames[i], Math.max(stylesheetLastModified_, new File(originalSrcURIs[i]).lastModified()), destMapping_);
         }
         return includes;
     }
@@ -276,7 +276,7 @@ public final class Output extends Sink {
 
     @Override
     Result startOne(int originalSrcIndex, URI originalSrcURI, String originalSrcFileName,
-            List<String> referredContents) {
+            long originalSrcFileLastModifiedTime, List<String> referredContents) {
         // Initialize currentDests_ as empty.
         if (currentDests_ == null) {
             currentDests_ = new TreeSet<>();
@@ -297,16 +297,16 @@ public final class Output extends Sink {
             } else {
                 currentDests_.add(destDir_.resolve(referredContents.get(0)).toFile());
             }
-            if (!force_
-             && !isOriginalSrcNewer(originalSrcURI, originalSrcFileName, s -> currentDests_)) {
-                String files = currentDests_.stream()
-                                            .map(File::getAbsolutePath)
-                                            .reduce((ss, s) -> ss + s)
-                                            .orElse(null);
-                logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
-                return null;
-            }
         }
+        if (!force_
+         && !isOriginalSrcNewer(originalSrcURI, originalSrcFileName, originalSrcFileLastModifiedTime, s -> currentDests_)) {
+            String files = currentDests_.stream()
+                                        .map(File::getAbsolutePath)
+                                        .reduce((ss, s) -> ss + s)
+                                        .orElse(null);
+            logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
+            return null;
+       }
 
         // Initialize currentContent_ as empty.
         if (currentContent_ == null) {
@@ -319,23 +319,23 @@ public final class Output extends Sink {
     }
 
     private boolean isOriginalSrcNewer(URI originalSrcURI, String originalSrcFileName,
-            Function<String, Set<File>> destMapping) {
+            long originalSrcFileLastModifiedTime, Function<String, Set<File>> destMapping) {
         assert ! force_;
-        if (originalSrcURI == null) {
-            // No certain original source available -> Continue processing
-            return true;
-        }
-        if (stylesheetLastModified_ == Long.MAX_VALUE) {
-            // Stylesheets are non-file resources -> Continue processing
-            return true;
-        }
-        if (!originalSrcURI.getScheme().equalsIgnoreCase("file")) {
-            // The original source is a non-file resource -> Continue processing
-            return true;
-        }
+        //if (originalSrcURI == null) {
+        //    // No certain original source available -> Continue processing
+        //    return true;
+        //}
+        //if (stylesheetLastModified_ == Long.MAX_VALUE) {
+        //    // Stylesheets are non-file resources -> Continue processing
+        //    return true;
+        //}
+        //if (!originalSrcURI.getScheme().equalsIgnoreCase("file")) {
+        //    // The original source is a non-file resource -> Continue processing
+        //    return true;
+        //}
 
-        long srcLastModified = new File(originalSrcURI).lastModified();
-        long lastModified = Math.max(srcLastModified, stylesheetLastModified_);
+        //long srcLastModified = new File(originalSrcURI).lastModified();
+        long lastModified = originalSrcFileLastModifiedTime;//Math.max(srcLastModified, stylesheetLastModified_);
         Collection<File> dests = destMapping.apply(originalSrcFileName);
         return dests.stream()
                      .anyMatch(f -> (!f.exists()

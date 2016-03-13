@@ -219,6 +219,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         // Find files to process.
         String[] includedFiles;
         URI[] includedURIs;
+        long[] includedFileLastModifiedTimes;
         {
             DirectoryScanner scanner = getDirectoryScanner(srcDir_.toFile());
             scanner.scan();
@@ -231,6 +232,10 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                                  .map(srcDir_::resolve)
                                  .map(Path::toUri)
                                  .toArray(URI[]::new);
+            includedFileLastModifiedTimes = Arrays.stream(includedURIs)
+                    .map(File::new)
+                    .mapToLong(File::lastModified)
+                    .toArray();
         }
         sinks_.log(this, includedURIs.length + " input sources found", LogLevel.INFO);
 
@@ -308,7 +313,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                     }
 
                     // Do processing.
-                    Result result = sinks_.startOne(i, includedURI, includedFiles[i], referredContents);
+                    Result result = sinks_.startOne(i, includedURI, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
                     if (result != null) {
                         identity.reset();
                         identity.setOutputProperty(OutputKeys.METHOD, "xml");
