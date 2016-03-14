@@ -1,3 +1,10 @@
+/*
+ * Chionographis
+ *
+ * These codes are licensed under CC0.
+ * https://creativecommons.org/publicdomain/zero/1.0/deed
+ */
+
 package net.furfurylic.chionographis;
 
 import java.net.URI;
