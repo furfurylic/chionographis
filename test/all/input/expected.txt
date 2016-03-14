@@ -1,1 +1,1 @@
-[q:[{http://www.furfurylic.net/chionographis/test}a:[{http://www.furfurylic.net/chionographis/test}x:]][a:A]]
+[q:<pi1=data1>[{http://www.furfurylic.net/chionographis/test}a:[{http://www.furfurylic.net/chionographis/test}x:]]<<<comment2>>>[a:A]]
