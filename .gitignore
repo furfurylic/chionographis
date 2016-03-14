@@ -17,3 +17,5 @@ hs_err_pid*
 /classes/
 /devel/
 .settings
+*.orig
+

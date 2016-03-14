@@ -47,7 +47,7 @@ public final class All extends Sink implements SinkDriver {
 
     private QName rootQ_;
 
-    private Document document_;
+    private Document resultDocument_;
     private Document currentDocument_;
     long lastModifiedTime_;
 
@@ -156,39 +156,34 @@ public final class All extends Sink implements SinkDriver {
             DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
             dbfac.setNamespaceAware(true);
             DocumentBuilder builder = dbfac.newDocumentBuilder();
-            document_ = builder.newDocument();
-            Element docElement = document_.createElementNS(rootQ_.getNamespaceURI(), root_);
-            if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + rootQ_.getPrefix(), rootQ_.getNamespaceURI());
-            }
-            document_.appendChild(docElement);
-            lastModifiedTime_ = Long.MIN_VALUE;
+            resultDocument_ = builder.newDocument();
+            currentDocument_ = builder.newDocument();
         } catch (ParserConfigurationException e) {
             throw new BuildException(e);
         }
+        Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
+        if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+            docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI,
+                "xmlns:" + rootQ_.getPrefix(), rootQ_.getNamespaceURI());
+        }
+        resultDocument_.appendChild(docElement);
+        lastModifiedTime_ = Long.MIN_VALUE;
     }
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
-        assert document_ != null;
-        try {
-            lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
-            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-            dbfac.setNamespaceAware(true);
-            DocumentBuilder builder = dbfac.newDocumentBuilder();
-            currentDocument_ = builder.newDocument();
-            return new DOMResult(currentDocument_);
-        } catch (ParserConfigurationException e) {
-            throw new BuildException(e);
-        }
+        assert resultDocument_ != null;
+        assert currentDocument_.getFirstChild() == null;
+        lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
+        return new DOMResult(currentDocument_);
     }
 
     @Override
     void finishOne() {
-        assert document_ != null;
+        assert resultDocument_ != null;
         Node node;
         while ((node = currentDocument_.getFirstChild()) != null) {
-            document_.getDocumentElement().appendChild(document_.adoptNode(node));
+            resultDocument_.getDocumentElement().appendChild(resultDocument_.adoptNode(node));
         }
     }
 
@@ -203,15 +198,15 @@ public final class All extends Sink implements SinkDriver {
 
     @Override
     void finishBundle() {
-        assert document_ != null;
+        assert resultDocument_ != null;
         List<XPathExpression> referents = sinks_.referents(-1, null);
-        List<String> referredContents = Referral.extract(document_, referents);
+        List<String> referredContents = Referral.extract(resultDocument_, referents);
         Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
             try {
                 // Send fragment to sink
                 TransformerFactory.newInstance().newTransformer().transform(
-                    new DOMSource(document_), result);
+                    new DOMSource(resultDocument_), result);
 
                 // Finish sink
                 sinks_.finishOne();
