@@ -29,6 +29,7 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 /**
  * An <i>All</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} collects
@@ -185,7 +186,10 @@ public final class All extends Sink implements SinkDriver {
     @Override
     void finishOne() {
         assert document_ != null;
-        document_.getDocumentElement().appendChild(document_.adoptNode(currentDocument_.getDocumentElement()));
+        Node node;
+        while ((node = currentDocument_.getFirstChild()) != null) {
+            document_.getDocumentElement().appendChild(document_.adoptNode(node));
+        }
     }
 
     @Override

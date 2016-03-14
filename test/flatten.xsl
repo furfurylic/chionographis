@@ -6,5 +6,6 @@
 <xsl:template match="text()"><xsl:value-of select="."/></xsl:template>
 <xsl:template match="processing-instruction()">&lt;<xsl:value-of select="local-name()"/>=<xsl:value-of select="."/>&gt;</xsl:template>
 <xsl:template match="processing-instruction('chionographis-output')"/>
+<xsl:template match="comment()">&lt;&lt;&lt;<xsl:value-of select="."/>&gt;&gt;&gt;</xsl:template>
 <xsl:template name="write-node-name"><xsl:if test="namespace-uri(.)">{<xsl:value-of select="namespace-uri(.)"/>}</xsl:if><xsl:value-of select="local-name(.)"/></xsl:template>
 </xsl:stylesheet>
