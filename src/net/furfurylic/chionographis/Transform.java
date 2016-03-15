@@ -210,8 +210,7 @@ public final class Transform extends Sink implements SinkDriver {
             Long.MAX_VALUE;
 
         try {
-            List<XPathExpression> referents =
-                sinks_.referents(originalSrcIndex, originalSrcFileName);
+            List<XPathExpression> referents = sinks_.referents();
             if (!referents.isEmpty()) {
                 sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                 Document document;
