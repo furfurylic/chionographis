@@ -279,8 +279,8 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                 ++count;
                 try {
                     sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                    List<XPathExpression> referents = sinks_.referents(i, includedFiles[i]);
-                    List<String> referredContents = Collections.emptyList();
+                    List<XPathExpression> referents = sinks_.referents();
+                    List<String> referredContents;
                     Source source;
                     if (!referents.isEmpty()) {
                         sinks_.log(this,
@@ -305,6 +305,7 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
                         XMLReader xmlReader = reader.get();
                         sinks_.log(this,
                             "  Referral to the source contents not required", LogLevel.DEBUG);
+                        referredContents = Collections.emptyList();
                         if (!metaFuncMap.isEmpty()) {
                             xmlReader = new MetaFilter(xmlReader,
                                 c -> addMetaInformation(metaFuncMap, includedURI, c));

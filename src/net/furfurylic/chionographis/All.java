@@ -199,7 +199,7 @@ public final class All extends Sink implements SinkDriver {
     @Override
     void finishBundle() {
         assert resultDocument_ != null;
-        List<XPathExpression> referents = sinks_.referents(-1, null);
+        List<XPathExpression> referents = sinks_.referents();
         List<String> referredContents = Referral.extract(resultDocument_, referents);
         Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
