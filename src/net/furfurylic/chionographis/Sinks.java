@@ -8,12 +8,9 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -43,18 +40,14 @@ final class Sinks extends Sink implements SinkDriver, Logger {
      * {@code includes_[i][j]} tells whether {@code sinks_.get(i)} wants the source indexed by
      * {@code j} to be processed.
      *
-     * <p>This field is maintained by {@link #init(File, URI[], String[], Set)} method.
+     * <p>This field is maintained by {@link #preexamineBundle(String[], long[])} method.
      */
     private boolean[][] includes_;
 
     /**
-     * Sinks which receives the resulted document of which processing is undergoing.
-     *
      * <p>This field is maintained by {@link #startOne(int, String)} method.
      */
     private List<Sink> activeSinks_;
-
-    private int[] referentCounts_;
 
     public Sinks(Logger logger) {
         logger_ = logger;
@@ -105,6 +98,14 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
+    List<XPathExpression> referents() {
+        return sinks_.stream()
+                      .map(s -> s.referents())
+                      .flatMap(r -> r.stream())
+                      .collect(Collectors.toList());
+    }
+
+    @Override
     boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
@@ -132,67 +133,32 @@ final class Sinks extends Sink implements SinkDriver, Logger {
     }
 
     @Override
-    List<XPathExpression> referents(int originalSrcIndex, String originalSrcFileName) {
-        prepareActiveSinks(originalSrcIndex);
-        referentCounts_ = null;
-        List<List<XPathExpression>> referents = activeSinks_.stream()
-                .map(s -> s.referents(originalSrcIndex, originalSrcFileName))
-                .collect(Collectors.toList());
-        if (referents.stream().noneMatch(r -> !r.isEmpty())) {
-            return Collections.<XPathExpression>emptyList();
-        }
-        referentCounts_ = referents.stream()
-            .mapToInt(r -> (r.isEmpty() ? 0 : r.size())).toArray();
-        List<XPathExpression> expressions = referents.stream()
-            .filter(r -> !r.isEmpty())
-            .flatMap(r -> r.stream())
-            .collect(Collectors.toList());
-        return expressions;
-    }
-
-    private void prepareActiveSinks(int originalSrcIndex) {
-        if ((includes_ == null) || (originalSrcIndex < 0)) {
-            activeSinks_ = new ArrayList<>(sinks_);
-        } else {
-            activeSinks_ = IntStream.range(0, includes_.length)
-                .filter(i -> includes_[i][originalSrcIndex])
-                .mapToObj(i -> sinks_.get(i))
-                .collect(Collectors.toList());
-        }
-    }
-
-    @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcFileLastModifiedTime, List<String> referredContents) {
         if (activeSinks_ == null) {
-            prepareActiveSinks(originalSrcIndex);
-        }
-        if (activeSinks_.isEmpty()) {
-            return null;
-        } else if (activeSinks_.size() == 1) {
-            return activeSinks_.get(0).startOne(
-                originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContents);
+            activeSinks_ = new ArrayList<>();
         } else {
-            CompositeResultBuilder builder = new CompositeResultBuilder();
-            int i = 0;
-            for (int j = 0; j < activeSinks_.size(); ++j) {
-                List<String> referredContentsOne;
-                if (referentCounts_ != null) {
-                    referredContentsOne = referredContents.subList(i, i + referentCounts_[j]);
-                    i += referentCounts_[j];
-                } else {
-                    referredContentsOne = Collections.emptyList();
-                }
-                Result result = activeSinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
-                if (result != null) {
-                    builder.add(result);
-                } else {
-                    activeSinks_.set(j,  null);
+            activeSinks_.clear();
+        }
+        CompositeResultBuilder builder = new CompositeResultBuilder();
+        int i = 0;
+        for (int j = 0; j < sinks_.size(); ++j) {
+            if (includes_ != null) {
+                boolean[] includesOne = includes_[j];
+                if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
+                    continue;
                 }
             }
-            return builder.newCompositeResult();
+            List<String> referredContentsOne =
+                referredContents.subList(i, i + sinks_.get(j).referents().size());
+            Result result = sinks_.get(j).startOne(
+                originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
+            if (result != null) {
+                builder.add(result);
+                activeSinks_.add(sinks_.get(j));
+            }
         }
+        return builder.newCompositeResult();
     }
 
     @Override
@@ -233,9 +199,8 @@ final class Sinks extends Sink implements SinkDriver, Logger {
         }
 
         public void add(Result result) {
-            if (result != null) {
-                results_.add(result);
-            }
+            assert result != null;
+            results_.add(result);
         }
 
         public Result newCompositeResult() {

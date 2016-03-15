@@ -168,15 +168,15 @@ public final class Snip extends Sink implements SinkDriver {
                     document.appendChild(document.adoptNode(node));
 
                     // Search the source contents if necessary
-                    List<XPathExpression> referents =
-                        sinks_.referents(currentIndex_, currentSrcFileName_);
-                    List<String> referredContents = Collections.emptyList();
+                    List<XPathExpression> referents = sinks_.referents();
+                    List<String> referredContents;
                     if (!referents.isEmpty()) {
                         sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                         referredContents = Referral.extract(document, referents);
                         sinks_.log(this, "  Referred source data: "
                             + String.join(", ", referredContents), LogLevel.DEBUG);
                     } else {
+                        referredContents = Collections.emptyList();
                         sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                     }
 

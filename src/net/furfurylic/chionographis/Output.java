@@ -226,6 +226,11 @@ public final class Output extends Sink {
     }
 
     @Override
+    List<XPathExpression> referents() {
+        return referents_;
+    }
+
+    @Override
     boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         boolean[] includes = new boolean[originalSrcFileNames.length];
         if (force_ || !referents_.isEmpty()) {
@@ -243,11 +248,6 @@ public final class Output extends Sink {
     @Override
     void startBundle() {
         countInBundle_ = 0;
-    }
-
-    @Override
-    List<XPathExpression> referents(int originalSrcIndex, String originalSrcFileName) {
-        return referents_;
     }
 
     @Override
