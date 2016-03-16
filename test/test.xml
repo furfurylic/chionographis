@@ -745,6 +745,7 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}/input-${test.title}" includes="input.xml" cache="yes" verbose="yes">
+            <meta type="file-title"/>
             <transform style="style1.xsl" cache="yes">
                 <output dest="../output-${test.title}/actual1.txt" mkdirs="yes"/>
             </transform>
@@ -769,6 +770,7 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${dir.input}" includes="input.xml" cache="yes" verbose="yes">
+            <meta type="file-title"/>
             <output destdir="../output-${test.title}" refer="count(/*/*)" mkdirs="yes">
                 <globmapper from="*" to="output*.xml"/>
             </output>
