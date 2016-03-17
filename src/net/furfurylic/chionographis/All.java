@@ -15,12 +15,7 @@ import java.util.stream.IntStream;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.namespace.QName;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPathExpression;
@@ -50,6 +45,8 @@ public final class All extends Sink implements SinkDriver {
     private Document resultDocument_;
     private Document currentDocument_;
     long lastModifiedTime_;
+
+    private XMLTransfer xfer_;
 
     All(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -128,6 +125,7 @@ public final class All extends Sink implements SinkDriver {
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
+        xfer_ = new XMLTransfer(null);
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
     }
@@ -152,19 +150,13 @@ public final class All extends Sink implements SinkDriver {
     void startBundle() {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
-        try {
-            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-            dbfac.setNamespaceAware(true);
-            DocumentBuilder builder = dbfac.newDocumentBuilder();
-            resultDocument_ = builder.newDocument();
-            currentDocument_ = builder.newDocument();
-        } catch (ParserConfigurationException e) {
-            throw new BuildException(e);
-        }
+        resultDocument_ = xfer_.newDocument();
+        currentDocument_ = xfer_.newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
             docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI,
-                "xmlns:" + rootQ_.getPrefix(), rootQ_.getNamespaceURI());
+                XMLConstants.XMLNS_ATTRIBUTE + ':' + rootQ_.getPrefix(),
+                rootQ_.getNamespaceURI());
         }
         resultDocument_.appendChild(docElement);
         lastModifiedTime_ = Long.MIN_VALUE;
@@ -203,16 +195,10 @@ public final class All extends Sink implements SinkDriver {
         List<String> referredContents = Referral.extract(resultDocument_, referents);
         Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
-            try {
-                // Send fragment to sink
-                TransformerFactory.newInstance().newTransformer().transform(
-                    new DOMSource(resultDocument_), result);
-
-                // Finish sink
-                sinks_.finishOne();
-            } catch (TransformerException e) {
-                throw new BuildException(e);
-            }
+            // Send fragment to sink
+            xfer_.transfer(new DOMSource(resultDocument_), result);
+            // Finish sink
+            sinks_.finishOne();
         }
         sinks_.finishBundle();
     }
