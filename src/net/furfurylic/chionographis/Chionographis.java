@@ -8,7 +8,6 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,24 +23,15 @@ import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
-import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
@@ -243,105 +233,97 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
         NamespaceContext namespaceContext = createNamespaceContext();
 
-        try {
-            sinks_.init(baseDir_.toFile(), namespaceContext, force_);
+        sinks_.init(baseDir_.toFile(), namespaceContext, force_);
 
-            // Tell whether destinations are older.
-            boolean[] includes = null;
-            if (!force_) {
-                boolean[] examined = sinks_.preexamineBundle(
-                    includedFiles, includedFileLastModifiedTimes);
-                if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
-                    sinks_.log(this, "No input sources processed", LogLevel.INFO);
-                    sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
-                    Arrays.stream(includedURIs)
-                          .forEach(u -> sinks_.log(this, "    " + u, LogLevel.DEBUG));
-                    return;
-                }
-                includes = examined;
-            }
-
-            // Set up XML engines.
-            EntityResolver resolver = createEntityResolver();
-            Supplier<XMLReader> reader = createXMLReaderSupplier(resolver);
-            Supplier<DocumentBuilder> builder = createDocumentBuilderSupplier(resolver);
-            Transformer identity = TransformerFactory.newInstance().newTransformer();
-
-            int count = 0;
-            sinks_.startBundle();
-            for (int i = 0; i < includedFiles.length; ++i) {
-                URI includedURI = includedURIs[i];
-                String systemID = includedURI.toString();
-                if ((includes != null) && !includes[i]) {
-                    sinks_.log(this, "Skipping " + systemID, LogLevel.DEBUG);
-                    continue;
-                }
-                ++count;
-                try {
-                    sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                    List<XPathExpression> referents = sinks_.referents();
-                    List<String> referredContents;
-                    Source source;
-                    if (!referents.isEmpty()) {
-                        sinks_.log(this,
-                            "  Referral to the source contents required", LogLevel.DEBUG);
-                        Document document = builder.get().parse(systemID);
-                        referredContents = Referral.extract(document, referents);
-                        sinks_.log(this, "  Referred source data: "
-                            + String.join(", ", referredContents), LogLevel.DEBUG);
-
-                        if (!metaFuncMap.isEmpty()) {
-                            DocumentFragment metas = document.createDocumentFragment();
-                            addMetaInformation(metaFuncMap, includedURI, (target, data) ->
-                                metas.appendChild(
-                                    document.createProcessingInstruction(target, data)));
-                            Element docElem = document.getDocumentElement();
-                            docElem.insertBefore(metas, docElem.getFirstChild());
-                        }
-
-                        source = new DOMSource(document, systemID);
-
-                    } else {
-                        XMLReader xmlReader = reader.get();
-                        sinks_.log(this,
-                            "  Referral to the source contents not required", LogLevel.DEBUG);
-                        referredContents = Collections.emptyList();
-                        if (!metaFuncMap.isEmpty()) {
-                            xmlReader = new MetaFilter(xmlReader,
-                                c -> addMetaInformation(metaFuncMap, includedURI, c));
-                        }
-                        source = new SAXSource(xmlReader, new InputSource(systemID));
-                    }
-
-                    // Do processing.
-                    Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
-                    if (result != null) {
-                        identity.reset();
-                        identity.setOutputProperty(OutputKeys.METHOD, "xml");
-                        identity.transform(source, result);
-                        sinks_.finishOne();
-                    }
-
-                } catch (TransformerException | IOException | BuildException e) {
-                    sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
-                    sinks_.abortOne();
-                    if (e instanceof FatalityException) {
-                        throw new BuildException(e.getCause());
-                    }
-                }
-            }
-            if (count > 0) {
-                sinks_.log(this,
-                    "Finishing results of " + count +" input sources", LogLevel.VERBOSE);
-            } else {
+        // Tell whether destinations are older.
+        boolean[] includes = null;
+        if (!force_) {
+            boolean[] examined = sinks_.preexamineBundle(
+                includedFiles, includedFileLastModifiedTimes);
+            if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
                 sinks_.log(this, "No input sources processed", LogLevel.INFO);
+                sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
+                Arrays.stream(includedURIs)
+                      .forEach(u -> sinks_.log(this, "    " + u, LogLevel.DEBUG));
+                return;
             }
-            sinks_.finishBundle();
-        } catch (FatalityException e) {
-            throw new BuildException(e.getCause());
-        } catch (SAXException | TransformerException e) {
-            throw new BuildException(e);
+            includes = examined;
         }
+
+        // Set up XML engines.
+        EntityResolver resolver = createEntityResolver();
+        XMLTransfer xfer = new XMLTransfer(resolver);
+
+        int count = 0;
+        sinks_.startBundle();
+        for (int i = 0; i < includedFiles.length; ++i) {
+            URI includedURI = includedURIs[i];
+            String systemID = includedURI.toString();
+            if ((includes != null) && !includes[i]) {
+                sinks_.log(this, "Skipping " + systemID, LogLevel.DEBUG);
+                continue;
+            }
+            ++count;
+            try {
+                sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
+                List<XPathExpression> referents = sinks_.referents();
+                List<String> referredContents;
+                Source source;
+                if (!referents.isEmpty()) {
+                    sinks_.log(this,
+                        "  Referral to the source contents required", LogLevel.DEBUG);
+                    Document document = xfer.parse(new StreamSource(systemID));
+                    referredContents = Referral.extract(document, referents);
+                    sinks_.log(this, "  Referred source data: "
+                        + String.join(", ", referredContents), LogLevel.DEBUG);
+
+                    if (!metaFuncMap.isEmpty()) {
+                        DocumentFragment metas = document.createDocumentFragment();
+                        addMetaInformation(metaFuncMap, includedURI, (target, data) ->
+                            metas.appendChild(
+                                document.createProcessingInstruction(target, data)));
+                        Element docElem = document.getDocumentElement();
+                        docElem.insertBefore(metas, docElem.getFirstChild());
+                    }
+
+                    source = new DOMSource(document, systemID);
+
+                } else {
+                    sinks_.log(this,
+                        "  Referral to the source contents not required", LogLevel.DEBUG);
+                    referredContents = Collections.emptyList();
+                    if (!metaFuncMap.isEmpty()) {
+                        source = new SAXSource(
+                            new MetaFilter(null,
+                                c -> addMetaInformation(metaFuncMap, includedURI, c)),
+                            new InputSource(systemID));
+                    } else {
+                        source = new StreamSource(systemID);
+                    }
+                }
+
+                // Do processing.
+                Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
+                if (result != null) {
+                    xfer.transfer(source, result);
+                    sinks_.finishOne();
+                }
+
+            } catch (BuildException e) {
+                sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
+                sinks_.abortOne();
+                if (e instanceof FatalityException) {
+                    throw new BuildException(e.getCause());
+                }
+            }
+        }
+        if (count > 0) {
+            sinks_.log(this,
+                "Finishing results of " + count +" input sources", LogLevel.VERBOSE);
+        } else {
+            sinks_.log(this, "No input sources processed", LogLevel.INFO);
+        }
+        sinks_.finishBundle();
     }
 
     private void setUpDirectories() {
@@ -363,61 +345,13 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
     }
 
     private EntityResolver createEntityResolver() {
-        EntityResolver resolver = null;
         if (usesCache_) {
-            resolver = new CachingResolver(
+            return new CachingResolver(
                 u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
                 u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
+        } else {
+            return null;
         }
-        return resolver;
-    }
-
-    private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {
-        Supplier<XMLReader> reader = new One<XMLReader, SAXParser>(
-            () -> {
-                SAXParserFactory pfac = SAXParserFactory.newInstance();
-                pfac.setNamespaceAware(true);
-                try {
-                    pfac.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
-                    return pfac.newSAXParser();
-                } catch (ParserConfigurationException | SAXException e) {
-                    throw new FatalityException(e);
-                }
-            },
-            p -> {
-                try {
-                    p.reset();
-                    XMLReader xmlReader = p.getXMLReader();
-                    if (resolver != null) {
-                        xmlReader.setEntityResolver(resolver);
-                    }
-                    return xmlReader;
-                } catch (SAXException e) {
-                    throw new FatalityException(e);
-                }
-            });
-        return reader;
-    }
-
-    private static Supplier<DocumentBuilder> createDocumentBuilderSupplier(EntityResolver resolver) {
-        Supplier<DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
-            () -> {
-                try {
-                    DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                    dbfac.setNamespaceAware(true);
-                    return dbfac.newDocumentBuilder();
-                } catch (ParserConfigurationException e) {
-                    throw new FatalityException(e);
-                }
-            },
-            b -> {
-                b.reset();
-                if (resolver != null) {
-                    b.setEntityResolver(resolver);
-                }
-                return b;
-            });
-        return builder;
     }
 
     private Map<String, Function<URI, String>> createMetaFuncMap() {
@@ -486,36 +420,6 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
             sinks_.log(this, "Adding processing instruction; target=" + target + ", data=" + data,
                 LogLevel.DEBUG);
             consumer.accept(target, data);
-        }
-    }
-
-    private static class FatalityException extends BuildException {
-
-        private static final long serialVersionUID = 333446244602547133L;
-
-        public FatalityException(Throwable cause) {
-            super(cause);
-        }
-    }
-
-    private static final class One<T, U> implements Supplier<T> {
-
-
-        private Supplier<U> factory_;
-        private Function<U, T> resetter_;
-        private U one_;
-
-        public One(Supplier<U> factory, Function<U, T> resetter) {
-            factory_ = factory;
-            resetter_ = resetter;
-        }
-
-        @Override
-        public T get() {
-            if (one_ == null) {
-                one_ = factory_.get();
-            }
-            return resetter_.apply(one_);
         }
     }
 

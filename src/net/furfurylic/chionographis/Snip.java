@@ -12,11 +12,7 @@ import java.util.Collections;
 import java.util.List;
 
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPath;
@@ -47,6 +43,7 @@ public final class Snip extends Sink implements SinkDriver {
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
 
+    private XMLTransfer xfer_;
     private Document document_;
     private int currentIndex_;
     private String currentSrcFileName_;
@@ -112,6 +109,7 @@ public final class Snip extends Sink implements SinkDriver {
      */
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+        xfer_ = new XMLTransfer(null);
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
         namespaceContext_ = namespaceContext;
@@ -133,18 +131,8 @@ public final class Snip extends Sink implements SinkDriver {
         currentIndex_ = originalSrcIndex;
         currentSrcFileName_ = originalSrcFileName;
         currentSrcLastModifiedTime_ = originalSrcLastModifiedTime;
-        document_ = newDocument();
+        document_ = xfer_.newDocument();
         return new DOMResult(document_);
-    }
-
-    private Document newDocument() {
-        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-        dbfac.setNamespaceAware(true);
-        try {
-            return dbfac.newDocumentBuilder().newDocument();
-        } catch (ParserConfigurationException e) {
-            throw new BuildException(e);
-        }
     }
 
     @Override
@@ -164,7 +152,7 @@ public final class Snip extends Sink implements SinkDriver {
             for (int i = 0; i < nodes.getLength(); ++i) {
                 Node node = nodes.item(i);
                 if (node.getNodeType() == Node.ELEMENT_NODE) {
-                    Document document = newDocument();
+                    Document document = xfer_.newDocument();
                     document.appendChild(document.adoptNode(node));
 
                     // Search the source contents if necessary
@@ -186,9 +174,7 @@ public final class Snip extends Sink implements SinkDriver {
 
                     if (result != null) {
                         // Send fragment to sink
-                        TransformerFactory.newInstance().newTransformer().transform(
-                            new DOMSource(document), result);
-
+                        xfer_.transfer(new DOMSource(document), result);
                         // Finish sink
                         sinks_.finishOne();
                     }
@@ -202,7 +188,7 @@ public final class Snip extends Sink implements SinkDriver {
                 sinks_.log(this, "No snipped fragments generated; the original source is " + currentSrcFileName_, LogLevel.INFO);
             }
 
-        } catch (TransformerException | XPathExpressionException e) {
+        } catch (XPathExpressionException e) {
             throw new BuildException(e);
         }
     }
