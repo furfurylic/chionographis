@@ -80,7 +80,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        Optional<byte[]> cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
+        byte[] cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
             try {
                 if (u.getScheme().equalsIgnoreCase("file")) {
                     // Files are easy to get lengths in advance.
@@ -123,8 +123,8 @@ final class CachingResolver implements EntityResolver, URIResolver {
             }
         });
 
-        if (cached.isPresent()) {
-            InputSource inputSource = new InputSource(new ByteArrayInputStream(cached.get()));
+        if (cached != null) {
+            InputSource inputSource = new InputSource(new ByteArrayInputStream(cached));
             inputSource.setSystemId(systemId);
             inputSource.setPublicId(publicId);
             return inputSource;
@@ -146,7 +146,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        Optional<Source> cached = TREES.get(uri, listenStored_, listenHit_, u -> {
+        Source cached = TREES.get(uri, listenStored_, listenHit_, u -> {
             DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
             dbfac.setNamespaceAware(true);
             try {
@@ -158,7 +158,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
                 return null;
             }
         });
-        return cached.orElse(null);
+        return cached;
     }
 
     /**
@@ -208,7 +208,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
          * @return
          *      a possibly-empty resolved object.
          */
-        public Optional<T> get(URI uri,
+        public T get(URI uri,
                 Consumer<URI> listenStored, Consumer<URI> listenHit,
                 Function<URI, ? extends T> factory) {
             assert uri != null;
@@ -254,7 +254,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
                     }
                     strongOne.put(canonicalizedURI, cached);
                 }
-                return cached;
+                return cached.get();
             }
         }
 
