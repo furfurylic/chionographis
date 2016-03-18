@@ -39,9 +39,10 @@ import org.w3c.dom.Document;
 
 /**
  * An <i>Transform</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} transforms
- * each source document into an document styled by an XSLT stylsheet.
+ * each source document into an document styled by an XSLT stylesheet.
  */
 public final class Transform extends Sink implements SinkDriver {
+    private static final NetResourceCache<Templates> STYLESHEETS = new NetResourceCache<>();
 
     private Sinks sinks_;
     private String style_ = null;
@@ -254,7 +255,7 @@ public final class Transform extends Sink implements SinkDriver {
                 }
             }
         } catch (TransformerConfigurationException e) {
-            throw new BuildException(e);
+            throw new FatalityException(e);
         }
     }
 
@@ -275,37 +276,50 @@ public final class Transform extends Sink implements SinkDriver {
 
     private class Stylesheet {
 
-        private SAXTransformerFactory tfac_;
-        private Templates compiledStylesheet_;
-        private CachingResolver resolver_;
+        private SAXTransformerFactory tfac_ = null;
+        private CachingResolver resolver_ = null;
 
         public Transformer newTransformer() throws TransformerConfigurationException {
-            ensureStylesheetCompiled();
-            Transformer transformer = compiledStylesheet_.newTransformer();
+            Templates compiledStylesheet = getCompiledStylesheet();
+            Transformer transformer = compiledStylesheet.newTransformer();
             configureTransformer(transformer);
             return transformer;
         }
 
         public TransformerHandler newTransformerHandler() throws TransformerConfigurationException {
-            ensureStylesheetCompiled();
-            TransformerHandler styler = tfac_.newTransformerHandler(compiledStylesheet_);
+            Templates compiledStylesheet = getCompiledStylesheet();
+            if (tfac_ == null) {
+                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+            }
+            TransformerHandler styler = tfac_.newTransformerHandler(compiledStylesheet);
             configureTransformer(styler.getTransformer());
             return styler;
         }
 
-        private void ensureStylesheetCompiled() throws TransformerConfigurationException {
-            if (compiledStylesheet_ == null) {
-                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
-                String styleSystemID = styleURI_.toString();
-                sinks_.log(Transform.this, "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
-                if (usesCache_) {
-                    resolver_ = new CachingResolver(
-                        u -> sinks_.log(Transform.this, "Caching " + u, LogLevel.DEBUG),
-                        u -> sinks_.log(Transform.this, "Reusing " + u, LogLevel.DEBUG));
-                    tfac_.setURIResolver(resolver_);
-                }
-                compiledStylesheet_ = tfac_.newTemplates(new StreamSource(styleSystemID));
-            }
+        private Templates getCompiledStylesheet() {
+            return STYLESHEETS.get(styleURI_,
+                u -> {},
+                u -> {
+                    sinks_.log(Transform.this,
+                        "Reusing compiled stylesheet: " + u.toString(), LogLevel.VERBOSE);
+                },
+                u -> {
+                    tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+                    String styleSystemID = styleURI_.toString();
+                    sinks_.log(Transform.this,
+                        "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+                    if (usesCache_) {
+                        resolver_ = new CachingResolver(
+                            r -> sinks_.log(Transform.this, "Caching " + r, LogLevel.DEBUG),
+                            r -> sinks_.log(Transform.this, "Reusing " + r, LogLevel.DEBUG));
+                        tfac_.setURIResolver(resolver_);
+                    }
+                    try {
+                        return tfac_.newTemplates(new StreamSource(styleSystemID));
+                    } catch (TransformerConfigurationException e) {
+                        throw new FatalityException(e);
+                    }
+                });
         }
 
         private void configureTransformer(Transformer transformer) {
@@ -316,6 +330,5 @@ public final class Transform extends Sink implements SinkDriver {
                 transformer.setURIResolver(resolver_);
             }
         }
-
     }
 }
