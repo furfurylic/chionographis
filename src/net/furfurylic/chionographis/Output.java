@@ -9,8 +9,9 @@ package net.furfurylic.chionographis;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -46,10 +47,10 @@ public final class Output extends Sink {
     private FileNameMapper mapper_;
 
     private Logger logger_;
-    private Function<String, Set<File>> destMapping_;
+    private Function<String, Set<Path>> destMapping_;
     private List<XPathExpression> referents_;
 
-    private Set<File> currentDests_;
+    private Set<Path> currentDests_;
     private ByteArrayOutputStream currentContent_;
     private int countInBundle_;
 
@@ -179,8 +180,9 @@ public final class Output extends Sink {
         } else {
             destDir_ = baseDir.toPath().resolve(destDir_);
         }
+        assert destDir_.isAbsolute();
 
-        if (dest_!= null) {
+        if (dest_ != null) {
             // A predefined destination path exists.
             if (referent_ != null) {
                 logger_.log(this, "\"dest\" and \"refer\" can be set exclusively", LogLevel.ERR);
@@ -190,6 +192,8 @@ public final class Output extends Sink {
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
+            assert dest_.isAbsolute();
+
         } else if (referent_ != null) {
             // No predefined destination path exists
             // and specified to refer the source document contents.
@@ -202,6 +206,7 @@ public final class Output extends Sink {
                 logger_.log(this, "Failed to compile XPath expression: " + referent_, LogLevel.ERR);
                 throw new BuildException(e);
             }
+
         } else if (mapper_ == null) {
             // No predefined destination path configured,
             // neither does reference to the source document contents,
@@ -210,6 +215,7 @@ public final class Output extends Sink {
             logger_.log(this, "Neither \"dest\", \"refer\" nor file mappers are set", LogLevel.ERR);
             throw new BuildException();
         }
+
         if (referents_ == null) {
             referents_ = Collections.emptyList();
         }
@@ -219,21 +225,21 @@ public final class Output extends Sink {
         if (mapper_ != null) {
             // There is a mapper and the output path will be decided later using it.
             destMapping_ = s -> {
-                    if (s != null) {
-                        String[] mapped = mapper_.mapFileName(s);
-                        if (mapped != null) {
-                            return Arrays.stream(mapped)
-                                         .map(destDir_::resolve)
-                                         .map(Path::toFile)
-                                         .collect(Collectors.toSet());
-                        }
+                if (s != null) {
+                    String[] mapped = mapper_.mapFileName(s);
+                    if (mapped != null) {
+                        return Arrays.stream(mapped)
+                                     .map(destDir_::resolve)
+                                     .collect(Collectors.toSet());
                     }
-                    return null;
-                };
+                }
+                return null;
+            };
         } else if (referents_.isEmpty()) {
             // There is no mapper and the output path has been already decided.
             assert dest_ != null;
-            destMapping_ = s -> Collections.singleton(dest_.toFile());
+            assert dest_.isAbsolute();
+            destMapping_ = s -> Collections.singleton(dest_);
         }
 
         force_ = force_ || force;
@@ -285,13 +291,13 @@ public final class Output extends Sink {
             } else if (destMapping_ != null) {
                 currentDests_.addAll(destMapping_.apply(referredContents.get(0)));
             } else {
-                currentDests_.add(destDir_.resolve(referredContents.get(0)).toFile());
+                currentDests_.add(destDir_.resolve(referredContents.get(0)));
             }
         }
         if (!force_
          && !isOriginalSrcNewer(originalSrcLastModifiedTime, currentDests_)) {
             String files = currentDests_.stream()
-                                        .map(File::getAbsolutePath)
+                                        .map(Path::toString)
                                         .reduce((ss, s) -> ss + ", " + s)
                                         .orElse(null);
             logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
@@ -308,14 +314,14 @@ public final class Output extends Sink {
         return new StreamResult(currentContent_);
     }
 
-    private boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<File> dests) {
+    private boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<Path> dests) {
         assert !force_;
         if (originalSrcLastModifiedTime <= 0) {
             return true;
         } else {
             return dests.stream()
-                        .anyMatch(f -> (!f.exists()
-                                     || (f.lastModified() < originalSrcLastModifiedTime)));
+                        .anyMatch(f -> (!Files.exists(f)
+                                     || (f.toFile().lastModified() < originalSrcLastModifiedTime)));
         }
     }
 
@@ -324,15 +330,15 @@ public final class Output extends Sink {
         // Write the buffer contents to currentDests_.
         assert currentDests_ != null;
         try {
-            for (File mapped : currentDests_) {
+            for (Path mapped : currentDests_) {
                 if (mkDirs_) {
-                    File parent = mapped.getParentFile();
-                    if (!parent.exists()) {
-                        parent.mkdirs();
+                    Path parent = mapped.getParent();
+                    if ((parent != null) && !Files.exists(parent)) {
+                        Files.createDirectories(parent);
                     }
                 }
-                logger_.log(this, "Creating " + mapped.getAbsolutePath(), LogLevel.VERBOSE);
-                try (FileOutputStream channel = new FileOutputStream(mapped)) {
+                logger_.log(this, "Creating " + mapped.toAbsolutePath(), LogLevel.VERBOSE);
+                try (OutputStream channel = Files.newOutputStream(mapped)) {
                     currentContent_.writeTo(channel);
                 }
             }
