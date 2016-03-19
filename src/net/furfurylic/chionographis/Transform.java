@@ -36,6 +36,7 @@ import javax.xml.xpath.XPathExpression;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
+import org.xml.sax.ContentHandler;
 
 /**
  * An <i>Transform</i> filter transforms each source document into an document
@@ -54,7 +55,6 @@ public final class Transform extends Sink implements Driver {
     private Map<String, Object> paramMap_ = null;
 
     private Stylesheet stylesheet_ = new Stylesheet();
-    private Runnable finisher_;
 
     Transform(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -229,24 +229,25 @@ public final class Transform extends Sink implements Driver {
                 } catch (ParserConfigurationException e) {
                     throw new BuildException(e);
                 }
-                finisher_ = () -> {
-                    List<String> referredContents = Referral.extract(document, referents);
-                    sinks_.log(this, "  Referred source data: "
-                        + String.join(", ", referredContents), LogLevel.DEBUG);
-                    Result openedResult =
-                        sinks_.startOne(originalSrcIndex, originalSrcFileName,
-                            lastModified, referredContents);
-                    if (openedResult != null) {
-                        try {
-                            stylesheet_.newTransformer()
-                                .transform(new DOMSource(document), openedResult);
-                        } catch (TransformerException e) {
-                            throw new BuildException(e);
+                return new FinisherDOMResult(document,
+                    () -> {
+                        List<String> referredContents = Referral.extract(document, referents);
+                        sinks_.log(this, "  Referred source data: "
+                            + String.join(", ", referredContents), LogLevel.DEBUG);
+                        Result openedResult =
+                            sinks_.startOne(originalSrcIndex, originalSrcFileName,
+                                lastModified, referredContents);
+                        if (openedResult != null) {
+                            try {
+                                stylesheet_.newTransformer()
+                                    .transform(new DOMSource(document), openedResult);
+                            } catch (TransformerException e) {
+                                throw new BuildException(e);
+                            }
+                            sinks_.finishOne(openedResult);
                         }
-                        sinks_.finishOne();
-                    }
-                };
-                return new DOMResult(document);
+                    },
+                    () -> {});
             } else {
                 sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                 Result openedResult =
@@ -255,8 +256,9 @@ public final class Transform extends Sink implements Driver {
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
                     styler.setResult(openedResult);
-                    finisher_ = () -> sinks_.finishOne();
-                    return new SAXResult(styler);
+                    return new FinisherSAXResult(styler,
+                        () -> sinks_.finishOne(openedResult),
+                        () -> sinks_.abortOne(openedResult));
                 } else {
                     return null;
                 }
@@ -267,13 +269,17 @@ public final class Transform extends Sink implements Driver {
     }
 
     @Override
-    void finishOne() {
-        finisher_.run();
+    void finishOne(Result result) {
+        assert result != null;
+        assert result instanceof Finisher;
+        ((Finisher) result).finish();
     }
 
     @Override
-    void abortOne() {
-        sinks_.abortOne();
+    void abortOne(Result result) {
+        assert result != null;
+        assert result instanceof Finisher;
+        ((Finisher) result).abort();
     }
 
     @Override
@@ -281,7 +287,55 @@ public final class Transform extends Sink implements Driver {
         sinks_.finishBundle();
     }
 
+    private static interface Finisher {
+        void finish();
+        void abort();
+    }
+
+    private static class FinisherSAXResult extends SAXResult implements Finisher {
+        private Runnable finisher_;
+        private Runnable aborter_;
+
+        public FinisherSAXResult(ContentHandler handler, Runnable finisher, Runnable aborter) {
+            super(handler);
+            finisher_ = finisher;
+            aborter_ = aborter;
+        }
+
+        @Override
+        public void finish() {
+            finisher_.run();
+        }
+
+        @Override
+        public void abort() {
+            aborter_.run();
+        }
+    }
+
+    private static class FinisherDOMResult extends DOMResult implements Finisher {
+        private Runnable finisher_;
+        private Runnable aborter_;
+
+        public FinisherDOMResult(Document document, Runnable finisher, Runnable aborter) {
+            super(document);
+            finisher_ = finisher;
+            aborter_ = aborter;
+        }
+
+        @Override
+        public void finish() {
+            finisher_.run();
+        }
+
+        @Override
+        public void abort() {
+            aborter_.run();
+        }
+    }
+
     private class Stylesheet {
+        private final Object LOCK = new Object();
 
         private SAXTransformerFactory tfac_ = null;
         private CachingResolver resolver_ = null;
@@ -295,38 +349,46 @@ public final class Transform extends Sink implements Driver {
 
         public TransformerHandler newTransformerHandler() throws TransformerConfigurationException {
             Templates compiledStylesheet = getCompiledStylesheet();
-            if (tfac_ == null) {
-                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+            TransformerHandler styler;
+            synchronized (LOCK) {
+                if (tfac_ == null) {
+                    tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+                }
+                styler = tfac_.newTransformerHandler(compiledStylesheet);
             }
-            TransformerHandler styler = tfac_.newTransformerHandler(compiledStylesheet);
             configureTransformer(styler.getTransformer());
             return styler;
         }
 
         private Templates getCompiledStylesheet() {
-            return STYLESHEETS.get(styleURI_,
+            return STYLESHEETS.get(
+                styleURI_,
                 u -> {},
                 u -> {
                     sinks_.log(Transform.this,
                         "Reusing compiled stylesheet: " + u.toString(), LogLevel.VERBOSE);
                 },
-                u -> {
-                    tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
-                    String styleSystemID = styleURI_.toString();
-                    sinks_.log(Transform.this,
-                        "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
-                    if (usesCache_) {
-                        resolver_ = new CachingResolver(
-                            r -> sinks_.log(Transform.this, "Caching " + r, LogLevel.DEBUG),
-                            r -> sinks_.log(Transform.this, "Reusing " + r, LogLevel.DEBUG));
-                        tfac_.setURIResolver(resolver_);
-                    }
-                    try {
-                        return tfac_.newTemplates(new StreamSource(styleSystemID));
-                    } catch (TransformerConfigurationException e) {
-                        throw new FatalityException(e);
-                    }
-                });
+                this::compileStylesheet);
+        }
+
+        private Templates compileStylesheet(URI styleURI) {
+            String styleSystemID = styleURI.toString();
+            sinks_.log(Transform.this,
+                "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+            synchronized (LOCK) {
+                tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
+                if (usesCache_) {
+                    resolver_ = new CachingResolver(
+                        r -> sinks_.log(Transform.this, "Caching " + r, LogLevel.DEBUG),
+                        r -> sinks_.log(Transform.this, "Reusing " + r, LogLevel.DEBUG));
+                    tfac_.setURIResolver(resolver_);
+                }
+                try {
+                    return tfac_.newTemplates(new StreamSource(styleSystemID));
+                } catch (TransformerConfigurationException e) {
+                    throw new FatalityException(e);
+                }
+            }
         }
 
         private void configureTransformer(Transformer transformer) {
