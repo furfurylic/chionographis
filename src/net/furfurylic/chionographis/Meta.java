@@ -17,9 +17,19 @@ import java.util.regex.Pattern;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.LogLevel;
 
+/**
+ * A class to instruct the <i>{@linkplain Chionographis}</i> driver to add
+ * a processing instruction which includes meta-information of the original source.
+ */
 public final class Meta {
 
+    /**
+     * This type defines the set of usable original source meta-information types.
+     *
+     * @see Meta#setType(String)
+     */
     public enum Type {
+        /** The absolute URI. The corresponding string expression is "uri". */
         URI {
             @Override
             Function<URI, String> extractor() {
@@ -27,6 +37,10 @@ public final class Meta {
             }
         },
 
+        /**
+         * The last part of the path of the {@linkplain #URI}.
+         * The corresponding string expression is "file-name".
+         */
         FILE_NAME {
             @Override
             Function<URI, String> extractor() {
@@ -34,6 +48,10 @@ public final class Meta {
             }
         },
 
+        /**
+         * The substring of the {@linkplain #FILE_NAME} before its last period (".").
+         * The corresponding string expression is "file-title".
+         */
         FILE_TITLE {
             @Override
             Function<URI, String> extractor() {
@@ -81,6 +99,13 @@ public final class Meta {
         logger_ = logger;
     }
 
+    /**
+     * Sets the type of the meta-information.
+     * Only {@link Type} objects' string expression can be accepted.
+     *
+     * @param type
+     *      a {@link Type} object's string expression.
+     */
     public void setType(String type) {
         if (type.isEmpty()) {
             logger_.log(this, "Empty meta-information type is not acceptable", LogLevel.ERR);
@@ -95,6 +120,15 @@ public final class Meta {
         }
     }
 
+    /**
+     * Sets the target of the processing instruction.
+     *
+     * <p>If not specified, the target is defaulted to "chionographis-" and the {@linkplain
+     * #setType(String) type} concatenated.</p>
+     *
+     * @param name
+     *      the target of the processing instruction.
+     */
     public void setName(String name) {
         if (name.isEmpty()) {
             logger_.log(this, "Empty meta-information name is not acceptable", LogLevel.ERR);

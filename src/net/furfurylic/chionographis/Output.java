@@ -123,10 +123,24 @@ public final class Output extends Sink {
         referent_ = refer;
     }
 
+    /**
+     * Sets whether this sink should make the destination files' parent directories
+     * if necessary. Defaulted to "no".
+     *
+     * @param mkDirs
+     *      {@code true} if make parent directories; {@code false} otherwise.
+     */
     public void setMkDirs(boolean mkDirs) {
         mkDirs_ = mkDirs;
     }
 
+    /**
+     * Sets whether this sink should proceed processing even if the destination files are
+     * up to date.
+     *
+     * @param force
+     *      {@code true} if proceeds even if up to date; {@code false} otherwise.
+     */
     public void setForce(boolean force) {
         force_ = force;
     }
@@ -252,7 +266,7 @@ public final class Output extends Sink {
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcFileLastModifiedTime, List<String> referredContents) {
+            long originalSrcLastModifiedTime, List<String> referredContents) {
         // Initialize currentDests_ as empty.
         if (currentDests_ == null) {
             currentDests_ = new TreeSet<>();
@@ -275,7 +289,7 @@ public final class Output extends Sink {
             }
         }
         if (!force_
-         && !isOriginalSrcNewer(originalSrcFileLastModifiedTime, currentDests_)) {
+         && !isOriginalSrcNewer(originalSrcLastModifiedTime, currentDests_)) {
             String files = currentDests_.stream()
                                         .map(File::getAbsolutePath)
                                         .reduce((ss, s) -> ss + ", " + s)
@@ -294,11 +308,15 @@ public final class Output extends Sink {
         return new StreamResult(currentContent_);
     }
 
-    private boolean isOriginalSrcNewer(long originalSrcFileLastModifiedTime, Set<File> dests) {
+    private boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<File> dests) {
         assert !force_;
-        return dests.stream()
-                    .anyMatch(f -> (!f.exists()
-                                 || (f.lastModified() < originalSrcFileLastModifiedTime)));
+        if (originalSrcLastModifiedTime <= 0) {
+            return true;
+        } else {
+            return dests.stream()
+                        .anyMatch(f -> (!f.exists()
+                                     || (f.lastModified() < originalSrcLastModifiedTime)));
+        }
     }
 
     @Override
