@@ -31,7 +31,7 @@ import org.xml.sax.Locator;
 import org.xml.sax.SAXException;
 import org.xml.sax.ext.LexicalHandler;
 
-final class Sinks extends Sink implements SinkDriver, Logger {
+final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
     private List<Sink> sinks_;
@@ -64,28 +64,24 @@ final class Sinks extends Sink implements SinkDriver, Logger {
         logger_.log(issuer, message, ex, level);
     }
 
-    @Override
     public Transform createTransform() {
         Transform sink = new Transform(logger_);
         sinks_.add(sink);
         return sink;
     }
 
-    @Override
     public All createAll() {
         All sink = new All(logger_);
         sinks_.add(sink);
         return sink;
     }
 
-    @Override
     public Snip createSnip() {
         Snip sink = new Snip(logger_);
         sinks_.add(sink);
         return sink;
     }
 
-    @Override
     public Output createOutput() {
         Output sink = new Output(logger_);
         sinks_.add(sink);
@@ -134,7 +130,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcFileLastModifiedTime, List<String> referredContents) {
+            long originalSrcLastModifiedTime, List<String> referredContents) {
         if (activeSinks_ == null) {
             activeSinks_ = new ArrayList<>();
         } else {
@@ -152,7 +148,7 @@ final class Sinks extends Sink implements SinkDriver, Logger {
             List<String> referredContentsOne =
                 referredContents.subList(i, i + sinks_.get(j).referents().size());
             Result result = sinks_.get(j).startOne(
-                originalSrcIndex, originalSrcFileName, originalSrcFileLastModifiedTime, referredContentsOne);
+                originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime, referredContentsOne);
             if (result != null) {
                 builder.add(result);
                 activeSinks_.add(sinks_.get(j));
@@ -163,18 +159,26 @@ final class Sinks extends Sink implements SinkDriver, Logger {
 
     @Override
     void finishOne() {
-        activeSinks_.stream().filter(s -> s != null).forEach(Sink::finishOne);
+        activeSinks_.stream().forEach(Sink::finishOne);
     }
 
     @Override
     void abortOne() {
         Optional<RuntimeException> ex = activeSinks_.stream()
-            .filter(s -> s != null)
-            .map(s -> { try { s.abortOne(); return null; } catch (RuntimeException e) { return e; } })
+            .map(Sinks::abortSink)
             .filter(e -> e != null)
             .findAny();
         if (ex.isPresent()) {
             throw ex.get();
+        }
+    }
+
+    private static RuntimeException abortSink(Sink s) {
+        try {
+            s.abortOne();
+            return null;
+        } catch (RuntimeException e) {
+            return e;
         }
     }
 

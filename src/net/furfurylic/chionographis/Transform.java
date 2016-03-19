@@ -38,10 +38,10 @@ import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 
 /**
- * An <i>Transform</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} transforms
- * each source document into an document styled by an XSLT stylesheet.
+ * An <i>Transform</i> filter transforms each source document into an document
+ * styled by an XSLT stylesheet.
  */
-public final class Transform extends Sink implements SinkDriver {
+public final class Transform extends Sink implements Driver {
     private static final NetResourceCache<Templates> STYLESHEETS = new NetResourceCache<>();
 
     private Sinks sinks_;
@@ -51,7 +51,6 @@ public final class Transform extends Sink implements SinkDriver {
     private List<Param> params_ = Collections.emptyList();
 
     private URI styleURI_;
-    private long styleLastModified_;
     private Map<String, Object> paramMap_ = null;
 
     private Stylesheet stylesheet_ = new Stylesheet();
@@ -78,6 +77,10 @@ public final class Transform extends Sink implements SinkDriver {
         usesCache_ = cache;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void setForce(boolean force) {
         force_ = force;
     }
@@ -147,12 +150,6 @@ public final class Transform extends Sink implements SinkDriver {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
         }
 
-        if (styleURI_.getScheme().equalsIgnoreCase("file")) {
-            styleLastModified_ = new File(styleURI_).lastModified();
-        } else {
-            styleLastModified_ = Long.MAX_VALUE;
-        }
-
         force_ = force_ || force;
 
         sinks_.init(baseDir, namespaceContext, force_);
@@ -184,18 +181,28 @@ public final class Transform extends Sink implements SinkDriver {
 
     @Override
     boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
-        boolean[] includes;
-        if (force_) {
-            includes = new boolean[originalSrcFileNames.length];
-            Arrays.fill(includes, true);
-        } else {
-            long[] lastModifiedTimes =
-                Arrays.stream(originalSrcLastModifiedTimes)
-                      .map(l -> Math.max(l, styleLastModified_))
-                      .toArray();
-            includes = sinks_.preexamineBundle(originalSrcFileNames, lastModifiedTimes);
+        if (!force_) {
+            long styleLastModified = lastModified(styleURI_);
+            if (styleLastModified > 0) {
+                long[] lastModifiedTimes =
+                    Arrays.stream(originalSrcLastModifiedTimes)
+                          .map(l -> (l <= 0 ? l : Math.max(l, styleLastModified)))
+                          .toArray();
+                return sinks_.preexamineBundle(originalSrcFileNames, lastModifiedTimes);
+            }
         }
+
+        boolean[] includes = new boolean[originalSrcFileNames.length];
+        Arrays.fill(includes, true);
         return includes;
+    }
+
+    private static long lastModified(URI uri) {
+        if (uri.getScheme().equalsIgnoreCase("file")) {
+            return new File(uri).lastModified();
+        } else {
+            return 0;
+        }
     }
 
     @Override
@@ -205,10 +212,10 @@ public final class Transform extends Sink implements SinkDriver {
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcFileLastModifiedTime, List<String> notUsed) {
-        long lastModified = styleURI_.getScheme().equalsIgnoreCase("file") ?
-            Math.max(originalSrcFileLastModifiedTime, new File(styleURI_).lastModified()) :
-            Long.MAX_VALUE;
+            long originalSrcLastModifiedTime, List<String> notUsed) {
+        long styleLastModified = lastModified(styleURI_);
+        long lastModified = (styleLastModified <= 0) ?
+            styleLastModified : Math.max(originalSrcLastModifiedTime, styleLastModified);
 
         try {
             List<XPathExpression> referents = sinks_.referents();

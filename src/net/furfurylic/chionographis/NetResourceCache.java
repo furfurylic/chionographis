@@ -18,6 +18,15 @@ import java.util.WeakHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+/**
+ * A class for caching objects identified by URIs.
+ *
+ * The cached objects are held by soft references.
+ * Objects of this class are thread-safe.
+ *
+ * @param <T>
+ *      the class of the cached objects.
+ */
 final class NetResourceCache<T> {
 
     private final Object LOCK = new Object();
@@ -28,15 +37,26 @@ final class NetResourceCache<T> {
     /** A possibly identity-based synchronized map. */
     private SoftReference<Map<URI, Optional<T>>> cache_ = null;
 
+    /** Sole constructor. */
+    public NetResourceCache() {
+    }
+
     /**
+     * Fetches an object from the cache. If no objects are bound to the specified URI,
+     * an object for the URI is created and cached.
      *
      * @param uri
      *      a URI.
+     * @param listenStored
+     *      a listener invoked when an object is about to be cached.
+     * @param listenHit
+     *      a listener invoked when an object is fetched from the cache.
      * @param factory
-     *      a factory function which make an object from a URI.
+     *      a factory function which make an object from a URI, which can return {@code null}
+     *      in case of errors.
      *
      * @return
-     *      a possibly-empty resolved object.
+     *      a possibly-{@code null} resolved object.
      */
     public T get(URI uri,
             Consumer<URI> listenStored, Consumer<URI> listenHit,

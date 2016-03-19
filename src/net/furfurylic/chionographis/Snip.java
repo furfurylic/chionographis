@@ -28,13 +28,13 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 /**
- * A <i>Snip</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} performs
- * extraction of tree fragments from the source documents and passes the fragments to its sinks.
+ * A <i>Snip</i> filter performs extraction of tree fragments from the source documents
+ * and passes the fragments to its sinks.
  *
  * <p>The way of extraction is specified by <i>XPath</i> expression.
  * The root nodes of the fragments are the matched elements with the XPath expression.</p>
  */
-public final class Snip extends Sink implements SinkDriver {
+public final class Snip extends Sink implements Driver {
 
     private Sinks sinks_;
     private String select_;
@@ -68,6 +68,10 @@ public final class Snip extends Sink implements SinkDriver {
         select_ = xpath;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void setForce(boolean force) {
         force_ = force;
     }
