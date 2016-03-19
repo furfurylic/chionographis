@@ -27,16 +27,22 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 /**
- * An <i>All</i> {@linkplain Sink sink}/{@linkplain SinkDriver sink driver} collects
- * all source documents up into an document.
+ * An <i>All</i> filter collects all source documents up into an document.
  *
  * <p>The resulted document has all elements of the document elements of the source documents
  * supplied to this object by the driver as the direct child nodes of the document element of the
  * resulted document.</p>
  */
-public final class All extends Sink implements SinkDriver {
-
+public final class All extends Sink implements Driver {
+    /**
+     * The qualified name of the root element.
+     *
+     * Before {@link #init(File, NamespaceContext, boolean)} is invoked,
+     * this field is the user-specified string.
+     * After the invocation, this field is the string value of {@link #rootQ_}.
+     */
     private String root_ = null;
+
     private boolean force_ = true;
     private Sinks sinks_;
 
@@ -44,7 +50,7 @@ public final class All extends Sink implements SinkDriver {
 
     private Document resultDocument_;
     private Document currentDocument_;
-    long lastModifiedTime_;
+    private long lastModifiedTime_;
 
     private XMLTransfer xfer_;
 
@@ -70,6 +76,10 @@ public final class All extends Sink implements SinkDriver {
         root_ = root;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void setForce(boolean force) {
         force_ = force;
     }
