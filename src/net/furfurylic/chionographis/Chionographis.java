@@ -54,7 +54,7 @@ import org.xml.sax.helpers.XMLFilterImpl;
  *
  * <p>An object of this class behaves as a <i>sink driver</i>.</p>
  */
-public final class Chionographis extends MatchingTask implements SinkDriver {
+public final class Chionographis extends MatchingTask implements Driver {
 
     private Path srcDir_;
     private Path baseDir_;
@@ -110,14 +110,36 @@ public final class Chionographis extends MatchingTask implements SinkDriver {
         usesCache_ = cache;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void setForce(boolean force) {
         force_ = force;
     }
 
+    /**
+     * Sets whether verbose logging should be performed.
+     *
+     * <p>If set to "yes", log entries whose level is "verbose" or "debug" are escalated to
+     * "info" or "verbose" level respectively.</p>
+     *
+     * @param verbose
+     *      {@code true} if verbose logging is performed; {@code false} otherwise.
+     */
     public void setVerbose(boolean verbose) {
         verbose_ = verbose;
     }
 
+    /**
+     * Add sn instruction to include the meta-information of the original source documents
+     * into the processing instruction in the documents emitted to the sinks.
+     *
+     * <p>The processing instructions appear as the document elements first children.</p>
+     *
+     * @return
+     *      an empty instruction of meta-information processing instruction.
+     */
     public Meta createMeta() {
         Meta meta = new Meta(sinks_);
         if (metas_.isEmpty()) {

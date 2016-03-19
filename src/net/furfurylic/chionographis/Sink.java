@@ -17,7 +17,7 @@ import javax.xml.xpath.XPathExpression;
 
 /**
  * A <i>sink</i> object is a destination of processed documents.
- * Objects which supplies documents to sinks are called <i>{@linkplain SinkDriver sink drivers}</i>.
+ * Objects which supplies documents to sinks are called <i>{@linkplain Driver sink drivers}</i>.
  */
 public abstract class Sink {
 
@@ -69,14 +69,15 @@ public abstract class Sink {
      * If the driver consider all of the candidate are to be included to the processing,
      * this method might never be invoked.</p>
      *
-     * <p>Callees must not try to modify arrays and a set passed as parameters.</p>
+     * <p>Callees must not try to modify arrays passed as parameters.</p>
      *
      * @param originalSrcFileNames
      *      the source file names of the original input sources to the {@linkplain Chionographis
      *      Chionographis task}, whose elements shall not be {@code null}.
      * @param originalSrcLastModifiedTimes
-     *      the source file names which correspond the URIs in {@code srcURIs},
-     *      whose elements shall not be {@code null}.
+     *      the last modification times of the source files which correspond the file names in
+     *      {@code srcURIs} from the epoch, each element of which is positive if significant, or
+     *      {@code 0} if unknown.
      *
      * @return
      *      an array of necessity for a process for each input source;
@@ -107,6 +108,9 @@ public abstract class Sink {
      *      {@code originalSrcFileNames} is the argument passed in the prior call of {@link
      *      #preexamineBundle(String[], long[])}; or {@code null} if the driver have not invoked
      *      {@link #preexamineBundle(String[], long[])}.
+     * @param originalSrcLastModifiedTime
+     *      the last modification time of the original source file from the epoch,
+     *      which is positive if significant, or {@code 0} if unknown..
      * @param referredContents
      *      an list whose size is the same as the return value of
      *      {@link #referents()} and contains the required input document contents
@@ -117,7 +121,7 @@ public abstract class Sink {
      *      an TrAX {@code Result} object which receives the input document.
      */
     abstract Result startOne(int originalSrcIndex,
-        String originalSrcFileName, long originalSrcFileLastModifiedTime,
+        String originalSrcFileName, long originalSrcLastModifiedTime,
         List<String> referredContents);
 
     /**
