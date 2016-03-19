@@ -127,7 +127,7 @@ public abstract class Sink {
     /**
      * Finishes to receive one input document.
      */
-    abstract void finishOne();
+    abstract void finishOne(Result result);
 
     /**
      * Aborts processing the current source doucment.
@@ -135,7 +135,7 @@ public abstract class Sink {
      * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
      * is considered fatal (i.e. the build process itself will be aborted).</p>
      */
-    abstract void abortOne();
+    abstract void abortOne(Result result);
 
     abstract void finishBundle();
 }

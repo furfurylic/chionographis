@@ -286,57 +286,57 @@ public final class Chionographis extends MatchingTask implements Driver {
                 continue;
             }
             ++count;
-            try {
-                sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                List<XPathExpression> referents = sinks_.referents();
-                List<String> referredContents;
-                Source source;
-                if (!referents.isEmpty()) {
-                    sinks_.log(this,
-                        "  Referral to the source contents required", LogLevel.DEBUG);
-                    Document document = xfer.parse(new StreamSource(systemID));
-                    referredContents = Referral.extract(document, referents);
-                    sinks_.log(this, "  Referred source data: "
-                        + String.join(", ", referredContents), LogLevel.DEBUG);
 
-                    if (!metaFuncMap.isEmpty()) {
-                        DocumentFragment metas = document.createDocumentFragment();
-                        addMetaInformation(metaFuncMap, includedURI, (target, data) ->
-                            metas.appendChild(
-                                document.createProcessingInstruction(target, data)));
-                        Element docElem = document.getDocumentElement();
-                        docElem.insertBefore(metas, docElem.getFirstChild());
-                    }
+            sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
+            List<XPathExpression> referents = sinks_.referents();
+            List<String> referredContents;
+            Source source;
+            if (!referents.isEmpty()) {
+                sinks_.log(this,
+                    "  Referral to the source contents required", LogLevel.DEBUG);
+                Document document = xfer.parse(new StreamSource(systemID));
+                referredContents = Referral.extract(document, referents);
+                sinks_.log(this, "  Referred source data: "
+                    + String.join(", ", referredContents), LogLevel.DEBUG);
 
-                    source = new DOMSource(document, systemID);
+                if (!metaFuncMap.isEmpty()) {
+                    DocumentFragment metas = document.createDocumentFragment();
+                    addMetaInformation(metaFuncMap, includedURI, (target, data) ->
+                        metas.appendChild(
+                            document.createProcessingInstruction(target, data)));
+                    Element docElem = document.getDocumentElement();
+                    docElem.insertBefore(metas, docElem.getFirstChild());
+                }
 
+                source = new DOMSource(document, systemID);
+
+            } else {
+                sinks_.log(this,
+                    "  Referral to the source contents not required", LogLevel.DEBUG);
+                referredContents = Collections.emptyList();
+                if (!metaFuncMap.isEmpty()) {
+                    source = new SAXSource(
+                        new MetaFilter(null,
+                            c -> addMetaInformation(metaFuncMap, includedURI, c)),
+                        new InputSource(systemID));
                 } else {
-                    sinks_.log(this,
-                        "  Referral to the source contents not required", LogLevel.DEBUG);
-                    referredContents = Collections.emptyList();
-                    if (!metaFuncMap.isEmpty()) {
-                        source = new SAXSource(
-                            new MetaFilter(null,
-                                c -> addMetaInformation(metaFuncMap, includedURI, c)),
-                            new InputSource(systemID));
-                    } else {
-                        source = new StreamSource(systemID);
+                    source = new StreamSource(systemID);
+                }
+            }
+
+            // Do processing.
+            Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
+            if (result != null) {
+                try {
+                    xfer.transfer(source, result);
+                } catch (BuildException e) {
+                    sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
+                    sinks_.abortOne(result);
+                    if (e instanceof FatalityException) {
+                        throw new BuildException(e.getCause());
                     }
                 }
-
-                // Do processing.
-                Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
-                if (result != null) {
-                    xfer.transfer(source, result);
-                    sinks_.finishOne();
-                }
-
-            } catch (BuildException e) {
-                sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
-                sinks_.abortOne();
-                if (e instanceof FatalityException) {
-                    throw new BuildException(e.getCause());
-                }
+                sinks_.finishOne(result);
             }
         }
         if (count > 0) {

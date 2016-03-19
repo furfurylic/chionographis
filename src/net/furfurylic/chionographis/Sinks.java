@@ -9,7 +9,10 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -44,10 +47,7 @@ final class Sinks extends Sink implements Logger {
      */
     private boolean[][] includes_;
 
-    /**
-     * <p>This field is maintained by {@link #startOne(int, String)} method.
-     */
-    private List<Sink> activeSinks_;
+    private Map<Result, List<Sink>> activeSinkMap_;
 
     public Sinks(Logger logger) {
         logger_ = logger;
@@ -126,16 +126,17 @@ final class Sinks extends Sink implements Logger {
             .mapToObj(i -> sinks_.get(i))
             .forEach(Sink::startBundle);
         }
+        if (activeSinkMap_ == null) {
+            activeSinkMap_ = new IdentityHashMap<>();
+        } else {
+            activeSinkMap_.clear();
+        }
     }
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> referredContents) {
-        if (activeSinks_ == null) {
-            activeSinks_ = new ArrayList<>();
-        } else {
-            activeSinks_.clear();
-        }
+        List<Sink> activeSinks = null;
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int i = 0;
         for (int j = 0; j < sinks_.size(); ++j) {
@@ -151,31 +152,71 @@ final class Sinks extends Sink implements Logger {
                 originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime, referredContentsOne);
             if (result != null) {
                 builder.add(result);
-                activeSinks_.add(sinks_.get(j));
+                if (activeSinks == null) {
+                    activeSinks = Collections.singletonList(sinks_.get(j));
+                } else{
+                    if (activeSinks.size() == 1) {
+                        Sink s = activeSinks.get(0);
+                        activeSinks = new ArrayList<>();
+                        activeSinks.add(s);
+                    }
+                    activeSinks.add(sinks_.get(j));
+                }
             }
         }
-        return builder.newCompositeResult();
+        Result r = builder.newCompositeResult();
+        synchronized (activeSinkMap_) {
+            activeSinkMap_.put(r, activeSinks);
+        }
+        return r;
     }
 
     @Override
-    void finishOne() {
-        activeSinks_.stream().forEach(Sink::finishOne);
-    }
-
-    @Override
-    void abortOne() {
-        Optional<RuntimeException> ex = activeSinks_.stream()
-            .map(Sinks::abortSink)
-            .filter(e -> e != null)
-            .findAny();
-        if (ex.isPresent()) {
-            throw ex.get();
+    void finishOne(Result result) {
+        assert result != null;
+        List<Sink> activeSinks;
+        synchronized (activeSinkMap_) {
+            activeSinks = activeSinkMap_.get(result);
+            activeSinkMap_.remove(result);
+        }
+        assert activeSinks != null;
+        if (activeSinks.size() == 1) {
+            activeSinks.get(0).finishOne(result);
+        } else {
+            assert result instanceof CompositeSAXResult : result.getClass();
+            CompositeSAXResult r = (CompositeSAXResult) result;
+            IntStream.range(0, activeSinks.size()).forEach(i -> activeSinks.get(i).finishOne(r.resultOf(i)));
         }
     }
 
-    private static RuntimeException abortSink(Sink s) {
+    @Override
+    void abortOne(Result result) {
+        assert result != null;
+        List<Sink> activeSinks;
+        synchronized (activeSinkMap_) {
+            activeSinks = activeSinkMap_.get(result);
+            activeSinkMap_.remove(result);
+        }
+        assert activeSinks != null;
+        if (activeSinks.size() == 1) {
+            activeSinks.get(0).abortOne(result);
+        } else {
+            assert result instanceof CompositeSAXResult : result.getClass();
+            CompositeSAXResult r = (CompositeSAXResult) result;
+            Optional<RuntimeException> ex =
+                IntStream.range(0, activeSinks.size())
+                         .mapToObj(i -> Sinks.abortSink(activeSinks.get(i), r.resultOf(i)))
+                         .filter(e -> e != null)
+                         .findAny();
+            if (ex.isPresent()) {
+                throw ex.get();
+            }
+        }
+    }
+
+    private static RuntimeException abortSink(Sink sink, Result result) {
         try {
-            s.abortOne();
+            sink.abortOne(result);
             return null;
         } catch (RuntimeException e) {
             return e;
@@ -192,6 +233,20 @@ final class Sinks extends Sink implements Logger {
                                            .anyMatch(j -> includes_[i][j]))
                      .mapToObj(i -> sinks_.get(i))
                      .forEach(Sink::finishBundle);
+        }
+    }
+
+    private static class CompositeSAXResult extends SAXResult {
+
+        List<Result> results_;
+
+        public CompositeSAXResult(ContentHandler handler, List<Result> results) {
+            super(handler);
+            results_ = results;
+        }
+
+        Result resultOf(int index) {
+            return results_.get(index);
         }
     }
 
@@ -238,7 +293,7 @@ final class Sinks extends Sink implements Logger {
                         lexicalHandlers.add(identity);
                     }
                 }
-                return new SAXResult(new CompositeHandler(contentHandlers, lexicalHandlers));
+                return new CompositeSAXResult(new CompositeHandler(contentHandlers, lexicalHandlers), results_);
             } catch (TransformerConfigurationException e) {
                 throw new BuildException(e);
             }

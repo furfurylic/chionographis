@@ -14,11 +14,13 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -38,6 +40,7 @@ import org.apache.tools.ant.util.FileNameMapper;
  * An <i>Output</i> {@linkplain Sink sink} writes each source document into an filesystem file.
  */
 public final class Output extends Sink {
+    private final Object LOCK = new Object();
 
     private Path destDir_;
     private Path dest_;
@@ -50,9 +53,8 @@ public final class Output extends Sink {
     private Function<String, Set<Path>> destMapping_;
     private List<XPathExpression> referents_;
 
-    private Set<Path> currentDests_;
-    private ByteArrayOutputStream currentContent_;
-    private int countInBundle_;
+    private Queue<ByteArrayOutputStream> buffers_;
+    private AtomicInteger countInBundle_;
 
     Output(Logger logger) {
         logger_ = logger;
@@ -267,55 +269,51 @@ public final class Output extends Sink {
 
     @Override
     void startBundle() {
-        countInBundle_ = 0;
+        countInBundle_ = new AtomicInteger(0);
     }
 
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> referredContents) {
-        // Initialize currentDests_ as empty.
-        if (currentDests_ == null) {
-            currentDests_ = new TreeSet<>();
-        } else {
-            currentDests_.clear();
+        ByteArrayOutputStream buffer = null;
+        if (buffers_ != null) {
+            synchronized (buffers_) {
+                buffer = buffers_.poll();
+            }
+        }
+        if (buffer == null) {
+            buffer = new ByteArrayOutputStream();
         }
 
-        // Make sure currentDests_ fully configured.
+        // Configure dests.
+        Set<Path> dests;
         if (referents_.isEmpty()) {
             assert destMapping_ != null;
-            currentDests_.addAll(destMapping_.apply(originalSrcFileName));
+            dests = destMapping_.apply(originalSrcFileName);
         } else {
             if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
                 logger_.log(this, "Cannot decide the output file path", LogLevel.ERR);
                 throw new BuildException();
             } else if (destMapping_ != null) {
-                currentDests_.addAll(destMapping_.apply(referredContents.get(0)));
+                dests = destMapping_.apply(referredContents.get(0));
             } else {
-                currentDests_.add(destDir_.resolve(referredContents.get(0)));
+                dests = Collections.singleton(destDir_.resolve(referredContents.get(0)));
             }
         }
         if (!force_
-         && !isOriginalSrcNewer(originalSrcLastModifiedTime, currentDests_)) {
-            String files = currentDests_.stream()
-                                        .map(Path::toString)
-                                        .reduce((ss, s) -> ss + ", " + s)
-                                        .orElse(null);
+         && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
+            String files = dests.stream()
+                                .map(Path::toString)
+                                .reduce((ss, s) -> ss + ", " + s)
+                                .orElse(null);
             logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
             return null;
        }
 
-        // Initialize currentContent_ as empty.
-        if (currentContent_ == null) {
-            currentContent_ = new ByteArrayOutputStream();
-        } else {
-            currentContent_.reset();
-        }
-
-        return new StreamResult(currentContent_);
+        return new OutputStreamResult(buffer, dests);
     }
 
-    private boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<Path> dests) {
-        assert !force_;
+    private static boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<Path> dests) {
         if (originalSrcLastModifiedTime <= 0) {
             return true;
         } else {
@@ -326,11 +324,15 @@ public final class Output extends Sink {
     }
 
     @Override
-    void finishOne() {
+    void finishOne(Result result) {
+        assert result != null;
+        assert result instanceof OutputStreamResult : result.getClass();
+        OutputStreamResult r = (OutputStreamResult) result;
+        ByteArrayOutputStream buffer = (ByteArrayOutputStream) r.getOutputStream();
+
         // Write the buffer contents to currentDests_.
-        assert currentDests_ != null;
         try {
-            for (Path mapped : currentDests_) {
+            for (Path mapped : r.getDestinations()) {
                 if (mkDirs_) {
                     Path parent = mapped.getParent();
                     if ((parent != null) && !Files.exists(parent)) {
@@ -339,21 +341,49 @@ public final class Output extends Sink {
                 }
                 logger_.log(this, "Creating " + mapped.toAbsolutePath(), LogLevel.VERBOSE);
                 try (OutputStream channel = Files.newOutputStream(mapped)) {
-                    currentContent_.writeTo(channel);
+                    buffer.writeTo(channel);
                 }
             }
         } catch (IOException e) {
             throw new BuildException(e);
         }
-        ++countInBundle_;
+
+        placeBackBuffer(buffer);
+
+        countInBundle_.incrementAndGet();
     }
 
     @Override
-    void abortOne() {
+    void abortOne(Result result) {
+        placeBackBuffer((ByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
+    }
+
+    private void placeBackBuffer(ByteArrayOutputStream buffer) {
+        buffer.reset();
+        synchronized (LOCK) {
+            if (buffers_ == null) {
+                buffers_ = new ArrayDeque<>();
+            }
+            buffers_.offer(buffer);
+        }
     }
 
     @Override
     void finishBundle() {
         logger_.log(this, countInBundle_ + " output files created", LogLevel.INFO);
+    }
+
+    private static class OutputStreamResult extends StreamResult {
+
+        Set<Path> destinations_;
+
+        public OutputStreamResult(ByteArrayOutputStream outputStream, Set<Path> destinations) {
+            super(outputStream);
+            destinations_ = destinations;
+        }
+
+        Set<Path> getDestinations() {
+            return destinations_;
+        }
     }
 }

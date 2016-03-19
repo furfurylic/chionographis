@@ -46,14 +46,14 @@ import org.xml.sax.ext.LexicalHandler;
 
 final class XMLTransfer {
 
-    private Supplier<XMLReader> reader_;
-    private Supplier<DocumentBuilder> builder_;
-    private Supplier<Transformer> identity_;
+    private ThreadLocal<Supplier<XMLReader>> reader_;
+    private ThreadLocal<Supplier<DocumentBuilder>> builder_;
+    private ThreadLocal<Supplier<Transformer>> identity_;
 
     public XMLTransfer(EntityResolver resolver) {
-        reader_ = createXMLReaderSupplier(resolver);
-        builder_ = createDocumentBuilderSupplier(resolver);
-        identity_ = createIdentityTransformerSupplier();
+        reader_ = ThreadLocal.withInitial(() -> createXMLReaderSupplier(resolver));
+        builder_ = ThreadLocal.withInitial(() -> createDocumentBuilderSupplier(resolver));
+        identity_ = ThreadLocal.withInitial(() -> createIdentityTransformerSupplier());
     }
 
     public void transfer(Source source, Result result) {
@@ -75,7 +75,7 @@ final class XMLTransfer {
                 } else if (result instanceof StreamResult) {
                     StreamResult streamResult = (StreamResult) result;
                     DOMImplementationLS ls =
-                        (DOMImplementationLS) builder_.get().getDOMImplementation();
+                        (DOMImplementationLS) builder_.get().get().getDOMImplementation();
                     LSOutput output = ls.createLSOutput();
                     output.setByteStream(streamResult.getOutputStream());
                     output.setCharacterStream(streamResult.getWriter());
@@ -92,7 +92,7 @@ final class XMLTransfer {
                     return;
                 } else if (result instanceof DOMResult){
                     InputSource input = SAXSource.sourceToInputSource(source);
-                    Document document = builder_.get().parse(input);
+                    Document document = builder_.get().get().parse(input);
                     transferDOM2DOM(new DOMSource(document), (DOMResult) result);
                     return;
                 } else {
@@ -102,7 +102,7 @@ final class XMLTransfer {
                 // Fall through
             }
 
-            identity_.get().transform(source, result);
+            identity_.get().get().transform(source, result);
 
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
             throw new FatalityException(e);
@@ -113,23 +113,23 @@ final class XMLTransfer {
 
     public Document parse(StreamSource source) {
         try {
-            return builder_.get().parse(SAXSource.sourceToInputSource(source));
+            return builder_.get().get().parse(SAXSource.sourceToInputSource(source));
         } catch (IOException | SAXException e) {
             throw new BuildException(e);
         }
     }
 
     public Document newDocument() {
-        return builder_.get().newDocument();
+        return builder_.get().get().newDocument();
     }
 
     private void fillUpSAXSource(SAXSource saxSource) {
         if (saxSource.getXMLReader() == null) {
-            saxSource.setXMLReader(reader_.get());
+            saxSource.setXMLReader(reader_.get().get());
         } else if (saxSource.getXMLReader() instanceof XMLFilter) {
             XMLFilter filter = (XMLFilter) saxSource.getXMLReader();
             if (filter.getParent() == null) {
-                filter.setParent(reader_.get());
+                filter.setParent(reader_.get().get());
             }
         }
         InputSource input = saxSource.getInputSource();
