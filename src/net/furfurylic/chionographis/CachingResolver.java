@@ -9,13 +9,11 @@ package net.furfurylic.chionographis;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
 
@@ -76,40 +74,28 @@ final class CachingResolver implements EntityResolver, URIResolver {
         byte[] cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
             try {
                 if (u.getScheme().equalsIgnoreCase("file")) {
-                    // Files are easy to get lengths in advance.
-                    File file = new File(u);
-                    long length = file.length();
-                    if (length <= Integer.MAX_VALUE) {
-                        byte[] content = new byte[(int) length];
-                        try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
-                            in.readFully(content);
+                    return Files.readAllBytes(Paths.get(u));
+                } else {
+                    byte[] buffer = null;
+                    {
+                        SoftReference<byte[]> ref = BUFFER.get();
+                        if (ref != null) {
+                            buffer = ref.get();
                         }
-                        return content;
-                    } else {
-                        // Fall through
+                        if (buffer == null) {
+                            buffer = new byte[4096];
+                            BUFFER.set(new SoftReference<byte[]>(buffer));
+                        }
                     }
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    try (InputStream in = u.toURL().openStream()) {
+                        int length;
+                        while ((length = in.read(buffer)) != -1) {
+                            bytes.write(buffer, 0, length);
+                        }
+                    }
+                    return bytes.toByteArray();
                 }
-
-                // In case of non-files and too-long files
-                byte[] buffer = null;
-                {
-                    SoftReference<byte[]> ref = BUFFER.get();
-                    if (ref != null) {
-                        buffer = ref.get();
-                    }
-                    if (buffer == null) {
-                        buffer = new byte[4096];
-                        BUFFER.set(new SoftReference<byte[]>(buffer));
-                    }
-                }
-                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                try (InputStream in = u.toURL().openStream()) {
-                    int length;
-                    while ((length = in.read(buffer)) != -1) {
-                        bytes.write(buffer, 0, length);
-                    }
-                }
-                return bytes.toByteArray();
 
             } catch (IOException e) {
                 return null;
