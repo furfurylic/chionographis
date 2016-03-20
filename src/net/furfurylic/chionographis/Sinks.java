@@ -21,12 +21,14 @@ import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
-import org.apache.tools.ant.BuildException;
+import org.w3c.dom.Node;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.Locator;
@@ -37,6 +39,7 @@ final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
     private List<Sink> sinks_;
+    private XMLTransfer xfer_ = null;
 
     /**
      * {@code includes_[i][j]} tells whether {@code sinks_.get(i)} wants the source indexed by
@@ -181,6 +184,20 @@ final class Sinks extends Sink implements Logger {
         assert activeSinks != null;
         if (activeSinks.size() == 1) {
             activeSinks.get(0).finishOne(result);
+        } else if (result instanceof CompositeDOMResult) {
+            CompositeDOMResult r = (CompositeDOMResult) result;
+            DOMSource source = new DOMSource(r.getNode());
+            if (xfer_ == null) {
+                xfer_ = new XMLTransfer(null);
+            }
+            // [1, size()): send result by copy
+            IntStream.range(1, activeSinks.size()).forEach(i -> {
+                xfer_.transfer(source, r.resultOf(i), false);
+                activeSinks.get(i).finishOne(r.resultOf(i));
+            });
+            // [0, 1): send result by move
+            xfer_.transfer(source, r.resultOf(0), true);
+            activeSinks.get(0).finishOne(r.resultOf(0));
         } else {
             assert result instanceof CompositeSAXResult : result.getClass();
             CompositeSAXResult r = (CompositeSAXResult) result;
@@ -249,6 +266,20 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
+    private static class CompositeDOMResult extends DOMResult {
+
+        List<Result> results_;
+
+        public CompositeDOMResult(Node node, List<Result> results) {
+            super(node);
+            results_ = results;
+        }
+
+        Result resultOf(int index) {
+            return results_.get(index);
+        }
+    }
+
     private static final class CompositeResultBuilder {
 
         private List<Result> results_ = new ArrayList<>();
@@ -267,6 +298,9 @@ final class Sinks extends Sink implements Logger {
             }
             if (results_.size() == 1) {
                 return results_.get(0);
+            }
+            if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
+                return new CompositeDOMResult(new XMLTransfer(null).newDocument(), results_);
             }
 
             try {
@@ -294,7 +328,7 @@ final class Sinks extends Sink implements Logger {
                 }
                 return new CompositeSAXResult(new CompositeHandler(contentHandlers, lexicalHandlers), results_);
             } catch (TransformerConfigurationException e) {
-                throw new BuildException(e);
+                throw new FatalityException(e);
             }
         }
 
