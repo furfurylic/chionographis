@@ -33,7 +33,9 @@ final class Referral {
         List<String> referredContents;
         referredContents = referents.stream().map(r -> {
             try {
-                return (String) r.evaluate(node, XPathConstants.STRING);
+                synchronized (r) {  // TODO: synchronizing unit is OK?
+                    return (String) r.evaluate(node, XPathConstants.STRING);
+                }
             } catch (XPathExpressionException e) {
                 return null;
             }

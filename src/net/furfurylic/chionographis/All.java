@@ -8,8 +8,10 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -49,10 +51,10 @@ public final class All extends Sink implements Driver {
     private QName rootQ_;
 
     private Document resultDocument_;
-    private Document currentDocument_;
     private long lastModifiedTime_;
 
     private XMLTransfer xfer_;
+    private Queue<Node> nodes_;
 
     All(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -161,7 +163,6 @@ public final class All extends Sink implements Driver {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
         sinks_.startBundle();
         resultDocument_ = xfer_.newDocument();
-        currentDocument_ = xfer_.newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
             docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI,
@@ -175,25 +176,44 @@ public final class All extends Sink implements Driver {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
         assert resultDocument_ != null;
-        assert currentDocument_.getFirstChild() == null;
-        lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
-        return new DOMResult(currentDocument_);
+        Node currentDocument = null;
+        synchronized (resultDocument_) {
+            lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
+            if (nodes_ != null) {
+                currentDocument = nodes_.poll();
+            }
+        }
+        if (currentDocument == null) {
+            currentDocument = xfer_.newDocument();
+        }
+        return new DOMResult(currentDocument);
     }
 
     @Override
-    void finishOne() {
+    void finishOne(Result result) {
         assert resultDocument_ != null;
-        Node node;
-        while ((node = currentDocument_.getFirstChild()) != null) {
-            resultDocument_.getDocumentElement().appendChild(resultDocument_.adoptNode(node));
+        assert result != null;
+        assert result instanceof DOMResult;
+        DOMResult r = (DOMResult) result;
+        synchronized (resultDocument_) {
+            Node node;
+            while ((node = r.getNode().getFirstChild()) != null) {
+                resultDocument_.getDocumentElement().appendChild(resultDocument_.adoptNode(node));
+            }
+        }
+        assert r.getNode().getFirstChild() == null;
+        synchronized (resultDocument_) {
+            if (nodes_ == null) {
+                nodes_ = new ArrayDeque<>();
+            }
+            nodes_.offer(r.getNode());
         }
     }
 
     @Override
-    void abortOne() {
+    void abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        sinks_.abortOne();
         sinks_.log(this, "One of the sources is damaged; must give up all", LogLevel.ERR);
         throw new BuildException();
     }
@@ -208,7 +228,7 @@ public final class All extends Sink implements Driver {
             // Send fragment to sink
             xfer_.transfer(new DOMSource(resultDocument_), result);
             // Finish sink
-            sinks_.finishOne();
+            sinks_.finishOne(result);
         }
         sinks_.finishBundle();
     }

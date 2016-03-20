@@ -44,10 +44,6 @@ public final class Snip extends Sink implements Driver {
     private XPathExpression expr_;
 
     private XMLTransfer xfer_;
-    private Document document_;
-    private int currentIndex_;
-    private String currentSrcFileName_;
-    private long currentSrcLastModifiedTime_;
 
     Snip(Logger logger) {
         sinks_ = new Sinks(logger);
@@ -132,25 +128,28 @@ public final class Snip extends Sink implements Driver {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> notUsed) {
-        currentIndex_ = originalSrcIndex;
-        currentSrcFileName_ = originalSrcFileName;
-        currentSrcLastModifiedTime_ = originalSrcLastModifiedTime;
-        document_ = xfer_.newDocument();
-        return new DOMResult(document_);
+        return new SnipDOMResult(xfer_.newDocument(), originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime);
     }
 
     @Override
-    void finishOne() {
+    void finishOne(Result result) {
+        assert result != null;
+        assert result instanceof SnipDOMResult;
+        SnipDOMResult r = (SnipDOMResult) result;
+
         try {
             // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criteria " + select_ +
-                "; the original source is " + currentSrcFileName_, LogLevel.VERBOSE);
-            if (expr_ == null) {
-                XPath xpath = XPathFactory.newInstance().newXPath();
-                xpath.setNamespaceContext(namespaceContext_);
-                expr_ = xpath.compile(select_);
+                "; the original source is " + r.originalSrcFileName(), LogLevel.VERBOSE);
+            NodeList nodes;
+            synchronized (this) {   // TODO: synchronization unit is OK?
+                if (expr_ == null) {
+                    XPath xpath = XPathFactory.newInstance().newXPath();
+                    xpath.setNamespaceContext(namespaceContext_);
+                    expr_ = xpath.compile(select_);
+                }
+                nodes = (NodeList) expr_.evaluate(r.getNode(), XPathConstants.NODESET);
             }
-            NodeList nodes = (NodeList) expr_.evaluate(document_, XPathConstants.NODESET);
 
             int count = 0;
             for (int i = 0; i < nodes.getLength(); ++i) {
@@ -173,14 +172,13 @@ public final class Snip extends Sink implements Driver {
                     }
 
                     // Open sink's result
-                    Result result = sinks_.startOne(currentIndex_, currentSrcFileName_,
-                        currentSrcLastModifiedTime_, referredContents);
-
-                    if (result != null) {
+                    Result rr = sinks_.startOne(r.originalSrcIndex(), r.originalSrcFileName(),
+                        r.originalSrcLastModifiedTime(), referredContents);
+                    if (rr != null) {
                         // Send fragment to sink
-                        xfer_.transfer(new DOMSource(document), result);
+                        xfer_.transfer(new DOMSource(document), rr);
                         // Finish sink
-                        sinks_.finishOne();
+                        sinks_.finishOne(rr);
                     }
 
                     ++count;
@@ -189,7 +187,7 @@ public final class Snip extends Sink implements Driver {
             if (count > 0) {
                 sinks_.log(this, count + " snipped fragments processed", LogLevel.VERBOSE);
             } else {
-                sinks_.log(this, "No snipped fragments generated; the original source is " + currentSrcFileName_, LogLevel.INFO);
+                sinks_.log(this, "No snipped fragments generated; the original source is " + r.originalSrcFileName(), LogLevel.INFO);
             }
 
         } catch (XPathExpressionException e) {
@@ -198,7 +196,7 @@ public final class Snip extends Sink implements Driver {
     }
 
     @Override
-    void abortOne() {
+    void abortOne(Result result) {
         // sink_.startOne(int, String) is not invoked yet,
         // so we can evade call sink_.abortOne().
     }
@@ -208,4 +206,30 @@ public final class Snip extends Sink implements Driver {
         sinks_.finishBundle();
     }
 
+    private static class SnipDOMResult extends DOMResult {
+        private int originalSrcIndex_;
+        private String originalSrcFileName_;
+        private long originalSrcLastModifiedTime_;
+
+        public SnipDOMResult(Document document,
+                int originalSrcIndex, String originalSrcFileName,
+                long originalSrcLastModifiedTime) {
+            super(document);
+            originalSrcIndex_ = originalSrcIndex;
+            originalSrcFileName_ = originalSrcFileName;
+            originalSrcLastModifiedTime_ = originalSrcLastModifiedTime;
+        }
+
+        public int originalSrcIndex() {
+            return originalSrcIndex_;
+        }
+
+        public String originalSrcFileName() {
+            return originalSrcFileName_;
+        }
+
+        public long originalSrcLastModifiedTime() {
+            return originalSrcLastModifiedTime_;
+        }
+    }
 }
