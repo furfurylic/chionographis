@@ -22,7 +22,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -140,7 +139,7 @@ public final class Snip extends Sink implements Driver {
         try {
             // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criteria " + select_ +
-                "; the original source is " + r.originalSrcFileName(), LogLevel.VERBOSE);
+                "; the original source is " + r.originalSrcFileName(), Logger.Level.DEBUG);
             NodeList nodes;
             synchronized (this) {   // TODO: synchronization unit is OK?
                 if (expr_ == null) {
@@ -162,13 +161,11 @@ public final class Snip extends Sink implements Driver {
                     List<XPathExpression> referents = sinks_.referents();
                     List<String> referredContents;
                     if (!referents.isEmpty()) {
-                        sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
                         referredContents = Referral.extract(document, referents);
-                        sinks_.log(this, "  Referred source data: "
-                            + String.join(", ", referredContents), LogLevel.DEBUG);
+                        sinks_.log(this, "Referred source data: "
+                            + String.join(", ", referredContents), Logger.Level.DEBUG);
                     } else {
                         referredContents = Collections.emptyList();
-                        sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                     }
 
                     // Open sink's result
@@ -185,9 +182,10 @@ public final class Snip extends Sink implements Driver {
                 }
             }
             if (count > 0) {
-                sinks_.log(this, count + " snipped fragments processed", LogLevel.VERBOSE);
+                sinks_.log(this, count + " snipped fragments processed", Logger.Level.DEBUG);
             } else {
-                sinks_.log(this, "No snipped fragments generated; the original source is " + r.originalSrcFileName(), LogLevel.INFO);
+                sinks_.log(this, "No snipped fragments generated; the original source is " +
+                        r.originalSrcFileName(), Logger.Level.INFO);
             }
 
         } catch (XPathExpressionException e) {
