@@ -11,6 +11,7 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -19,34 +20,24 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.transform.Result;
-import javax.xml.transform.Source;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.sax.SAXSource;
-import javax.xml.transform.stream.StreamSource;
-import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
-import org.w3c.dom.Document;
-import org.w3c.dom.DocumentFragment;
-import org.w3c.dom.Element;
-import org.xml.sax.Attributes;
 import org.xml.sax.EntityResolver;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLFilterImpl;
+
+import net.furfurylic.chionographis.ChionographisWorker.OriginalSource;
 
 /**
  * An Ant task class that performs cascading transformation to XML documents.
@@ -61,6 +52,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean usesCache_ = false;
     private boolean force_ = false;
     private boolean verbose_ = false;
+    private int maxWorkers_ = 0;
 
     private List<Namespace> namespaces_ = Collections.emptyList();
     private List<Meta> metas_ = Collections.emptyList();
@@ -129,6 +121,29 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     public void setVerbose(boolean verbose) {
         verbose_ = verbose;
+    }
+
+    /**
+     * Sets the maximum number of concurrent workers.
+     *
+     * <p>If not positive, the maximun number of workers is decided as
+     * "available processor count + maximum worker count (this attribute)".</p>
+     *
+     * <p>In any case, the actual number of workers is not greater than the available processor
+     * count, and is not less than 1.</p>
+     *
+     * <p>This attribute is defaulted to 0.</p>
+     *
+     * @param maxWorkers
+     *      the number of concurrent workers.
+     */
+    public void setMaxWorkers(int maxWorkers) {
+        int processors = Runtime.getRuntime().availableProcessors();
+        if (maxWorkers <= 0) {
+            maxWorkers_ = processors;
+        } else {
+            maxWorkers_ = Math.min(maxWorkers, processors);
+        }
     }
 
     /**
@@ -272,73 +287,90 @@ public final class Chionographis extends MatchingTask implements Driver {
             includes = examined;
         }
 
-        // Set up XML engines.
-        EntityResolver resolver = createEntityResolver();
-        XMLTransfer xfer = new XMLTransfer(resolver);
-
-        int count = 0;
-        sinks_.startBundle();
+        Queue<OriginalSource> sources = new ArrayDeque<>();
         for (int i = 0; i < includedFiles.length; ++i) {
-            URI includedURI = includedURIs[i];
-            String systemID = includedURI.toString();
             if ((includes != null) && !includes[i]) {
-                sinks_.log(this, "Skipping " + systemID, LogLevel.DEBUG);
+                sinks_.log(this, "Skipping " + includedURIs[i], LogLevel.DEBUG);
                 continue;
             }
-            ++count;
-            try {
-                sinks_.log(this, "Processing " + systemID, LogLevel.VERBOSE);
-                List<XPathExpression> referents = sinks_.referents();
-                List<String> referredContents;
-                Source source;
-                if (!referents.isEmpty()) {
-                    sinks_.log(this,
-                        "  Referral to the source contents required", LogLevel.DEBUG);
-                    Document document = xfer.parse(new StreamSource(systemID));
-                    referredContents = Referral.extract(document, referents);
-                    sinks_.log(this, "  Referred source data: "
-                        + String.join(", ", referredContents), LogLevel.DEBUG);
+            sources.offer(new OriginalSource(i, includedURIs[i], includedFiles[i], includedFileLastModifiedTimes[i]));
+        }
+        assert !sources.isEmpty() : sources.size();
 
-                    if (!metaFuncMap.isEmpty()) {
-                        DocumentFragment metas = document.createDocumentFragment();
-                        addMetaInformation(metaFuncMap, includedURI, (target, data) ->
-                            metas.appendChild(
-                                document.createProcessingInstruction(target, data)));
-                        Element docElem = document.getDocumentElement();
-                        docElem.insertBefore(metas, docElem.getFirstChild());
-                    }
+        sinks_.startBundle();
 
-                    source = new DOMSource(document, systemID);
-
-                } else {
-                    sinks_.log(this,
-                        "  Referral to the source contents not required", LogLevel.DEBUG);
-                    referredContents = Collections.emptyList();
-                    if (!metaFuncMap.isEmpty()) {
-                        source = new SAXSource(
-                            new MetaFilter(null,
-                                c -> addMetaInformation(metaFuncMap, includedURI, c)),
-                            new InputSource(systemID));
-                    } else {
-                        source = new StreamSource(systemID);
-                    }
-                }
-
-                // Do processing.
-                Result result = sinks_.startOne(i, includedFiles[i], includedFileLastModifiedTimes[i], referredContents);
-                if (result != null) {
-                    xfer.transfer(source, result);
-                    sinks_.finishOne();
-                }
-
-            } catch (BuildException e) {
-                sinks_.log(this, "Aborting processing " + systemID, e, LogLevel.WARN);
-                sinks_.abortOne();
-                if (e instanceof FatalityException) {
-                    throw new BuildException(e.getCause());
-                }
+        // Decide parallelism.
+        int parallelism;
+        {
+            int processors = Runtime.getRuntime().availableProcessors();
+            if (maxWorkers_ <= 0) {
+                parallelism = Math.max(Math.min(sources.size(), processors + maxWorkers_), 1);
+            } else {
+                parallelism = Math.min(Math.min(sources.size(), maxWorkers_), processors);
             }
         }
+        sinks_.log(this, "Concurrency is " + parallelism, LogLevel.VERBOSE);
+        for (int i = 0; i < parallelism; ++i) {
+            sources.add(new OriginalSource());  // Add poisons in number of parallelism
+        }
+        ChionographisWorker[] workers = new ChionographisWorker[parallelism];
+
+        int count = 0;
+        EntityResolver resolver = createEntityResolver();
+        BiConsumer<String, LogLevel> logger = (s, l) -> sinks_.log(this, s, l);
+        if (parallelism > 1) {
+            // A queue for workers to take and consume.
+            BlockingQueue<OriginalSource> sourcesQ = new ArrayBlockingQueue<>(sources.size(), false, sources);
+            // A queue for this thread to receive result (count or exception).
+            BlockingQueue<Object> resultsQ = new ArrayBlockingQueue<>(parallelism);
+
+            // Set up threads.
+            Thread[] threads = new Thread[parallelism];
+            for (int i = 0; i < threads.length; ++i) {
+                workers[i] = new ChionographisWorker(sinks_, logger,
+                    resolver, metaFuncMap, sourcesQ::take, resultsQ::offer);
+                threads[i] = new Thread(workers[i]);
+                threads[i].run();
+            }
+
+            try {
+                // Wait for reporting.
+                Throwable exception = null;
+                for (int i = 0; i < threads.length; ++i) {
+                    Object result = resultsQ.take();
+                    if (result instanceof Integer) {
+                        // Success.
+                        count += ((Integer) result).intValue();
+                    } else {
+                        // An exception occurred -> interrupt all threads.
+                        Arrays.stream(threads).forEach(Thread::interrupt);
+                        exception = (Throwable) result;
+                    }
+                }
+
+                // Wait for finishing.
+                for (int i = 0; i < threads.length; ++i) {
+                    threads[i].join();
+                }
+                throwIf(exception);
+
+            } catch (InterruptedException e) {
+                // In fact, no one would interrupt me.
+            }
+
+        } else {
+            // No parallelism here.
+            Object[] results = new Object[1];
+            workers[0] = new ChionographisWorker(sinks_, logger,
+                resolver, metaFuncMap, sources::poll, o -> results[0] = o);
+            workers[0].run();
+            if (results[0] instanceof Integer) {
+                count += ((Integer) results[0]).intValue();
+            } else {
+                throwIf((Throwable) results[0]);
+            }
+        }
+
         if (count > 0) {
             sinks_.log(this,
                 "Finishing results of " + count +" input sources", LogLevel.VERBOSE);
@@ -435,58 +467,14 @@ public final class Chionographis extends MatchingTask implements Driver {
         return new PrefixMap(namespaceMap);
     }
 
-    private void addMetaInformation(Map<String, Function<URI, String>> metaFuncMap, URI sourceURI, BiConsumer<String, String> consumer) {
-        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncMap.entrySet()) {
-            String target = metaFunc.getKey();
-            String data = metaFunc.getValue().apply(sourceURI);
-            sinks_.log(this, "Adding processing instruction; target=" + target + ", data=" + data,
-                LogLevel.DEBUG);
-            consumer.accept(target, data);
-        }
-    }
-
-    private static final class MetaFilter extends XMLFilterImpl {
-
-        private static final class HackedSAXException extends RuntimeException {
-
-            private static final long serialVersionUID = -6266539332239469415L;
-
-            public HackedSAXException(SAXException cause) {
-                super(cause);
-            }
-
-            @Override
-            public SAXException getCause() {
-                return (SAXException) super.getCause();
-            }
-        }
-
-        private Consumer<BiConsumer<String, String>> adder_;
-
-        public MetaFilter(XMLReader parent, Consumer<BiConsumer<String, String>> adder) {
-            super(parent);
-            adder_ = adder;
-        }
-
-        @Override
-        public void startElement(String uri, String localName, String qName, Attributes atts)
-                throws SAXException {
-            super.startElement(uri, localName, qName, atts);
-            if (adder_ != null) {
-                try {
-                    adder_.accept(this::processingInstructionHacked);
-                } catch (HackedSAXException e) {
-                    throw e.getCause();
-                }
-                adder_ = null;
-            }
-        }
-
-        private void processingInstructionHacked(String target, String data) {
-            try {
-                processingInstruction(target, data);
-            } catch (SAXException e) {
-                throw new HackedSAXException(e);
+    public void throwIf(Throwable ex) {
+        if (ex != null) {
+            if (ex instanceof Error) {
+                throw (Error) ex;
+            } else if (ex instanceof RuntimeException) {
+                throw (RuntimeException) ex;
+            } else {
+                throw new BuildException(ex);
             }
         }
     }
