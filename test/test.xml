@@ -29,6 +29,7 @@
         <antcall target="snip-ns"/>
         <antcall target="crossing-cache"/>
         <antcall target="crossing-cache-refer-content"/>
+        <antcall target="crossing-parallel-sinks"/>
     </target>
 
     <macrodef name="assertfileeq">
@@ -784,6 +785,34 @@
         </xslt>
         <assertfileeq name="${test.name} - 0" expected="${dir.input}/expected0.txt" actual="${dir.output}/actual0.txt"/>
         <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="crossing-parallel-sinks">
+        <property name="test.prefix" value="crossing"/>
+        <property name="test.title" value="parallel-sinks"/>
+        <property name="test.name" value="${test.prefix}-parallel-sinks"/>
+        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="*.xml">
+            <all root="q">
+                <output dest="output-${test.title}/output.xml" mkdirs="yes"/>
+            </all>
+            <output destdir="${dir.output}" mkdirs="yes">
+                <globmapper from="in*.xml" to="out*.xml"/>
+            </output>
+        </chionographis>
+
+        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+            <globmapper from="output*.xml" to="actual*.txt"/>
+        </xslt>
+        <assertfileeq name="${test.name} - all" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+        <assertfileeq name="${test.name} - output1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+        <assertfileeq name="${test.name} - output2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>

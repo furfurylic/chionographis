@@ -234,7 +234,7 @@ public final class Output extends Sink {
                                      .collect(Collectors.toSet());
                     }
                 }
-                return null;
+                return Collections.emptySet();
             };
         } else if (referents_.isEmpty()) {
             // There is no mapper and the output path has been already decided.
