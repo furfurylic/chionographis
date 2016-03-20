@@ -1,3 +1,10 @@
+/*
+ * Chionographis
+ *
+ * These codes are licensed under CC0.
+ * https://creativecommons.org/publicdomain/zero/1.0/deed
+ */
+
 package net.furfurylic.chionographis;
 
 import java.net.URI;
@@ -16,7 +23,6 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
@@ -72,7 +78,7 @@ final class ChionographisWorker implements Runnable {
     }
 
     private Sink sink_;
-    private BiConsumer<String, LogLevel> logger_;
+    private BiConsumer<String, Logger.Level> logger_;
     private Map<String, Function<URI, String>> metaFuncMap_;
 
     private SupplierX<OriginalSource, ? extends InterruptedException> sources_;
@@ -100,7 +106,7 @@ final class ChionographisWorker implements Runnable {
      *      where former means the successfully-processed count and lattter means an error.
      */
     public ChionographisWorker(
-                Sink sink, BiConsumer<String, LogLevel> logger,
+                Sink sink, BiConsumer<String, Logger.Level> logger,
                 EntityResolver resolver, Map<String, Function<URI, String>> metaFuncMap,
                 SupplierX<OriginalSource, ? extends InterruptedException> sources,
                 Consumer<Object> resultSink) {
@@ -126,17 +132,15 @@ final class ChionographisWorker implements Runnable {
 
                 String systemID = originalSrc.uri().toString();
 
-                logger_.accept("Processing " + systemID, LogLevel.VERBOSE);
+                logger_.accept("Processing " + systemID, Logger.Level.VERBOSE);
                 List<XPathExpression> referents = sink_.referents();
                 List<String> referredContents;
                 Source source;
                 if (!referents.isEmpty()) {
-                    logger_.accept(
-                        "  Referral to the source contents required", LogLevel.DEBUG);
                     Document document = xfer_.parse(new StreamSource(systemID));
                     referredContents = Referral.extract(document, referents);
-                    logger_.accept("  Referred source data: "
-                        + String.join(", ", referredContents), LogLevel.DEBUG);
+                    logger_.accept("Referred source data: "
+                        + String.join(", ", referredContents), Logger.Level.DEBUG);
 
                     if (!metaFuncMap_.isEmpty()) {
                         DocumentFragment metas = document.createDocumentFragment();
@@ -150,8 +154,6 @@ final class ChionographisWorker implements Runnable {
                     source = new DOMSource(document, systemID);
 
                 } else {
-                    logger_.accept(
-                        "  Referral to the source contents not required", LogLevel.DEBUG);
                     referredContents = Collections.emptyList();
                     if (!metaFuncMap_.isEmpty()) {
                         source = new SAXSource(
@@ -172,7 +174,7 @@ final class ChionographisWorker implements Runnable {
                             throw new InterruptedException();
                         }
                     } catch (BuildException | InterruptedException e) {
-                        logger_.accept("Aborting processing " + systemID, LogLevel.WARN);
+                        logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
                         sink_.abortOne(result);
                         if (e instanceof FatalityException) {
                             throw new BuildException(e.getCause());
@@ -194,7 +196,7 @@ final class ChionographisWorker implements Runnable {
             String target = metaFunc.getKey();
             String data = metaFunc.getValue().apply(sourceURI);
             logger_.accept("Adding processing instruction; target=" + target + ", data=" + data,
-                LogLevel.DEBUG);
+                Logger.Level.DEBUG);
             consumer.accept(target, data);
         }
     }

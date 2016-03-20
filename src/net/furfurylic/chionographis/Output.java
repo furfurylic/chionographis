@@ -33,7 +33,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.apache.tools.ant.util.FileNameMapper;
 
 /**
@@ -168,7 +167,7 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            logger_.log(this, "File mappers added twice", LogLevel.ERR);
+            logger_.log(this, "File mappers added twice", Logger.Level.ERR);
             throw new BuildException();
         }
         mapper_ = mapper;
@@ -187,10 +186,10 @@ public final class Output extends Sink {
         if (dest_ != null) {
             // A predefined destination path exists.
             if (referent_ != null) {
-                logger_.log(this, "\"dest\" and \"refer\" can be set exclusively", LogLevel.ERR);
+                logger_.log(this, "\"dest\" and \"refer\" can be set exclusively", Logger.Level.ERR);
                 throw new BuildException();
             } else if (mapper_ != null) {
-                logger_.log(this, "\"dest\" and file mappers can be set exclusively", LogLevel.ERR);
+                logger_.log(this, "\"dest\" and file mappers can be set exclusively", Logger.Level.ERR);
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
@@ -205,7 +204,7 @@ public final class Output extends Sink {
                 xpath.setNamespaceContext(namespaceContext);
                 referents_ = Collections.singletonList(xpath.compile(referent_));
             } catch (XPathExpressionException e) {
-                logger_.log(this, "Failed to compile XPath expression: " + referent_, LogLevel.ERR);
+                logger_.log(this, "Failed to compile XPath expression: " + referent_, Logger.Level.ERR);
                 throw new BuildException(e);
             }
 
@@ -214,7 +213,7 @@ public final class Output extends Sink {
             // neither does reference to the source document contents,
             // neither do file mappers.
             // -> No clue to decide the output path.
-            logger_.log(this, "Neither \"dest\", \"refer\" nor file mappers are set", LogLevel.ERR);
+            logger_.log(this, "Neither \"dest\", \"refer\" nor file mappers are set", Logger.Level.ERR);
             throw new BuildException();
         }
 
@@ -292,7 +291,7 @@ public final class Output extends Sink {
             dests = destMapping_.apply(originalSrcFileName);
         } else {
             if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
-                logger_.log(this, "Cannot decide the output file path", LogLevel.ERR);
+                logger_.log(this, "Cannot decide the output file path", Logger.Level.ERR);
                 throw new BuildException();
             } else if (destMapping_ != null) {
                 dests = destMapping_.apply(referredContents.get(0));
@@ -306,7 +305,7 @@ public final class Output extends Sink {
                                 .map(Path::toString)
                                 .reduce((ss, s) -> ss + ", " + s)
                                 .orElse(null);
-            logger_.log(this, "Newer output files: " + files, LogLevel.VERBOSE);
+            logger_.log(this, "output files are up to date: " + files, Logger.Level.DEBUG);
             return null;
        }
 
@@ -339,7 +338,7 @@ public final class Output extends Sink {
                         Files.createDirectories(parent);
                     }
                 }
-                logger_.log(this, "Creating " + mapped.toAbsolutePath(), LogLevel.VERBOSE);
+                logger_.log(this, "Creating " + mapped.toAbsolutePath(), Logger.Level.FINE);
                 try (OutputStream channel = Files.newOutputStream(mapped)) {
                     buffer.writeTo(channel);
                 }
@@ -370,7 +369,7 @@ public final class Output extends Sink {
 
     @Override
     void finishBundle() {
-        logger_.log(this, countInBundle_ + " output files created", LogLevel.INFO);
+        logger_.log(this, countInBundle_ + " output files created", Logger.Level.INFO);
     }
 
     private static class OutputStreamResult extends StreamResult {
