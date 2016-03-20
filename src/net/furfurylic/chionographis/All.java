@@ -10,6 +10,7 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.stream.IntStream;
@@ -23,7 +24,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -160,7 +160,7 @@ public final class All extends Sink implements Driver {
 
     @Override
     void startBundle() {
-        sinks_.log(this, "Starting to collect input sources into " + rootQ_, LogLevel.DEBUG);
+        sinks_.log(this, "Starting to collect input sources into " + rootQ_, Logger.Level.DEBUG);
         sinks_.startBundle();
         resultDocument_ = xfer_.newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
@@ -214,7 +214,7 @@ public final class All extends Sink implements Driver {
     void abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        sinks_.log(this, "One of the sources is damaged; must give up all", LogLevel.ERR);
+        sinks_.log(this, "One of the sources is damaged; must give up all", Logger.Level.ERR);
         throw new BuildException();
     }
 
@@ -222,7 +222,14 @@ public final class All extends Sink implements Driver {
     void finishBundle() {
         assert resultDocument_ != null;
         List<XPathExpression> referents = sinks_.referents();
-        List<String> referredContents = Referral.extract(resultDocument_, referents);
+        List<String> referredContents;
+        if (!referents.isEmpty()) {
+            referredContents = Referral.extract(resultDocument_, referents);
+            sinks_.log(this, "Referred source data: "
+                + String.join(", ", referredContents), Logger.Level.DEBUG);
+        } else {
+            referredContents = Collections.emptyList();
+        }
         Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
             // Send fragment to sink

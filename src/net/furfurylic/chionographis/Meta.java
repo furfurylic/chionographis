@@ -15,7 +15,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 
 /**
  * A class to instruct the <i>{@linkplain Chionographis}</i> driver to add
@@ -108,14 +107,14 @@ public final class Meta {
      */
     public void setType(String type) {
         if (type.isEmpty()) {
-            logger_.log(this, "Empty meta-information type is not acceptable", LogLevel.ERR);
+            logger_.log(this, "Empty meta-information type is not acceptable", Logger.Level.ERR);
             throw new BuildException();
         }
 
         try {
             type_ = Type.valueOf(type.toUpperCase().replace('-', '_'));
         } catch (IllegalArgumentException e) {
-            logger_.log(this, "Bad meta-information type: " + type, LogLevel.ERR);
+            logger_.log(this, "Bad meta-information type: " + type, Logger.Level.ERR);
             throw new BuildException();
         }
     }
@@ -131,11 +130,11 @@ public final class Meta {
      */
     public void setName(String name) {
         if (name.isEmpty()) {
-            logger_.log(this, "Empty meta-information name is not acceptable", LogLevel.ERR);
+            logger_.log(this, "Empty meta-information name is not acceptable", Logger.Level.ERR);
             throw new BuildException();
         }
         if (name.equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad meta-information name: " + name, LogLevel.ERR);
+            logger_.log(this, "Bad meta-information name: " + name, Logger.Level.ERR);
             throw new BuildException();
         }
         name_ = name;
@@ -147,7 +146,7 @@ public final class Meta {
             if (name_ != null) {
                 message += ": name=" + name_;
             }
-            logger_.log(this, message, LogLevel.ERR);
+            logger_.log(this, message, Logger.Level.ERR);
             throw new BuildException();
         }
 

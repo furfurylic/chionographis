@@ -34,7 +34,6 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.w3c.dom.Document;
 import org.xml.sax.ContentHandler;
 
@@ -162,7 +161,7 @@ public final class Transform extends Sink implements Driver {
         }
         if (params_.size() == 1) {
             Map.Entry<String, Object> entry = params_.get(0).yield(namespaceContext);
-            sinks_.log(this, "Adding a stylesheet parameter: " + entry, LogLevel.VERBOSE);
+            sinks_.log(this, "Adding a stylesheet parameter: " + entry, Logger.Level.DEBUG);
             paramMap_ = Collections.singletonMap(entry.getKey(), entry.getValue());
             return;
         }
@@ -170,10 +169,10 @@ public final class Transform extends Sink implements Driver {
         paramMap_ = new TreeMap<>();
         for (Param param : params_) {
             Map.Entry<String, Object> entry = param.yield(namespaceContext);
-            sinks_.log(this, "Adding a stylesheet parameter: " + entry, LogLevel.VERBOSE);
+            sinks_.log(this, "Adding a stylesheet parameter: " + entry, Logger.Level.DEBUG);
             if (paramMap_.put(entry.getKey(), entry.getValue()) != null) {
                 sinks_.log(this,
-                    "Stylesheet parameter named " + entry.getKey() + " added twice", LogLevel.ERR);
+                    "Stylesheet parameter named " + entry.getKey() + " added twice", Logger.Level.ERR);
                 throw new BuildException();
             }
         }
@@ -220,7 +219,7 @@ public final class Transform extends Sink implements Driver {
         try {
             List<XPathExpression> referents = sinks_.referents();
             if (!referents.isEmpty()) {
-                sinks_.log(this, "  Referral to the source contents required", LogLevel.DEBUG);
+                sinks_.log(this, "  Referral to the source contents required", Logger.Level.DEBUG);
                 Document document;
                 DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
                 dbfac.setNamespaceAware(true);
@@ -232,8 +231,8 @@ public final class Transform extends Sink implements Driver {
                 return new FinisherDOMResult(document,
                     () -> {
                         List<String> referredContents = Referral.extract(document, referents);
-                        sinks_.log(this, "  Referred source data: "
-                            + String.join(", ", referredContents), LogLevel.DEBUG);
+                        sinks_.log(this, "Referred source data: "
+                            + String.join(", ", referredContents), Logger.Level.DEBUG);
                         Result openedResult =
                             sinks_.startOne(originalSrcIndex, originalSrcFileName,
                                 lastModified, referredContents);
@@ -249,7 +248,6 @@ public final class Transform extends Sink implements Driver {
                     },
                     () -> {});
             } else {
-                sinks_.log(this, "  Referral to the source contents not required", LogLevel.DEBUG);
                 Result openedResult =
                     sinks_.startOne(originalSrcIndex, originalSrcFileName,
                         lastModified, Collections.emptyList());
@@ -366,7 +364,7 @@ public final class Transform extends Sink implements Driver {
                 u -> {},
                 u -> {
                     sinks_.log(Transform.this,
-                        "Reusing compiled stylesheet: " + u.toString(), LogLevel.VERBOSE);
+                        "Reusing compiled stylesheet: " + u.toString(), Logger.Level.DEBUG);
                 },
                 this::compileStylesheet);
         }
@@ -374,13 +372,13 @@ public final class Transform extends Sink implements Driver {
         private Templates compileStylesheet(URI styleURI) {
             String styleSystemID = styleURI.toString();
             sinks_.log(Transform.this,
-                "Compiling stylesheet: " + styleSystemID, LogLevel.VERBOSE);
+                "Compiling stylesheet: " + styleSystemID, Logger.Level.VERBOSE);
             synchronized (LOCK) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 if (usesCache_) {
                     resolver_ = new CachingResolver(
-                        r -> sinks_.log(Transform.this, "Caching " + r, LogLevel.DEBUG),
-                        r -> sinks_.log(Transform.this, "Reusing " + r, LogLevel.DEBUG));
+                        r -> sinks_.log(Transform.this, "Caching " + r, Logger.Level.DEBUG),
+                        r -> sinks_.log(Transform.this, "Reusing " + r, Logger.Level.DEBUG));
                     tfac_.setURIResolver(resolver_);
                 }
                 try {

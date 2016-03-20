@@ -27,7 +27,6 @@ import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.types.LogLevel;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.Locator;
@@ -55,12 +54,12 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    public void log(Object issuer, String message, LogLevel level) {
+    public void log(Object issuer, String message, Logger.Level level) {
         logger_.log(issuer, message, level);
     }
 
     @Override
-    public void log(Object issuer, String message, Throwable ex, LogLevel level) {
+    public void log(Object issuer, String message, Throwable ex, Logger.Level level) {
         logger_.log(issuer, message, ex, level);
     }
 
