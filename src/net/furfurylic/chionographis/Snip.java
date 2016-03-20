@@ -141,12 +141,15 @@ public final class Snip extends Sink implements Driver {
             // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criteria " + select_ +
                 "; the original source is " + r.originalSrcFileName(), LogLevel.VERBOSE);
-            if (expr_ == null) {
-                XPath xpath = XPathFactory.newInstance().newXPath();
-                xpath.setNamespaceContext(namespaceContext_);
-                expr_ = xpath.compile(select_);
+            NodeList nodes;
+            synchronized (this) {   // TODO: synchronization unit is OK?
+                if (expr_ == null) {
+                    XPath xpath = XPathFactory.newInstance().newXPath();
+                    xpath.setNamespaceContext(namespaceContext_);
+                    expr_ = xpath.compile(select_);
+                }
+                nodes = (NodeList) expr_.evaluate(r.getNode(), XPathConstants.NODESET);
             }
-            NodeList nodes = (NodeList) expr_.evaluate(r.getNode(), XPathConstants.NODESET);
 
             int count = 0;
             for (int i = 0; i < nodes.getLength(); ++i) {

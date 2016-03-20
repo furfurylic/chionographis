@@ -97,6 +97,9 @@ public abstract class Sink {
      * <i>referredContents</i> argument. Note this behavior is optional (i.e. the driver can
      * ignore the request made by {@link #referents()}).</p>
      *
+     * <p>This method, {@link #finishOne(Result)}, and {@link #abortOne(Result)}
+     * can be invoked simultaneously by multiple threads.</p>
+     *
      * @param originalSrcIndex
      *      the index of the corresponding original source,
      *      which meets the index for {@code originalSrcURIs} and {@code originalSrcFileNames}
@@ -126,14 +129,28 @@ public abstract class Sink {
 
     /**
      * Finishes to receive one input document.
+     *
+     * <p>{@link #startOne(int, String, long, List)}, this method, and {@link #abortOne(Result)}
+     * can be invoked simultaneously by multiple threads.</p>
+     *
+     * @param result
+     *      an TrAX {@code Result} object which is returned by {@link #startOne(int, String, long,
+     *      List)} of this object.
      */
     abstract void finishOne(Result result);
 
     /**
-     * Aborts processing the current source doucment.
+     * Aborts processing one source document.
      *
      * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
-     * is considered fatal (i.e. the build process itself will be aborted).</p>
+     * is considered fatal situation (i.e. the build process itself will be aborted).</p>
+     *
+     * <p>{@link #startOne(int, String, long, List)}, {@link #finishOne(Result)}, and this method
+     * can be invoked simultaneously by multiple threads.</p>
+     *
+     * @param result
+     *      an TrAX {@code Result} object which is returned by {@link #startOne(int, String, long,
+     *      List)} of this object.
      */
     abstract void abortOne(Result result);
 

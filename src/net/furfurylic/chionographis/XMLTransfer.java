@@ -164,7 +164,11 @@ final class XMLTransfer {
             (Document) resultNode : resultNode.getOwnerDocument();
         Node node;
         while ((node = domSource.getNode().getFirstChild()) != null) {
-            resultNode.appendChild(resultDocument.adoptNode(node));
+            if (node.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
+                domSource.getNode().removeChild(node);
+            } else {
+                resultNode.appendChild(resultDocument.adoptNode(node));
+            }
         }
         // TODO: what if nextSibling set?
     }
