@@ -68,23 +68,8 @@ final class XMLTransfer {
                     // Fall through
                 }
             } else if (source instanceof DOMSource) {
-                DOMSource domSource = (DOMSource) source;
-                if (result instanceof DOMResult) {
-                    transferDOM2DOM(domSource, (DOMResult) result);
-                    return;
-                } else if (result instanceof StreamResult) {
-                    StreamResult streamResult = (StreamResult) result;
-                    DOMImplementationLS ls =
-                        (DOMImplementationLS) builder_.get().get().getDOMImplementation();
-                    LSOutput output = ls.createLSOutput();
-                    output.setByteStream(streamResult.getOutputStream());
-                    output.setCharacterStream(streamResult.getWriter());
-                    output.setSystemId(streamResult.getSystemId());
-                    ls.createLSSerializer().write(domSource.getNode(), output);
-                    return;
-                } else {
-                    // Fall through
-                }
+                transfer((DOMSource) source, result, true);
+                return;
             } else if (source instanceof StreamSource) {
                 if (result instanceof SAXResult) {
                     InputSource input = SAXSource.sourceToInputSource(source);
@@ -93,7 +78,7 @@ final class XMLTransfer {
                 } else if (result instanceof DOMResult){
                     InputSource input = SAXSource.sourceToInputSource(source);
                     Document document = builder_.get().get().parse(input);
-                    transferDOM2DOM(new DOMSource(document), (DOMResult) result);
+                    transferDOM2DOM(new DOMSource(document), (DOMResult) result, true);
                     return;
                 } else {
                     // Fall through
@@ -108,6 +93,29 @@ final class XMLTransfer {
             throw new FatalityException(e);
         } catch (IOException | SAXException | TransformerException e) {
             throw new BuildException(e);
+        }
+    }
+
+    public void transfer(DOMSource source, Result result, boolean adopts) {
+        if (result instanceof DOMResult) {
+            transferDOM2DOM(source, (DOMResult) result, adopts);
+            return;
+        } else if (result instanceof StreamResult) {
+            StreamResult streamResult = (StreamResult) result;
+            DOMImplementationLS ls =
+                (DOMImplementationLS) builder_.get().get().getDOMImplementation();
+            LSOutput output = ls.createLSOutput();
+            output.setByteStream(streamResult.getOutputStream());
+            output.setCharacterStream(streamResult.getWriter());
+            output.setSystemId(streamResult.getSystemId());
+            ls.createLSSerializer().write(source.getNode(), output);
+            return;
+        } else {
+            try {
+                identity_.get().get().transform(source, result);
+            } catch (TransformerException e) {
+                throw new BuildException(e);
+            }
         }
     }
 
@@ -158,16 +166,24 @@ final class XMLTransfer {
         saxSource.getXMLReader().parse(saxSource.getInputSource());
     }
 
-    private void transferDOM2DOM(DOMSource domSource, DOMResult domResult) {
+    private void transferDOM2DOM(DOMSource domSource, DOMResult domResult, boolean adopts) {
         Node resultNode = domResult.getNode();
         Document resultDocument = (resultNode.getNodeType() == Node.DOCUMENT_NODE) ?
             (Document) resultNode : resultNode.getOwnerDocument();
         Node node;
         while ((node = domSource.getNode().getFirstChild()) != null) {
             if (node.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
-                domSource.getNode().removeChild(node);
+                if (adopts) {
+                    domSource.getNode().removeChild(node);
+                }
             } else {
-                resultNode.appendChild(resultDocument.adoptNode(node));
+                Node n;
+                if (adopts) {
+                    n = resultDocument.adoptNode(node);
+                } else {
+                    n = resultDocument.importNode(node, true);
+                }
+                resultNode.appendChild(n);
             }
         }
         // TODO: what if nextSibling set?
