@@ -113,8 +113,8 @@ public final class Chionographis extends MatchingTask implements Driver {
     /**
      * Sets whether verbose logging should be performed.
      *
-     * <p>If set to "yes", log entries whose level is "verbose" or "debug" are escalated to
-     * "info" or "verbose" level respectively.</p>
+     * <p>If set to "yes", some log entries with "verbose" log level, such as reporting
+     * document output, are promoted to "info" level.</p>
      *
      * @param verbose
      *      {@code true} if verbose logging is performed; {@code false} otherwise.
@@ -147,7 +147,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
-     * Add sn instruction to include the meta-information of the original source documents
+     * Add an instruction to include the meta-information of the original source documents
      * into the processing instruction in the documents emitted to the sinks.
      *
      * <p>The processing instructions appear as the document elements first children.</p>
@@ -252,7 +252,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             scanner.scan();
             includedFiles = scanner.getIncludedFiles();
             if (includedFiles.length == 0) {
-                sinks_.log(this, "No input sources found", LogLevel.INFO);
+                sinks_.log(this, "No input sources found", Logger.Level.INFO);
                 return;
             }
             includedURIs = Arrays.stream(includedFiles)
@@ -264,7 +264,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                     .mapToLong(File::lastModified)
                     .toArray();
         }
-        sinks_.log(this, includedURIs.length + " input sources found", LogLevel.INFO);
+        sinks_.log(this, includedURIs.length + " input sources found", Logger.Level.INFO);
 
         // Set up namespace context.
         Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
@@ -278,10 +278,10 @@ public final class Chionographis extends MatchingTask implements Driver {
             boolean[] examined = sinks_.preexamineBundle(
                 includedFiles, includedFileLastModifiedTimes);
             if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
-                sinks_.log(this, "No input sources processed", LogLevel.INFO);
-                sinks_.log(this, "  Skipped input sources are", LogLevel.DEBUG);
+                sinks_.log(this, "No input sources processed", Logger.Level.INFO);
+                sinks_.log(this, "  Skipped input sources are", Logger.Level.DEBUG);
                 Arrays.stream(includedURIs)
-                      .forEach(u -> sinks_.log(this, "    " + u, LogLevel.DEBUG));
+                      .forEach(u -> sinks_.log(this, "    " + u, Logger.Level.DEBUG));
                 return;
             }
             includes = examined;
@@ -290,7 +290,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         Queue<OriginalSource> sources = new ArrayDeque<>();
         for (int i = 0; i < includedFiles.length; ++i) {
             if ((includes != null) && !includes[i]) {
-                sinks_.log(this, "Skipping " + includedURIs[i], LogLevel.DEBUG);
+                sinks_.log(this, "Skipping " + includedURIs[i], Logger.Level.DEBUG);
                 continue;
             }
             sources.offer(new OriginalSource(i, includedURIs[i], includedFiles[i], includedFileLastModifiedTimes[i]));
@@ -309,7 +309,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 parallelism = Math.min(Math.min(sources.size(), maxWorkers_), processors);
             }
         }
-        sinks_.log(this, "Concurrency is " + parallelism, LogLevel.VERBOSE);
+        sinks_.log(this, "Concurrency is " + parallelism, Logger.Level.VERBOSE);
         for (int i = 0; i < parallelism; ++i) {
             sources.add(new OriginalSource());  // Add poisons in number of parallelism
         }
@@ -317,7 +317,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         int count = 0;
         EntityResolver resolver = createEntityResolver();
-        BiConsumer<String, LogLevel> logger = (s, l) -> sinks_.log(this, s, l);
+        BiConsumer<String, Logger.Level> logger = (s, l) -> sinks_.log(this, s, l);
         if (parallelism > 1) {
             // A queue for workers to take and consume.
             BlockingQueue<OriginalSource> sourcesQ = new ArrayBlockingQueue<>(sources.size(), false, sources);
@@ -373,9 +373,9 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         if (count > 0) {
             sinks_.log(this,
-                "Finishing results of " + count +" input sources", LogLevel.VERBOSE);
+                "Finishing results of " + count +" input sources", Logger.Level.DEBUG);
         } else {
-            sinks_.log(this, "No input sources processed", LogLevel.INFO);
+            sinks_.log(this, "No input sources processed", Logger.Level.INFO);
         }
         sinks_.finishBundle();
     }
@@ -401,8 +401,8 @@ public final class Chionographis extends MatchingTask implements Driver {
     private EntityResolver createEntityResolver() {
         if (usesCache_) {
             return new CachingResolver(
-                u -> sinks_.log(this, "Caching " + u, LogLevel.DEBUG),
-                u -> sinks_.log(this, "Reusing " + u, LogLevel.DEBUG));
+                u -> sinks_.log(this, "Caching " + u, Logger.Level.DEBUG),
+                u -> sinks_.log(this, "Reusing " + u, Logger.Level.DEBUG));
         } else {
             return null;
         }
@@ -416,7 +416,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             Map.Entry<String, Function<URI, String>> entry = metas_.get(0).yield();
             sinks_.log(this,
                 "Adding a meta-information instruction: name=" + entry.getKey(),
-                LogLevel.VERBOSE);
+                Logger.Level.DEBUG);
             return Collections.singletonMap(entry.getKey(), entry.getValue());
         }
 
@@ -426,16 +426,16 @@ public final class Chionographis extends MatchingTask implements Driver {
             try {
                 entry = meta.yield();
             } catch (BuildException e) {
-                sinks_.log(this, e.getMessage(), LogLevel.ERR);
+                sinks_.log(this, e.getMessage(), Logger.Level.ERR);
                 throw e;
             }
             sinks_.log(this,
                 "Adding a meta-information instruction: name=" + entry.getKey(),
-                LogLevel.VERBOSE);
+                Logger.Level.DEBUG);
             if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
                 sinks_.log(this,
                     "Meta-information instruction named " + entry.getKey() + " added twice",
-                    LogLevel.ERR);
+                    Logger.Level.ERR);
                 throw new BuildException();
             }
         }
@@ -448,7 +448,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
         if (namespaces_.size() == 1) {
             Map.Entry<String, String> spec = namespaces_.get(0).yield();
-            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, LogLevel.VERBOSE);
+            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, Logger.Level.DEBUG);
             return new PrefixMap(
                 Collections.singletonMap(spec.getKey(), spec.getValue()));
         }
@@ -456,11 +456,11 @@ public final class Chionographis extends MatchingTask implements Driver {
         Map<String, String> namespaceMap = new HashMap<>();
         for (Namespace namespace : namespaces_) {
             Map.Entry<String, String> spec = namespace.yield();
-            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, LogLevel.VERBOSE);
+            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, Logger.Level.DEBUG);
             if (namespaceMap.put(spec.getKey(), spec.getValue()) != null) {
                 sinks_.log(this,
                     "Namespace prefix " + spec.getKey() + " added twice",
-                    LogLevel.ERR);
+                    Logger.Level.ERR);
                 throw new BuildException();
             }
         }
@@ -482,12 +482,12 @@ public final class Chionographis extends MatchingTask implements Driver {
     private final class ChionographisLogger implements Logger {
 
         @Override
-        public void log(Object issuer, String message, LogLevel level) {
+        public void log(Object issuer, String message, Logger.Level level) {
             Chionographis.this.log(format(issuer, message), translateLevel(level));
         }
 
         @Override
-        public void log(Object issuer, String message, Throwable ex, LogLevel level) {
+        public void log(Object issuer, String message, Throwable ex, Logger.Level level) {
             Chionographis.this.log(format(issuer, message), ex, translateLevel(level));
         }
 
@@ -502,14 +502,30 @@ public final class Chionographis extends MatchingTask implements Driver {
             }
         }
 
-        private int translateLevel(LogLevel level) {
-            LogLevel mutated = level;
-            if (Chionographis.this.verbose_) {
-                if (level == LogLevel.VERBOSE) {
-                    mutated = LogLevel.INFO;
-                } else if (level == LogLevel.DEBUG) {
-                    mutated = LogLevel.VERBOSE;
-                }
+        private int translateLevel(Logger.Level level) {
+            LogLevel mutated = null;
+            switch (level) {
+            case ERR:
+                mutated = LogLevel.ERR;
+                break;
+            case WARN:
+                mutated = LogLevel.WARN;
+                break;
+            case INFO:
+                mutated = LogLevel.INFO;
+                break;
+            case FINE:
+                mutated = Chionographis.this.verbose_ ? LogLevel.INFO : LogLevel.VERBOSE;
+                break;
+            case VERBOSE:
+                mutated = LogLevel.VERBOSE;
+                break;
+            case DEBUG:
+                mutated = LogLevel.DEBUG;
+                break;
+            default:
+                assert false : level;
+                break;
             }
             return mutated.getLevel();
         }

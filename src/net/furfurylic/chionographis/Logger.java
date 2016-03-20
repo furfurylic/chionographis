@@ -7,11 +7,13 @@
 
 package net.furfurylic.chionographis;
 
-import org.apache.tools.ant.types.LogLevel;
-
 interface Logger {
 
-    void log(Object issuer, String message, LogLevel level);
+    public enum Level {
+        ERR, WARN, INFO, FINE, VERBOSE, DEBUG
+    }
 
-    void log(Object issuer, String message, Throwable ex, LogLevel level);
+    void log(Object issuer, String message, Level level);
+
+    void log(Object issuer, String message, Throwable ex, Level level);
 }
