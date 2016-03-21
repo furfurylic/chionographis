@@ -1,5 +1,7 @@
 # Chionographis
 
+[![Build Status](https://travis-ci.org/furfurylic/chionographis.svg?branch=master)](https://travis-ci.org/furfurylic/chionographis)
+
 Chionographis is an [Apache Ant](http://ant.apache.org/) task for cascading XML transformation.
 This transformation is done with following three primitive operations applied arbitrary number of times in arbitrary order:
  - XML transformation with XSLT stylesheet,
