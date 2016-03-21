@@ -14,6 +14,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -182,26 +183,41 @@ final class Sinks extends Sink implements Logger {
             activeSinkMap_.remove(result);
         }
         assert activeSinks != null;
+
         if (activeSinks.size() == 1) {
             activeSinks.get(0).finishOne(result);
+
         } else if (result instanceof CompositeDOMResult) {
             CompositeDOMResult r = (CompositeDOMResult) result;
             DOMSource source = new DOMSource(r.getNode());
             if (xfer_ == null) {
                 xfer_ = new XMLTransfer(null);
             }
-            // [1, size()): send result by copy
-            IntStream.range(1, activeSinks.size()).forEach(i -> {
-                xfer_.transfer(source, r.resultOf(i), false);
-                activeSinks.get(i).finishOne(r.resultOf(i));
-            });
-            // [0, 1): send result by move
-            xfer_.transfer(source, r.resultOf(0), true);
-            activeSinks.get(0).finishOne(r.resultOf(0));
+
+            // First search a real DOMResult
+            OptionalInt realDOM = IntStream.range(1, activeSinks.size())
+                                           .filter(i -> r.resultOf(i) instanceof DOMResult)
+                                           .findAny();
+            assert realDOM.isPresent();
+            int j = realDOM.getAsInt();
+
+            // For indices other than j, send the result by copy
+            IntStream.range(0, activeSinks.size())
+                     .filter(i -> i != j)
+                     .forEach(i -> {
+                         xfer_.transfer(source, r.resultOf(i), false);
+                         activeSinks.get(i).finishOne(r.resultOf(i));
+                     });
+
+            // For the index j, send the result by move
+            xfer_.transfer(source, r.resultOf(j), true);
+            activeSinks.get(j).finishOne(r.resultOf(j));
+
         } else {
             assert result instanceof CompositeSAXResult : result.getClass();
             CompositeSAXResult r = (CompositeSAXResult) result;
-            IntStream.range(0, activeSinks.size()).forEach(i -> activeSinks.get(i).finishOne(r.resultOf(i)));
+            IntStream.range(0, activeSinks.size())
+                     .forEach(i -> activeSinks.get(i).finishOne(r.resultOf(i)));
         }
     }
 
