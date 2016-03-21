@@ -45,7 +45,7 @@ public final class All extends Sink implements Driver {
      */
     private String root_ = null;
 
-    private boolean force_ = true;
+    private boolean force_ = false;
     private Sinks sinks_;
 
     private QName rootQ_;
