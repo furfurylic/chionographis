@@ -41,15 +41,15 @@ import org.apache.tools.ant.util.FileNameMapper;
 public final class Output extends Sink {
     private final Object LOCK = new Object();
 
-    private Path destDir_;
-    private Path dest_;
-    private boolean mkDirs_;
-    private String referent_;
-    private boolean force_;
-    private FileNameMapper mapper_;
+    private Path destDir_ = null;
+    private Path dest_ = null;
+    private boolean mkDirs_ = true;
+    private String referent_ = null;
+    private boolean force_ = false;
+    private FileNameMapper mapper_ = null;
 
     private Logger logger_;
-    private Function<String, Set<Path>> destMapping_;
+    private Function<String, Set<Path>> destMapping_ = null;
     private List<XPathExpression> referents_;
 
     private Queue<ByteArrayOutputStream> buffers_;
