@@ -33,6 +33,7 @@ import javax.xml.transform.stream.StreamSource;
 import org.apache.tools.ant.BuildException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.w3c.dom.ls.DOMImplementationLS;
 import org.w3c.dom.ls.LSOutput;
 import org.xml.sax.EntityResolver;
@@ -170,20 +171,24 @@ final class XMLTransfer {
         Node resultNode = domResult.getNode();
         Document resultDocument = (resultNode.getNodeType() == Node.DOCUMENT_NODE) ?
             (Document) resultNode : resultNode.getOwnerDocument();
-        Node node;
-        while ((node = domSource.getNode().getFirstChild()) != null) {
-            if (node.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
-                if (adopts) {
+        if (adopts) {
+            Node node;
+            while ((node = domSource.getNode().getFirstChild()) != null) {
+                if (node.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
                     domSource.getNode().removeChild(node);
-                }
-            } else {
-                Node n;
-                if (adopts) {
-                    n = resultDocument.adoptNode(node);
                 } else {
-                    n = resultDocument.importNode(node, true);
+                    Node n = resultDocument.adoptNode(node);
+                    resultNode.appendChild(n);
                 }
-                resultNode.appendChild(n);
+            }
+        } else {
+            NodeList children = domSource.getNode().getChildNodes();
+            for (int i = 0; i < children.getLength(); ++i) {
+                Node node = children.item(i);
+                if (node.getNodeType() != Node.DOCUMENT_TYPE_NODE) {
+                    Node n = resultDocument.importNode(node, true);
+                    resultNode.appendChild(n);
+                }
             }
         }
         // TODO: what if nextSibling set?
