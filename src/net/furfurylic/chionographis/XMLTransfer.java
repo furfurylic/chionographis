@@ -8,6 +8,7 @@
 package net.furfurylic.chionographis;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -33,7 +34,6 @@ import javax.xml.transform.stream.StreamSource;
 import org.apache.tools.ant.BuildException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 import org.w3c.dom.ls.DOMImplementationLS;
 import org.w3c.dom.ls.LSOutput;
 import org.xml.sax.EntityResolver;
@@ -45,6 +45,11 @@ import org.xml.sax.XMLFilter;
 import org.xml.sax.XMLReader;
 import org.xml.sax.ext.LexicalHandler;
 
+/**
+ * Objects of this class transfer documents from a source to another result.
+ *
+ *<p>All methods of this class are thread-safe.</p>
+ */
 final class XMLTransfer {
 
     private ThreadLocal<Supplier<XMLReader>> reader_;
@@ -57,6 +62,26 @@ final class XMLTransfer {
         identity_ = ThreadLocal.withInitial(() -> createIdentityTransformerSupplier());
     }
 
+    public XMLTransfer() {
+        this(null);
+    }
+
+    /**
+     * Sends a document from a source to a result. Note that this method is detstuctive
+     * to the source.
+     *
+     * <p>If the source is a {@code SAXSource} object and the {@code XMLReader} is absent,
+     * this method complement a default reader. If the {@code SAXSource} object has a
+     * {@code XMLFilter} and its parent is absent, similarly the parent is complemented.</p>
+     *
+     * <p>If the source is a {@code DOMSource} object and the result is a {@code DOMResult} object,
+     * this method removes away the child nodes of the {@code DOMSource} object's node.</p>
+     *
+     * @param source
+     *      a TrAX {@code Source} object, which must not be {@code null}.
+     * @param result
+     *      a TrAX {@code Result} object, which must not be {@code null}.
+     */
     public void transfer(Source source, Result result) {
         try {
             if (source instanceof SAXSource) {
@@ -97,6 +122,21 @@ final class XMLTransfer {
         }
     }
 
+    /**
+     * Sends a document from a TrAX {@code DOMSource} to a {@code DOMResult}.
+     * Note that this method is detstuctive to the source.
+     *
+     * <p>If {@code adopts} is {@code true} and {@code result} is a {@code DOMResult} object,
+     * this method removes away the child nodes of the {@code source}'s node.
+     * Otherwise, this method do copying and {@code source} is left unchanged.</p>
+     *
+     * @param source
+     *      a TrAX {@code DOMSource} object, which must not be {@code null}.
+     * @param result
+     *      a TrAX {@code DOMResult} object, which must not be {@code null}.
+     * @param adopts
+     *      {@code true} if nodes are moved; {@code false} otherwise, i.e., they are copied.
+     */
     public void transfer(DOMSource source, Result result, boolean adopts) {
         if (result instanceof DOMResult) {
             transferDOM2DOM(source, (DOMResult) result, adopts);
@@ -167,31 +207,33 @@ final class XMLTransfer {
         saxSource.getXMLReader().parse(saxSource.getInputSource());
     }
 
-    private void transferDOM2DOM(DOMSource domSource, DOMResult domResult, boolean adopts) {
-        Node resultNode = domResult.getNode();
+    private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts) {
+        Node resultNode = result.getNode();
         Document resultDocument = (resultNode.getNodeType() == Node.DOCUMENT_NODE) ?
             (Document) resultNode : resultNode.getOwnerDocument();
-        if (adopts) {
-            Node node;
-            while ((node = domSource.getNode().getFirstChild()) != null) {
-                if (node.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
-                    domSource.getNode().removeChild(node);
+        Consumer<Node> appendNode = (result.getNextSibling() != null) ?
+            n -> result.getNextSibling().getParentNode().insertBefore(n, result.getNextSibling()) :
+            n -> resultNode.appendChild(n);
+
+        Function<Node, Node> transferNode = adopts ?
+            n -> {
+                if (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
+                    n.getParentNode().removeChild(n);
+                    return null;
                 } else {
-                    Node n = resultDocument.adoptNode(node);
-                    resultNode.appendChild(n);
+                    return resultDocument.adoptNode(n);
                 }
-            }
-        } else {
-            NodeList children = domSource.getNode().getChildNodes();
-            for (int i = 0; i < children.getLength(); ++i) {
-                Node node = children.item(i);
-                if (node.getNodeType() != Node.DOCUMENT_TYPE_NODE) {
-                    Node n = resultDocument.importNode(node, true);
-                    resultNode.appendChild(n);
-                }
-            }
+            } :
+            n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
+                    null : resultDocument.importNode(n, true);
+
+        Node node = source.getNode().getFirstChild();
+        while (node != null) {
+            Node nextNode = node.getNextSibling();
+            Node transferred = transferNode.apply(node);
+            appendNode.accept(transferred);
+            node = nextNode;
         }
-        // TODO: what if nextSibling set?
     }
 
     private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {
