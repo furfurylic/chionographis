@@ -1,1 +1,1 @@
-[a:A]
+[a:A]<<< input2.xml's end >>>

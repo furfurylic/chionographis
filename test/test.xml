@@ -799,18 +799,23 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="*.xml" cache="no">
-            <all root="q">
-                <output dest="output-${test.title}/output.xml"/>
+            <!-- Original sources are: input1.xml and input2.xml. The latter contains document element's sibling. -->
+            <all root="p">
+                <output dest="output-${test.title}/output-p.xml"/>
             </all>
             <output destdir="${dir.output}">
                 <globmapper from="in*.xml" to="out*.xml"/>
             </output>
+            <all root="q">
+                <output dest="output-${test.title}/output-q.xml"/>
+            </all>
         </chionographis>
 
         <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
             <globmapper from="output*.xml" to="actual*.txt"/>
         </xslt>
-        <assertfileeq name="${test.name} - all" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+        <assertfileeq name="${test.name} - all-p" expected="${dir.input}/expected-p.txt" actual="${dir.output}/actual-p.txt"/>
+        <assertfileeq name="${test.name} - all-q" expected="${dir.input}/expected-q.txt" actual="${dir.output}/actual-q.txt"/>
         <assertfileeq name="${test.name} - output1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
         <assertfileeq name="${test.name} - output2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
 
