@@ -46,7 +46,7 @@ public final class Transform extends Sink implements Driver {
 
     private Sinks sinks_;
     private String style_ = null;
-    private boolean usesCache_ = false;
+    private boolean usesCache_ = true;
     private boolean force_ = false;
     private List<Param> params_ = Collections.emptyList();
 
@@ -70,8 +70,22 @@ public final class Transform extends Sink implements Driver {
     public void setStyle(String style) {
         style_ = style;
     }
-    // TODO: Make this class able to accept non-file stylesheet URI
 
+    /**
+     * Sets whether external resources referred through the transformation process
+     * should be cached. Defaulted to "yes".
+     *
+     * <p>The external resources are:</p>
+     * <ul>
+     * <li>XSLT stylesheet files included by {@code xsl:include},</li>
+     * <li>XSLT stylesheet files imported by {@code xsl:import},</li>
+     * <li>external documents opened by {@code document} XPath functions,</li>
+     * <li>and external parsed entities referred by documents above.</li>
+     * </ul>
+     *
+     * @param cache
+     *      {@code true} if cached; {@code false} otherwise.
+     */
     public void setCache(boolean cache) {
         usesCache_ = cache;
     }

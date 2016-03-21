@@ -46,7 +46,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 |basedir|The base directory of this task.| No; defaults to the project's base directory
 |srcdir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
 |force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`
-|cache|Whether this driver uses a document cache shared in Chionographis library. When set to `yes`, the performance will be greatly increased. This option is here to enable users to evade a certain XSLT processor's bug.| No; defaults to `no`
+|cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to `no`, the performance will fall. This option is here to enable users to evade a certain XSLT processor's bug.| No; defaults to `no`
 |verbose|Whether this task promotes log levels from "verbose" to "info" for some log entries, such as reports of document output.| No; defaults to `no`
 |maxworkers|The maximum number of concurrent workers. If not positive, instead the number of available processors minus this attribute is used as the maximum number of the workers. In any case, the actual number of workers is in interval [1, processors].| No; defaults to 0
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
@@ -101,9 +101,13 @@ generates output XML documents one per one input document and pass them to sinks
 [options="header", cols="1,3,1"]
 |=================
 | Attribute | Description | Required
+
 |style|The URI of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
+
 |force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`
-|cache|Whether this driver uses a document cache shared in Chionographis library. When set to `yes`, the performance will be greatly increased. This option is here to enable users to evade a certain XSLT processor's bug.| No; defaults to `no`
+
+|cache|Whether this driver uses a document cache shared in Chionographis library for `xsl:include`, `xsl:import`, XPath `document` functions, and external entities referred by documents above.  +
+ When set to `no`, the performance will fall. This option is here to enable users to evade a certain XSLT processor's bug.| No; defaults to `yes`
 |=================
 
 === Nested elements
