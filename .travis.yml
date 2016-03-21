@@ -1,0 +1,8 @@
+language: java
+notifications:
+  email: false
+jdk:
+  - oraclejdk8
+script:
+  - ant
+  - ant -lib release/lib -f test/test.xml full
