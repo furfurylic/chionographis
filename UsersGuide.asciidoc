@@ -230,7 +230,7 @@ The string value of the pointee is used as an input to the installed file mapper
 _Transform_ drivers retrieve the pointee from the source documents of the transformation; on the other hand, the _Chionographis_, _All_, and _Snip_ drivers retrieve from their result document (the source document of this sink). +
 The XPath expression can include include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the task's child _namespace_ elements.| No; see note
 
-|mkdirs|Whether this sink creates parent directories of the destination file if needed.| No; defaults to `no`
+|mkdirs|Whether this sink creates parent directories of the destination file if needed.| No; defaults to `Yes`
 
 |force|Whether this sink creates output files even if existing files seem new enough.| No; defaults to `no`
 |=================

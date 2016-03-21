@@ -79,7 +79,7 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="${test.prefix}" srcdir="input" includes="*.xml">
-            <output destdir="output-${test.title}" mkdirs="yes">
+            <output destdir="output-${test.title}">
                 <globmapper from="input*.xml" to="output*.xml"/>
             </output>
         </chionographis>
@@ -133,8 +133,8 @@
         <delete dir="${dir.output}"/>
 
         <chionographis basedir="basic" srcdir="input-${test.title}" includes="*.xml">
-            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]" mkdirs="yes"/>
-            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]" mkdirs="yes">
+            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]"/>
+            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]">
                 <globmapper from="output*.xml" to="output*.2.xml"/>
             </output>
         </chionographis>
@@ -240,7 +240,7 @@
         <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:40 AM"/>
 
         <chionographis basedir="${dir.output}" includes="input*.xml">
-            <output refer="/*/@num" mkdirs="yes">
+            <output refer="/*/@num">
                 <globmapper from="*" to="output*.xml"/>
             </output>
         </chionographis>
@@ -275,7 +275,7 @@
         <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
 
         <chionographis basedir="${dir.output}" includes="input*.xml" cache="yes" force="yes">
-            <output refer="/*/@num" mkdirs="yes">
+            <output refer="/*/@num">
                 <globmapper from="*" to="output*.xml"/>
             </output>
         </chionographis>
@@ -301,7 +301,7 @@
         <chionographis srcdir="${dir.input}" includes="*.xml">
             <meta type="file-name"/>
             <meta type="file-title"/>
-            <output dest="${dir.output}/output.xml" mkdirs="yes"/>
+            <output dest="${dir.output}/output.xml"/>
         </chionographis>
 
         <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
@@ -324,7 +324,7 @@
         <chionographis srcdir="${dir.input}" includes="*.xml">
             <meta type="file-name"/>
             <meta type="file-title"/>
-            <output destdir="${dir.output}" refer="local-name(/*)" mkdirs="yes">
+            <output destdir="${dir.output}" refer="local-name(/*)">
                 <globmapper from="in*" to="out*.xml"/>
             </output>
         </chionographis>
@@ -347,7 +347,7 @@
 
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
             <transform style="../flatten.xsl">
-                <output dest="output/actual.txt" mkdirs="yes"/>
+                <output dest="output/actual.txt"/>
             </transform>
         </chionographis>
 
@@ -369,7 +369,7 @@
             <transform style="input/flatten-nons.xsl">
                 <param name="p1">v1</param>
                 <param name="p2">v2</param>
-                <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
+                <output dest="output-${test.title}/actual.txt"/>
             </transform>
         </chionographis>
 
@@ -393,7 +393,7 @@
             <transform style="input/flatten-ns.xsl">
                 <param name="p1:p">v1</param>
                 <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
-                <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
+                <output dest="output-${test.title}/actual.txt"/>
             </transform>
         </chionographis>
 
@@ -413,7 +413,7 @@
 
         <chionographis includes="${test.prefix}/input/*-${test.title}.xml">
             <transform style="flatten.xsl">
-                <output destdir="${test.prefix}/output-${test.title}" refer="/*/processing-instruction('chionographis-output')[1]" mkdirs="yes"/>
+                <output destdir="${test.prefix}/output-${test.title}" refer="/*/processing-instruction('chionographis-output')[1]"/>
             </transform>
         </chionographis>
 
@@ -445,7 +445,7 @@
         <!-- Shall be processed -->
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
             <transform style="output-${test.title}/flatten.xsl">
-                <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
+                <output dest="output-${test.title}/actual.txt"/>
             </transform>
         </chionographis>
 
@@ -477,7 +477,7 @@
         <!-- Shall be processed -->
         <chionographis basedir="${test.prefix}" includes="input/input.xml">
             <transform style="output-${test.title}/flatten.xsl" force="yes">
-                <output dest="output-${test.title}/actual.txt" mkdirs="yes"/>
+                <output dest="output-${test.title}/actual.txt"/>
             </transform>
         </chionographis>
 
@@ -496,7 +496,7 @@
 
         <chionographis basedir="${test.prefix}" includes="input/*.xml">
             <all root="q">
-                <output dest="output/output.xml" mkdirs="yes"/>
+                <output dest="output/output.xml"/>
             </all>
         </chionographis>
 
@@ -620,7 +620,7 @@
             <namespace prefix="all" uri="http://www.furfurylic.net/chionographis/test/all/ns/task1"/>
             <all root="all:p">
                 <all root="{http://www.furfurylic.net/chionographis/test/all/ns/task2}q">
-                    <output dest="output-${test.title}/output.xml" mkdirs="yes"/>
+                    <output dest="output-${test.title}/output.xml"/>
                 </all>
             </all>
         </chionographis>
@@ -674,7 +674,7 @@
 
         <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml">
             <snip select="//b">
-                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
+                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')"/>
             </snip>
         </chionographis>
 
@@ -698,7 +698,7 @@
 
         <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml">
             <snip select="a/b">
-                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
+                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')"/>
             </snip>
         </chionographis>
 
@@ -724,7 +724,7 @@
         <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml">
             <namespace prefix="q" uri="http://www.furfurylic.net/chionographis/test"/>
             <snip select="//q:a[2]">
-                <output destdir="${test.prefix}/output-${test.title}" refer="//processing-instruction('chionographis-output')" mkdirs="yes"/>
+                <output destdir="${test.prefix}/output-${test.title}" refer="//processing-instruction('chionographis-output')"/>
             </snip>
         </chionographis>
 
@@ -748,10 +748,10 @@
         <chionographis basedir="${test.prefix}/input-${test.title}" includes="input.xml" cache="yes" verbose="yes">
             <meta type="file-title"/>
             <transform style="style1.xsl" cache="yes">
-                <output dest="../output-${test.title}/actual1.txt" mkdirs="yes"/>
+                <output dest="../output-${test.title}/actual1.txt"/>
             </transform>
             <transform style="style2.xsl" cache="yes">
-                <output dest="../output-${test.title}/actual2.txt" mkdirs="yes"/>
+                <output dest="../output-${test.title}/actual2.txt"/>
             </transform>
         </chionographis>
 
@@ -772,11 +772,11 @@
 
         <chionographis basedir="${dir.input}" includes="input.xml" cache="yes" verbose="yes">
             <meta type="file-title"/>
-            <output destdir="../output-${test.title}" refer="count(/*/*)" mkdirs="yes">
+            <output destdir="../output-${test.title}" refer="count(/*/*)">
                 <globmapper from="*" to="output*.xml"/>
             </output>
             <transform style="style2.xsl" cache="yes">
-                <output dest="../output-${test.title}/actual2.txt" mkdirs="yes"/>
+                <output dest="../output-${test.title}/actual2.txt"/>
             </transform>
         </chionographis>
 
@@ -800,9 +800,9 @@
 
         <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="*.xml">
             <all root="q">
-                <output dest="output-${test.title}/output.xml" mkdirs="yes"/>
+                <output dest="output-${test.title}/output.xml"/>
             </all>
-            <output destdir="${dir.output}" mkdirs="yes">
+            <output destdir="${dir.output}">
                 <globmapper from="in*.xml" to="out*.xml"/>
             </output>
         </chionographis>
