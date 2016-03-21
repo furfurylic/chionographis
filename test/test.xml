@@ -527,7 +527,7 @@
 
         <!-- Shall not be processed -->
         <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q" force="no">
+            <all root="q">
                 <output dest="output-${test.title}/output.xml"/>
             </all>
         </chionographis>
@@ -558,7 +558,7 @@
 
         <!-- Shall not be processed (decided later) -->
         <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q" force="no">
+            <all root="q">
                 <output destdir="output-${test.title}" refer="local-name(/*)">
                     <globmapper from="*" to="*.xml"/>
                 </output>
@@ -594,7 +594,7 @@
 
         <!-- Shall be processed -->
         <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q" force="no">
+            <all root="q">
                 <output destdir="output-${test.title}" refer="local-name(/*)">
                     <globmapper from="*" to="*.xml"/>
                 </output>
@@ -652,7 +652,7 @@
 
         <!-- Shall BE processed -->
         <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q">
+            <all root="q" force="yes">
                 <output dest="output-${test.title}/output.xml"/>
             </all>
         </chionographis>
