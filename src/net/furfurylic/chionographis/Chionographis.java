@@ -49,7 +49,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private Path srcDir_;
     private Path baseDir_;
-    private boolean usesCache_ = false;
+    private boolean usesCache_ = true;
     private boolean force_ = false;
     private boolean verbose_ = false;
     private int maxWorkers_ = 0;
@@ -98,6 +98,13 @@ public final class Chionographis extends MatchingTask implements Driver {
         srcDir_ = Paths.get(srcDir);
     }
 
+    /**
+     * Sets whether the external parsed entities in the original source files are cached.
+     * Defaulted to "yes".
+     *
+     * @param cache
+     *      {@code true} if cached; {@code false} otherwise.
+     */
     public void setCache(boolean cache) {
         usesCache_ = cache;
     }
