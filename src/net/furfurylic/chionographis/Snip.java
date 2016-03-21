@@ -108,7 +108,7 @@ public final class Snip extends Sink implements Driver {
      */
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        xfer_ = new XMLTransfer(null);
+        xfer_ = new XMLTransfer();
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
         namespaceContext_ = namespaceContext;

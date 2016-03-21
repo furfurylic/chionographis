@@ -316,7 +316,7 @@ final class Sinks extends Sink implements Logger {
                 return results_.get(0);
             }
             if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
-                return new CompositeDOMResult(new XMLTransfer(null).newDocument(), results_);
+                return new CompositeDOMResult(new XMLTransfer().newDocument(), results_);
             }
 
             try {
