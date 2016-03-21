@@ -137,7 +137,7 @@ public final class All extends Sink implements Driver {
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
-        xfer_ = new XMLTransfer(null);
+        xfer_ = new XMLTransfer();
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
     }
@@ -196,10 +196,8 @@ public final class All extends Sink implements Driver {
         assert result instanceof DOMResult;
         DOMResult r = (DOMResult) result;
         synchronized (resultDocument_) {
-            Node node;
-            while ((node = r.getNode().getFirstChild()) != null) {
-                resultDocument_.getDocumentElement().appendChild(resultDocument_.adoptNode(node));
-            }
+            xfer_.transfer(new DOMSource(r.getNode()),
+                new DOMResult(resultDocument_.getDocumentElement()), true);
         }
         assert r.getNode().getFirstChild() == null;
         synchronized (resultDocument_) {
