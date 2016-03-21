@@ -152,15 +152,16 @@ The number of document passed to the sinks is always one.
 |root|The name of the document element of the resulted document. +
 Supported forms are `localName`, `prefix:localName` and `{namespaceURI}localName`. In first form, the name doesn't belong to any namespace. In second form, the name belongs to a namespace whose name is mapped from the prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
-|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `yes`; see note
+|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`; see note
 |=================
 
 [NOTE]
-If the set of the original source documents is constant (regardless of whether each
-document's content is modified), setting _force_ to `no` is generally safe.
+If the set of the original source documents is constant (regardless of whether
+each document's content is modified), setting _force_ to `no` or
+leaving it to be defaulted is generally safe.
 Otherwise, setting _force_ to `no` is possibly dangerous because the _All_
 filter can overlook the possible changes in resulted document when source
-documents are added or removed. This is why the default value is `yes`.
+documents are added or removed.
 
 === Nested elements
 
