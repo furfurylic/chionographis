@@ -127,7 +127,7 @@ public final class Snip extends Sink implements Driver {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> notUsed) {
-        return new SnipDOMResult(xfer_.newDocument(), originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime);
+        return new SnipDOMResult(originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime);
     }
 
     @Override
@@ -209,10 +209,10 @@ public final class Snip extends Sink implements Driver {
         private String originalSrcFileName_;
         private long originalSrcLastModifiedTime_;
 
-        public SnipDOMResult(Document document,
+        public SnipDOMResult(
                 int originalSrcIndex, String originalSrcFileName,
                 long originalSrcLastModifiedTime) {
-            super(document);
+            super();
             originalSrcIndex_ = originalSrcIndex;
             originalSrcFileName_ = originalSrcFileName;
             originalSrcLastModifiedTime_ = originalSrcLastModifiedTime;
