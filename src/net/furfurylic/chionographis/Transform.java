@@ -15,10 +15,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
 import javax.xml.transform.Templates;
 import javax.xml.transform.Transformer;
@@ -34,7 +33,6 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.w3c.dom.Document;
 import org.xml.sax.ContentHandler;
 
 /**
@@ -233,18 +231,9 @@ public final class Transform extends Sink implements Driver {
         try {
             List<XPathExpression> referents = sinks_.referents();
             if (!referents.isEmpty()) {
-                sinks_.log(this, "  Referral to the source contents required", Logger.Level.DEBUG);
-                Document document;
-                DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                dbfac.setNamespaceAware(true);
-                try {
-                    document = dbfac.newDocumentBuilder().newDocument();
-                } catch (ParserConfigurationException e) {
-                    throw new BuildException(e);
-                }
-                return new FinisherDOMResult(document,
-                    () -> {
-                        List<String> referredContents = Referral.extract(document, referents);
+                return new FinisherDOMResult(
+                    r -> {
+                        List<String> referredContents = Referral.extract(r.getNode(), referents);
                         sinks_.log(this, "Referred source data: "
                             + String.join(", ", referredContents), Logger.Level.DEBUG);
                         Result openedResult =
@@ -253,7 +242,7 @@ public final class Transform extends Sink implements Driver {
                         if (openedResult != null) {
                             try {
                                 stylesheet_.newTransformer()
-                                    .transform(new DOMSource(document), openedResult);
+                                    .transform(new DOMSource(r.getNode()), openedResult);
                             } catch (TransformerException e) {
                                 throw new BuildException(e);
                             }
@@ -326,18 +315,18 @@ public final class Transform extends Sink implements Driver {
     }
 
     private static class FinisherDOMResult extends DOMResult implements Finisher {
-        private Runnable finisher_;
+        private Consumer<DOMResult> finisher_;
         private Runnable aborter_;
 
-        public FinisherDOMResult(Document document, Runnable finisher, Runnable aborter) {
-            super(document);
+        public FinisherDOMResult(Consumer<DOMResult> finisher, Runnable aborter) {
+            super();
             finisher_ = finisher;
             aborter_ = aborter;
         }
 
         @Override
         public void finish() {
-            finisher_.run();
+            finisher_.accept(this);
         }
 
         @Override
