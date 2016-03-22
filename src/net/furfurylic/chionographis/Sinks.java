@@ -194,10 +194,18 @@ final class Sinks extends Sink implements Logger {
                 xfer_ = new XMLTransfer(null);
             }
 
-            // First search a real DOMResult
+            // Search a real DOMResult
+            // First whose getNode() == null
             OptionalInt realDOM = IntStream.range(1, activeSinks.size())
-                                           .filter(i -> r.resultOf(i) instanceof DOMResult)
+                                           .filter(i -> (r.resultOf(i) instanceof DOMResult)
+                                                     && ((DOMResult) r).getNode() == null)
                                            .findAny();
+            // Second any DOMResult
+            if (!realDOM.isPresent()) {
+                realDOM = IntStream.range(1, activeSinks.size())
+                                   .filter(i -> r.resultOf(i) instanceof DOMResult)
+                                   .findAny();
+            }
             assert realDOM.isPresent();
             int j = realDOM.getAsInt();
 
