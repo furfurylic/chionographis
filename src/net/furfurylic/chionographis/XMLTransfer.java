@@ -75,7 +75,8 @@ final class XMLTransfer {
      * {@code XMLFilter} and its parent is absent, similarly the parent is complemented.</p>
      *
      * <p>If the source is a {@code DOMSource} object and the result is a {@code DOMResult} object,
-     * this method removes away the child nodes of the {@code DOMSource} object's node.</p>
+     * this method removes away the child nodes of the {@code DOMSource} object's node,
+     * or removes away the {@code source}'s node itself (when {@code result} has no nodes).</p>
      *
      * @param source
      *      a TrAX {@code Source} object, which must not be {@code null}.
@@ -127,7 +128,8 @@ final class XMLTransfer {
      * Note that this method is detstuctive to the source.
      *
      * <p>If {@code adopts} is {@code true} and {@code result} is a {@code DOMResult} object,
-     * this method removes away the child nodes of the {@code source}'s node.
+     * this method removes away the child nodes of the {@code source}'s node,
+     * or removes away the {@code source}'s node itself (when {@code result} has no nodes).
      * Otherwise, this method do copying and {@code source} is left unchanged.</p>
      *
      * @param source
@@ -208,12 +210,21 @@ final class XMLTransfer {
     }
 
     private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts) {
-        Node resultNode = result.getNode();
-        Document resultDocument = (resultNode.getNodeType() == Node.DOCUMENT_NODE) ?
-            (Document) resultNode : resultNode.getOwnerDocument();
+        if (result.getNode() == null) {
+            if (adopts) {
+                result.setNode(source.getNode());
+                source.setNode(null);
+                return;
+            } else {
+                result.setNode(newDocument());
+            }
+        }
+
+        Document resultDocument = (result.getNode().getNodeType() == Node.DOCUMENT_NODE) ?
+            (Document) result.getNode() : result.getNode().getOwnerDocument();
         Consumer<Node> appendNode = (result.getNextSibling() != null) ?
             n -> result.getNextSibling().getParentNode().insertBefore(n, result.getNextSibling()) :
-            n -> resultNode.appendChild(n);
+            n -> result.getNode().appendChild(n);
 
         Function<Node, Node> transferNode = adopts ?
             n -> {
@@ -234,6 +245,8 @@ final class XMLTransfer {
             appendNode.accept(transferred);
             node = nextNode;
         }
+
+        assert result.getNode() != null;
     }
 
     private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {

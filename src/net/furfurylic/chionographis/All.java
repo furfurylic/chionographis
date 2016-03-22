@@ -176,17 +176,15 @@ public final class All extends Sink implements Driver {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
         assert resultDocument_ != null;
-        Node currentDocument = null;
         synchronized (resultDocument_) {
             lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
+        }
+        synchronized (resultDocument_) {
             if (nodes_ != null) {
-                currentDocument = nodes_.poll();
+                return new DOMResult(nodes_.poll());
             }
         }
-        if (currentDocument == null) {
-            currentDocument = xfer_.newDocument();
-        }
-        return new DOMResult(currentDocument);
+        return new DOMResult();
     }
 
     @Override
@@ -194,11 +192,13 @@ public final class All extends Sink implements Driver {
         assert resultDocument_ != null;
         assert result != null;
         assert result instanceof DOMResult;
+        assert ((DOMResult) result).getNode() != null;
         DOMResult r = (DOMResult) result;
         synchronized (resultDocument_) {
             xfer_.transfer(new DOMSource(r.getNode()),
                 new DOMResult(resultDocument_.getDocumentElement()), true);
         }
+        assert r.getNode() != null;
         assert r.getNode().getFirstChild() == null;
         synchronized (resultDocument_) {
             if (nodes_ == null) {
@@ -232,6 +232,7 @@ public final class All extends Sink implements Driver {
         if (result != null) {
             // Send fragment to sink
             xfer_.transfer(new DOMSource(resultDocument_), result);
+            resultDocument_ = null;
             // Finish sink
             sinks_.finishOne(result);
         }
