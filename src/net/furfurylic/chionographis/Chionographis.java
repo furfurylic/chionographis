@@ -145,12 +145,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      the number of concurrent workers.
      */
     public void setMaxWorkers(int maxWorkers) {
-        int processors = Runtime.getRuntime().availableProcessors();
-        if (maxWorkers <= 0) {
-            maxWorkers_ = processors;
-        } else {
-            maxWorkers_ = Math.min(maxWorkers, processors);
-        }
+        maxWorkers_ = maxWorkers;
     }
 
     /**
