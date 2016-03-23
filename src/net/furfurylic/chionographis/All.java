@@ -199,7 +199,9 @@ public final class All extends Sink implements Driver {
                 new DOMResult(resultDocument_.getDocumentElement()), true);
         }
         assert r.getNode() != null;
-        assert r.getNode().getFirstChild() == null;
+        while (r.getNode().getFirstChild() != null) {
+            r.getNode().removeChild(r.getNode().getFirstChild());
+        }
         synchronized (resultDocument_) {
             if (nodes_ == null) {
                 nodes_ = new ArrayDeque<>();
