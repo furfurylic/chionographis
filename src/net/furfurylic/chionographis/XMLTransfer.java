@@ -227,14 +227,8 @@ final class XMLTransfer {
             n -> result.getNode().appendChild(n);
 
         Function<Node, Node> transferNode = adopts ?
-            n -> {
-                if (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) {
-                    n.getParentNode().removeChild(n);
-                    return null;
-                } else {
-                    return resultDocument.adoptNode(n);
-                }
-            } :
+            n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
+                    null : resultDocument.importNode(n, true) :
             n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
                     null : resultDocument.importNode(n, true);
 
