@@ -236,7 +236,9 @@ final class XMLTransfer {
         while (node != null) {
             Node nextNode = node.getNextSibling();
             Node transferred = transferNode.apply(node);
-            appendNode.accept(transferred);
+            if (transferred != null) {
+                appendNode.accept(transferred);
+            }
             node = nextNode;
         }
 
