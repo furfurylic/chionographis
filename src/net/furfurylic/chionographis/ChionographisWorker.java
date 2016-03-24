@@ -77,12 +77,16 @@ final class ChionographisWorker implements Runnable {
         T get() throws X;
     }
 
+    public static interface ConsumerX<T, X extends Exception> {
+        void accept(T t) throws X;
+    }
+
     private Sink sink_;
     private BiConsumer<String, Logger.Level> logger_;
     private Map<String, Function<URI, String>> metaFuncMap_;
 
     private SupplierX<OriginalSource, ? extends InterruptedException> sources_;
-    private Consumer<Object> resultSink_;
+    private ConsumerX<Object, ? extends InterruptedException> resultSink_;
     private XMLTransfer xfer_;
 
     /**
@@ -109,7 +113,7 @@ final class ChionographisWorker implements Runnable {
                 Sink sink, BiConsumer<String, Logger.Level> logger,
                 EntityResolver resolver, Map<String, Function<URI, String>> metaFuncMap,
                 SupplierX<OriginalSource, ? extends InterruptedException> sources,
-                Consumer<Object> resultSink) {
+                ConsumerX<Object, ? extends InterruptedException> resultSink) {
         sink_ = sink;
         logger_ = logger;
         xfer_ = new XMLTransfer(resolver);
@@ -184,8 +188,12 @@ final class ChionographisWorker implements Runnable {
                 }
             }
             resultSink_.accept(Integer.valueOf(count));
+        } catch (InterruptedException e) {
         } catch (Throwable e) {
-            resultSink_.accept(e);
+            try {
+                resultSink_.accept(e);
+            } catch (InterruptedException ex) {
+            }
         }
     }
 

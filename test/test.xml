@@ -49,7 +49,35 @@
         </sequential>
     </macrodef>
 
-    <macrodef name="assertfilelastmodified">
+    <macrodef name="assertfileeq2">
+        <attribute name="name"/>
+        <attribute name="expected1"/>
+        <attribute name="expected2"/>
+        <attribute name="actual"/>
+        <sequential>
+            <fail message="@{name}: @{actual} doesn't exist">
+                <condition><not><resourceexists><file file="@{actual}"/> </resourceexists></not></condition>
+            </fail>
+            <fail message="@{name}: @{expected1} doesn't exist">
+                <condition><not><resourceexists><file file="@{expected1}"/> </resourceexists></not></condition>
+            </fail>
+            <fail message="@{name}: @{expected2} doesn't exist">
+                <condition><not><resourceexists><file file="@{expected2}"/> </resourceexists></not></condition>
+            </fail>
+            <fail message="@{name}: @{actual} doesn't match with neither @{expected1} nor @{expected2}">
+                <condition>
+                    <not>
+                        <or>
+                            <filesmatch file1="@{actual}" file2="@{expected1}"/>
+                            <filesmatch file1="@{actual}" file2="@{expected2}"/>
+                        </or>
+                    </not>
+                </condition>
+            </fail>
+        </sequential>
+    </macrodef>
+
+        <macrodef name="assertfilelastmodified">
         <attribute name="name"/>
         <attribute name="file"/>
         <attribute name="datetime"/>
@@ -501,7 +529,7 @@
         </chionographis>
 
         <xslt style="${basedir}/flatten.xsl" in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
@@ -602,7 +630,7 @@
         </chionographis>
 
         <xslt style="${basedir}/flatten.xsl" in="${dir.output}/q.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
@@ -658,7 +686,7 @@
         </chionographis>
 
         <xslt style="${basedir}/flatten.xsl" in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq name="${test.name}"  expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
@@ -814,8 +842,8 @@
         <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
             <globmapper from="output*.xml" to="actual*.txt"/>
         </xslt>
-        <assertfileeq name="${test.name} - all-p" expected="${dir.input}/expected-p.txt" actual="${dir.output}/actual-p.txt"/>
-        <assertfileeq name="${test.name} - all-q" expected="${dir.input}/expected-q.txt" actual="${dir.output}/actual-q.txt"/>
+        <assertfileeq2 name="${test.name} - all-p" expected1="${dir.input}/expected-p-a.txt" expected2="${dir.input}/expected-p-b.txt" actual="${dir.output}/actual-p.txt"/>
+        <assertfileeq2 name="${test.name} - all-q" expected1="${dir.input}/expected-q-a.txt" expected2="${dir.input}/expected-q-b.txt" actual="${dir.output}/actual-q.txt"/>
         <assertfileeq name="${test.name} - output1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
         <assertfileeq name="${test.name} - output2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
 

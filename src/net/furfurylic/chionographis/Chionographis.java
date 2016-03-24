@@ -27,6 +27,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
@@ -275,65 +276,85 @@ public final class Chionographis extends MatchingTask implements Driver {
         sinks_.init(baseDir_.toFile(), namespaceContext, force_);
 
         // Tell whether destinations are older.
-        boolean[] includes = null;
-        if (!force_) {
-            boolean[] examined = sinks_.preexamineBundle(
-                includedFiles, includedFileLastModifiedTimes);
-            if (IntStream.range(0, examined.length).noneMatch(i -> examined[i])) {
+        boolean[] includes = force_ ?
+            null : sinks_.preexamineBundle(includedFiles, includedFileLastModifiedTimes);
+        int includedCount;
+        if (includes == null) {
+            includedCount = includedFiles.length;
+        } else {
+            includedCount = 0;
+            for (int i = 0; i < includes.length; ++i) {
+                if (includes[i]) {
+                    ++includedCount;
+                } else {
+                    sinks_.log(this, "Skipping " + includedURIs[i], Logger.Level.DEBUG);
+                }
+            }
+            if (includedCount == 0) {
                 sinks_.log(this, "No input sources processed", Logger.Level.INFO);
-                sinks_.log(this, "  Skipped input sources are", Logger.Level.DEBUG);
-                Arrays.stream(includedURIs)
-                      .forEach(u -> sinks_.log(this, "    " + u, Logger.Level.DEBUG));
                 return;
             }
-            includes = examined;
         }
-
-        Queue<OriginalSource> sources = new ArrayDeque<>();
-        for (int i = 0; i < includedFiles.length; ++i) {
-            if ((includes != null) && !includes[i]) {
-                sinks_.log(this, "Skipping " + includedURIs[i], Logger.Level.DEBUG);
-                continue;
-            }
-            sources.offer(new OriginalSource(i, includedURIs[i], includedFiles[i], includedFileLastModifiedTimes[i]));
-        }
-        assert !sources.isEmpty() : sources.size();
-
-        sinks_.startBundle();
 
         // Decide parallelism.
         int parallelism;
         {
             int processors = Runtime.getRuntime().availableProcessors();
             if (maxWorkers_ <= 0) {
-                parallelism = Math.max(Math.min(sources.size(), processors + maxWorkers_), 1);
+                parallelism = Math.max(Math.min(includedCount, processors + maxWorkers_), 1);
             } else {
-                parallelism = Math.min(Math.min(sources.size(), maxWorkers_), processors);
+                parallelism = Math.min(Math.min(includedCount, maxWorkers_), processors);
             }
         }
         sinks_.log(this, "Concurrency is " + parallelism, Logger.Level.VERBOSE);
-        for (int i = 0; i < parallelism; ++i) {
-            sources.add(new OriginalSource());  // Add poisons in number of parallelism
-        }
-        ChionographisWorker[] workers = new ChionographisWorker[parallelism];
+
+        Stream<OriginalSource> sources = Stream.concat(
+            IntStream.range(0, includedFiles.length)
+                     .filter(i -> (includes == null) || includes[i])
+                     .mapToObj(i -> new OriginalSource(i, includedURIs[i], includedFiles[i],
+                                                       includedFileLastModifiedTimes[i])),
+            // Add poisons in number of parallelism
+            IntStream.range(0, parallelism)
+                     .mapToObj(i -> new OriginalSource()));
+
+        sinks_.startBundle();
 
         int count = 0;
         EntityResolver resolver = createEntityResolver();
         BiConsumer<String, Logger.Level> logger = (s, l) -> sinks_.log(this, s, l);
         if (parallelism > 1) {
             // A queue for workers to take and consume.
-            BlockingQueue<OriginalSource> sourcesQ = new ArrayBlockingQueue<>(sources.size(), false, sources);
+            BlockingQueue<OriginalSource> sourcesQ = new ArrayBlockingQueue<>(parallelism, false);
+
             // A queue for this thread to receive result (count or exception).
             BlockingQueue<Object> resultsQ = new ArrayBlockingQueue<>(parallelism);
 
-            // Set up threads.
-            Thread[] threads = new Thread[parallelism];
-            for (int i = 0; i < threads.length; ++i) {
-                workers[i] = new ChionographisWorker(sinks_, logger,
-                    resolver, metaFuncMap, sourcesQ::take, resultsQ::offer);
-                threads[i] = new Thread(workers[i]);
-                threads[i].run();
+            Thread[] threads = new Thread[parallelism + 1];
+
+            // Set up the consumer threads.
+            for (int i = 0; i < parallelism; ++i) {
+                Runnable worker = new ChionographisWorker(sinks_, logger,
+                    resolver, metaFuncMap, sourcesQ::take, resultsQ::put);
+                threads[i] = new Thread(worker);
+                threads[i].start();
             }
+
+            // Set up the producer thread.
+            threads[threads.length - 1] = new Thread(() -> {
+                try {
+                    for (Iterator<OriginalSource> i = sources.iterator(); i.hasNext();) {
+                        sourcesQ.put(i.next());
+                    }
+                    resultsQ.put(Integer.valueOf(0));
+                } catch (InterruptedException e) {
+                } catch (Throwable e) {
+                    try {
+                        resultsQ.put(e);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            });
+            threads[threads.length - 1].start();
 
             try {
                 // Wait for reporting.
@@ -347,6 +368,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                         // An exception occurred -> interrupt all threads.
                         Arrays.stream(threads).forEach(Thread::interrupt);
                         exception = (Throwable) result;
+                        break;
                     }
                 }
 
@@ -357,15 +379,15 @@ public final class Chionographis extends MatchingTask implements Driver {
                 throwIf(exception);
 
             } catch (InterruptedException e) {
-                // In fact, no one would interrupt me.
+                throw new BuildException(e);
             }
 
         } else {
             // No parallelism here.
             Object[] results = new Object[1];
-            workers[0] = new ChionographisWorker(sinks_, logger,
-                resolver, metaFuncMap, sources::poll, o -> results[0] = o);
-            workers[0].run();
+            Runnable worker = new ChionographisWorker(sinks_, logger,
+                resolver, metaFuncMap, sources.iterator()::next, o -> results[0] = o);
+            worker.run();
             if (results[0] instanceof Integer) {
                 count += ((Integer) results[0]).intValue();
             } else {
