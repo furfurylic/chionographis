@@ -11,7 +11,6 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -20,12 +19,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -37,8 +36,6 @@ import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.xml.sax.EntityResolver;
-
-import net.furfurylic.chionographis.ChionographisWorker.OriginalSource;
 
 /**
  * An Ant task class that performs cascading transformation to XML documents.
@@ -301,98 +298,40 @@ public final class Chionographis extends MatchingTask implements Driver {
         {
             int processors = Runtime.getRuntime().availableProcessors();
             if (maxWorkers_ <= 0) {
-                parallelism = Math.max(Math.min(includedCount, processors + maxWorkers_), 1);
+                parallelism = Math.max(processors + maxWorkers_, 1);
             } else {
-                parallelism = Math.min(Math.min(includedCount, maxWorkers_), processors);
+                parallelism = Math.min(maxWorkers_, processors);
             }
         }
-        sinks_.log(this, "Concurrency is " + parallelism, Logger.Level.VERBOSE);
-
-        Stream<OriginalSource> sources = Stream.concat(
-            IntStream.range(0, includedFiles.length)
-                     .filter(i -> (includes == null) || includes[i])
-                     .mapToObj(i -> new OriginalSource(i, includedURIs[i], includedFiles[i],
-                                                       includedFileLastModifiedTimes[i])),
-            // Add poisons in number of parallelism
-            IntStream.range(0, parallelism)
-                     .mapToObj(i -> new OriginalSource()));
 
         sinks_.startBundle();
 
-        int count = 0;
         EntityResolver resolver = createEntityResolver();
+        XMLTransfer xfer = new XMLTransfer(resolver);
+
         BiConsumer<String, Logger.Level> logger = (s, l) -> sinks_.log(this, s, l);
-        if (parallelism > 1) {
-            // A queue for workers to take and consume.
-            BlockingQueue<OriginalSource> sourcesQ = new ArrayBlockingQueue<>(parallelism, false);
 
-            // A queue for this thread to receive result (count or exception).
-            BlockingQueue<Object> resultsQ = new ArrayBlockingQueue<>(parallelism);
+        Stream<ChionographisCallable> callables =
+            IntStream.range(0, includedFiles.length)
+                     .filter(i -> (includes == null) || includes[i])
+                     .mapToObj(i -> new ChionographisCallable(
+                                            i, includedURIs[i], includedFiles[i],
+                                            includedFileLastModifiedTimes[i],
+                                            sinks_, logger, metaFuncMap, xfer,
+                                            () -> {
+                                                if (ForkJoinTask.getPool() != null) {
+                                                    ForkJoinTask.getPool().shutdownNow();
+                                                }
+                                            }));
 
-            Thread[] threads = new Thread[parallelism + 1];
-
-            // Set up the consumer threads.
-            for (int i = 0; i < parallelism; ++i) {
-                Runnable worker = new ChionographisWorker(sinks_, logger,
-                    resolver, metaFuncMap, sourcesQ::take, resultsQ::put);
-                threads[i] = new Thread(worker);
-                threads[i].start();
-            }
-
-            // Set up the producer thread.
-            threads[threads.length - 1] = new Thread(() -> {
-                try {
-                    for (Iterator<OriginalSource> i = sources.iterator(); i.hasNext();) {
-                        sourcesQ.put(i.next());
-                    }
-                    resultsQ.put(Integer.valueOf(0));
-                } catch (InterruptedException e) {
-                } catch (Throwable e) {
-                    try {
-                        resultsQ.put(e);
-                    } catch (InterruptedException ex) {
-                    }
-                }
-            });
-            threads[threads.length - 1].start();
-
-            try {
-                // Wait for reporting.
-                Throwable exception = null;
-                for (int i = 0; i < threads.length; ++i) {
-                    Object result = resultsQ.take();
-                    if (result instanceof Integer) {
-                        // Success.
-                        count += ((Integer) result).intValue();
-                    } else {
-                        // An exception occurred -> interrupt all threads.
-                        Arrays.stream(threads).forEach(Thread::interrupt);
-                        exception = (Throwable) result;
-                        break;
-                    }
-                }
-
-                // Wait for finishing.
-                for (int i = 0; i < threads.length; ++i) {
-                    threads[i].join();
-                }
-                throwIf(exception);
-
-            } catch (InterruptedException e) {
-                throw new BuildException(e);
-            }
-
+        int count;
+        if ((parallelism > 1) && (includedURIs.length > 1)) {
+            ForkJoinPool pool = new ForkJoinPool(parallelism);
+            List<ForkJoinTask<Integer>> tasks = callables.map(pool::submit)
+                                                         .collect(Collectors.toList());
+            count = tasks.stream().mapToInt(ForkJoinTask::join).sum();
         } else {
-            // No parallelism here.
-            Object[] results = new Object[1];
-            Runnable worker = new ChionographisWorker(sinks_, logger,
-                resolver, metaFuncMap, sources.iterator()::next, o -> results[0] = o);
-            worker.run();
-            if (results[0] instanceof Integer) {
-                count += ((Integer) results[0]).intValue();
-            } else {
-                throwIf((Throwable) results[0]);
-            }
+            count = callables.mapToInt(ChionographisCallable::call).sum();
         }
 
         if (count > 0) {
@@ -518,9 +457,10 @@ public final class Chionographis extends MatchingTask implements Driver {
         private String format(Object issuer, String message) {
             try (Formatter formatter = new Formatter()) {
                 String className = issuer.getClass().getSimpleName();
-                formatter.format("%13s(%08x): %s",
+                formatter.format("%13s@%08x(%02x): %s",
                     className.substring(0, Math.min(13, className.length())),
                     System.identityHashCode(issuer),
+                    Thread.currentThread().getId(),
                     message);
                 return formatter.toString();
             }
