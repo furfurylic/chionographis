@@ -169,7 +169,7 @@ public final class Snip extends Sink implements Driver {
                                                    .parallel()
                                                    .mapToInt(d -> sendFragmentDocument(d, r))
                                                    .sum())
-                                .join();
+                            .join();
                 // It is OK if some fragments failed.
             } else {
                 count = IntStream.range(0, nodes.getLength())

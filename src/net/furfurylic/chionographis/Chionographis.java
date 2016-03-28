@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.function.BiConsumer;
@@ -330,7 +331,15 @@ public final class Chionographis extends MatchingTask implements Driver {
             pool = new ForkJoinPool(parallelism);
             List<ForkJoinTask<Integer>> tasks = callables.map(pool::submit)
                                                          .collect(Collectors.toList());
-            count = tasks.stream().mapToInt(ForkJoinTask::join).sum();
+            count = tasks.stream()
+                         .mapToInt(t -> {
+                             try {
+                                 return t.join();
+                             } catch (CancellationException e) {
+                                 return 0;
+                             }
+                         })
+                         .sum();
         } else {
             count = callables.mapToInt(ChionographisCallable::call).sum();
         }
