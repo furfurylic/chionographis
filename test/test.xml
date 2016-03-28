@@ -30,6 +30,7 @@
         <antcall target="crossing-cache"/>
         <antcall target="crossing-cache-refer-content"/>
         <antcall target="crossing-parallel-sinks"/>
+        <antcall target="crossing-abort"/>
     </target>
 
     <macrodef name="assertfileeq">
@@ -820,7 +821,7 @@
     <target name="crossing-parallel-sinks">
         <property name="test.prefix" value="crossing"/>
         <property name="test.title" value="parallel-sinks"/>
-        <property name="test.name" value="${test.prefix}-parallel-sinks"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
         <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
         <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
@@ -846,6 +847,33 @@
         <assertfileeq2 name="${test.name} - all-q" expected1="${dir.input}/expected-q-a.txt" expected2="${dir.input}/expected-q-b.txt" actual="${dir.output}/actual-q.txt"/>
         <assertfileeq name="${test.name} - output1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
         <assertfileeq name="${test.name} - output2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="crossing-abort">
+        <property name="test.prefix" value="crossing"/>
+        <property name="test.title" value="abort"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+        <mkdir dir="${dir.output}/1"/>
+        <mkdir dir="${dir.output}/3"/>
+
+        <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="input*.xml" cache="no">
+            <!-- Original sources are: input1.xml, input2.xml, input3.xml.
+                 input2.xml's output shall fail due to absence of the parent directory.  -->
+            <transform style="../flatten.xsl">
+                <output destdir="output-${test.title}" mkdirs="no">
+                    <regexpmapper from="^input([0-9])\.xml$$" to="\1/output.txt"/>
+                </output>
+            </transform>
+        </chionographis>
+
+        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/1/output.txt"/>
+        <assertfileeq name="${test.name} - 3" expected="${dir.input}/expected3.txt" actual="${dir.output}/3/output.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
