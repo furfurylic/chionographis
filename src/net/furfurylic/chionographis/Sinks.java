@@ -210,12 +210,21 @@ final class Sinks extends Sink implements Logger {
             int j = realDOM.getAsInt();
 
             // For indices other than j, send the result by copy
-            IntStream.range(0, activeSinks.size())
-                     .filter(i -> i != j)
-                     .forEach(i -> {
-                         xfer_.transfer(source, r.resultOf(i), false);
-                         activeSinks.get(i).finishOne(r.resultOf(i));
-                     });
+            int i = 0;
+            try {
+                while (i < activeSinks.size()) {
+                    if (i != j) {
+                        xfer_.transfer(source, r.resultOf(i), false);
+                        activeSinks.get(i).finishOne(r.resultOf(i));
+                    }
+                    ++i;
+                }
+            } catch (RuntimeException e) {
+                IntStream.concat(IntStream.range(i + 1, activeSinks.size()), IntStream.of(j))
+                         .distinct()
+                         .forEach(k -> Sinks.abortSink(activeSinks.get(k), r.resultOf(k)));
+                throw e;
+            }
 
             // For the index j, send the result by move
             xfer_.transfer(source, r.resultOf(j), true);
@@ -224,8 +233,17 @@ final class Sinks extends Sink implements Logger {
         } else {
             assert result instanceof CompositeSAXResult : result.getClass();
             CompositeSAXResult r = (CompositeSAXResult) result;
-            IntStream.range(0, activeSinks.size())
-                     .forEach(i -> activeSinks.get(i).finishOne(r.resultOf(i)));
+            int i = 0;
+            try {
+                while (i < activeSinks.size()) {
+                    activeSinks.get(i).finishOne(r.resultOf(i));
+                    ++i;
+                }
+            } catch (RuntimeException e) {
+                IntStream.range(i + 1, activeSinks.size())
+                         .forEach(k -> Sinks.abortSink(activeSinks.get(k), r.resultOf(k)));
+                throw e;
+            }
         }
     }
 
