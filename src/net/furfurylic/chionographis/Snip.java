@@ -10,6 +10,10 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -150,36 +154,30 @@ public final class Snip extends Sink implements Driver {
                 nodes = (NodeList) expr_.evaluate(r.getNode(), XPathConstants.NODESET);
             }
 
-            int count = 0;
-            for (int i = 0; i < nodes.getLength(); ++i) {
-                Node node = nodes.item(i);
-                if (node.getNodeType() == Node.ELEMENT_NODE) {
-                    Document document = xfer_.newDocument();
-                    document.appendChild(document.adoptNode(node));
-
-                    // Search the source contents if necessary
-                    List<XPathExpression> referents = sinks_.referents();
-                    List<String> referredContents;
-                    if (!referents.isEmpty()) {
-                        referredContents = Referral.extract(document, referents);
-                        sinks_.log(this, "Referred source data: "
-                            + String.join(", ", referredContents), Logger.Level.DEBUG);
-                    } else {
-                        referredContents = Collections.emptyList();
-                    }
-
-                    // Open sink's result
-                    Result rr = sinks_.startOne(r.originalSrcIndex(), r.originalSrcFileName(),
-                        r.originalSrcLastModifiedTime(), referredContents);
-                    if (rr != null) {
-                        // Send fragment to sink
-                        xfer_.transfer(new DOMSource(document), rr);
-                        // Finish sink
-                        sinks_.finishOne(rr);
-                    }
-
-                    ++count;
-                }
+            int count;
+            ForkJoinPool pool = ForkJoinTask.getPool();
+            if (pool != null) {
+                // We do document creation sequentially.
+                List<Document> documents =
+                    IntStream.range(0, nodes.getLength())
+                             .mapToObj(i -> nodes.item(i))
+                             .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
+                             .map(n -> newFragmentDocument(n))
+                             .collect(Collectors.toList());
+                // Created documents are passed to sink in parallel.
+                count = pool.submit(() -> documents.stream()
+                                                   .parallel()
+                                                   .mapToInt(d -> sendFragmentDocument(d, r))
+                                                   .sum())
+                                .join();
+                // It is OK if some fragments failed.
+            } else {
+                count = IntStream.range(0, nodes.getLength())
+                                 .mapToObj(i -> nodes.item(i))
+                                 .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
+                                 .map(n -> newFragmentDocument(n))
+                                 .mapToInt(d -> sendFragmentDocument(d, r))
+                                 .sum();
             }
             if (count > 0) {
                 sinks_.log(this, count + " snipped fragments processed", Logger.Level.DEBUG);
@@ -191,6 +189,37 @@ public final class Snip extends Sink implements Driver {
         } catch (XPathExpressionException e) {
             throw new BuildException(e);
         }
+    }
+
+    private Document newFragmentDocument(Node node) {
+        Document document = xfer_.newDocument();
+        document.appendChild(document.adoptNode(node));
+        return document;
+    }
+
+    private int sendFragmentDocument(Document document, SnipDOMResult result) {
+        // Search the source contents if necessary
+        List<XPathExpression> referents = sinks_.referents();
+        List<String> referredContents;
+        if (!referents.isEmpty()) {
+            referredContents = Referral.extract(document, referents);
+            sinks_.log(this, "Referred source data: "
+                + String.join(", ", referredContents), Logger.Level.DEBUG);
+        } else {
+            referredContents = Collections.emptyList();
+        }
+
+        // Open sink's result
+        Result rr = sinks_.startOne(result.originalSrcIndex(), result.originalSrcFileName(),
+            result.originalSrcLastModifiedTime(), referredContents);
+        if (rr != null) {
+            // Send fragment to sink
+            xfer_.transfer(new DOMSource(document), rr);
+            // Finish sink
+            sinks_.finishOne(rr);
+        }
+
+        return 1;
     }
 
     @Override
