@@ -325,8 +325,9 @@ public final class Chionographis extends MatchingTask implements Driver {
                                             }));
 
         int count;
-        if ((parallelism > 1) && (includedURIs.length > 1)) {
-            ForkJoinPool pool = new ForkJoinPool(parallelism);
+        ForkJoinPool pool = null;
+        if (parallelism > 1) {
+            pool = new ForkJoinPool(parallelism);
             List<ForkJoinTask<Integer>> tasks = callables.map(pool::submit)
                                                          .collect(Collectors.toList());
             count = tasks.stream().mapToInt(ForkJoinTask::join).sum();
@@ -340,7 +341,12 @@ public final class Chionographis extends MatchingTask implements Driver {
         } else {
             sinks_.log(this, "No input sources processed", Logger.Level.INFO);
         }
-        sinks_.finishBundle();
+
+        if (pool != null) {
+            pool.submit(() -> sinks_.finishBundle()).join();
+        } else {
+            sinks_.finishBundle();
+        }
     }
 
     private void setUpDirectories() {

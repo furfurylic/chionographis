@@ -227,7 +227,11 @@ public final class Output extends Sink {
             // There is a mapper and the output path will be decided later using it.
             destMapping_ = s -> {
                 if (s != null) {
-                    String[] mapped = mapper_.mapFileName(s);
+                    String[] mapped;
+                    synchronized (mapper_) {
+                        // Ant's FileNameMapper seems not to be thread safe.
+                        mapped = mapper_.mapFileName(s);
+                    }
                     if (mapped != null) {
                         return Arrays.stream(mapped)
                                      .map(destDir_::resolve)
