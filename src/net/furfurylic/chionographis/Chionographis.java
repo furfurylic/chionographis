@@ -436,18 +436,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         return new PrefixMap(namespaceMap);
     }
 
-    public void throwIf(Throwable ex) {
-        if (ex != null) {
-            if (ex instanceof Error) {
-                throw (Error) ex;
-            } else if (ex instanceof RuntimeException) {
-                throw (RuntimeException) ex;
-            } else {
-                throw new BuildException(ex);
-            }
-        }
-    }
-
     private final class ChionographisLogger implements Logger {
 
         @Override
