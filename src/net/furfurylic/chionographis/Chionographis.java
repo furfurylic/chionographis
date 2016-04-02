@@ -18,7 +18,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.function.Function;
@@ -290,7 +289,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             includedURIs, includedFileNames, includedFileLastModifiedTimes,
             createEntityResolver(), metaFuncMap);
 
-        Stream<ChionographisWorker> workers =
+        Stream<IntSupplier> workers =
             IntStream.range(0, includedFileNames.length)
                      .filter(i -> (includes == null) || includes[i])
                      .mapToObj(wfac::create);
@@ -298,12 +297,12 @@ public final class Chionographis extends MatchingTask implements Driver {
         int count;
         ForkJoinPool pool = (parallelism > 1) ? new ForkJoinPool(parallelism) : null;
         if (pool != null) {
-            List<ForkJoinTask<Integer>> tasks = workers.map(w -> makeRunOrRuinCallable(w::run))
+            List<ForkJoinTask<Integer>> tasks = workers.map(wfac::convertToCallable)
                                                        .map(w -> pool.submit(w))
                                                        .collect(Collectors.toList());
-            count = tasks.stream().mapToInt(t -> join(t::join)).sum();
+            count = tasks.stream().mapToInt(t -> t.join()).sum();
         } else {
-            count = workers.mapToInt(ChionographisWorker::run).sum();
+            count = workers.mapToInt(IntSupplier::getAsInt).sum();
         }
 
         if (count > 0) {
@@ -320,18 +319,13 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
-    private static void ruin() {
-        if (ForkJoinTask.getPool() != null) {
-            ForkJoinTask.getPool().shutdownNow();
-        }
-    }
-
     private class ChionographisWorkerFactory {
         private URI[] uris_;
         private String[] fileNames_;
         private long[] lastModifiedTimes_;
         private XMLTransfer xfer_;
         private Map<String, Function<URI, String>> metaFuncMap_;
+        private volatile int isOK_;
 
         public ChionographisWorkerFactory(URI[] uris, String[] fileNames,
                 long[] lastModifiedTimes,
@@ -341,34 +335,32 @@ public final class Chionographis extends MatchingTask implements Driver {
             lastModifiedTimes_ = lastModifiedTimes;
             xfer_ = new XMLTransfer(resolver);
             metaFuncMap_ = metaFuncMap;
+            isOK_ = 1;
         }
 
-        public ChionographisWorker create(int index) {
+        public IntSupplier create(int index) {
             return new ChionographisWorker(index,
                 uris_[index], fileNames_[index], lastModifiedTimes_[index],
-                sinks_, (s, l) -> sinks_.log(Chionographis.this, s, l), metaFuncMap_, xfer_);
+                sinks_, (s, l) -> sinks_.log(Chionographis.this, s, l), metaFuncMap_, xfer_,
+                () -> isOK_)::run;
         }
-    }
 
-    private static Callable<Integer> makeRunOrRuinCallable(IntSupplier worker) {
-        return () -> {
-            try {
-                return worker.getAsInt();
-            } catch (Error e) {
-                ruin();
-                throw e;
-            } catch (RuntimeException e) {
-                ruin();
-                throw e;
-            }
-        };
-    }
+        public Callable<Integer> convertToCallable(IntSupplier worker) {
+            return () -> {
+                try {
+                    return worker.getAsInt();
+                } catch (Error e) {
+                    ruin();
+                    throw e;
+                } catch (RuntimeException e) {
+                    ruin();
+                    throw e;
+                }
+            };
+        }
 
-    private static int join(IntSupplier task) {
-        try {
-            return task.getAsInt();
-        } catch (CancellationException e) {
-            return 0;
+        private void ruin() {
+            isOK_ = 0;
         }
     }
 
