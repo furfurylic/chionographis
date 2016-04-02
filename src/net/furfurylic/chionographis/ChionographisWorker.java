@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
@@ -34,16 +35,18 @@ final class ChionographisWorker {
     private String fileName_;
     private long lastModified_;
 
+    private IntSupplier isOK_;
+
     private Sink sink_;
     private BiConsumer<String, Logger.Level> logger_;
     private Map<String, Function<URI, String>> metaFuncMap_;
-
     private XMLTransfer xfer_;
 
     public ChionographisWorker(
                 int index, URI uri, String fileName, long lastModified,
                 Sink sink, BiConsumer<String, Level> logger,
-                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer) {
+                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer,
+                IntSupplier isOK) {
         index_ = index;
         uri_ = uri;
         fileName_ = fileName;
@@ -52,9 +55,14 @@ final class ChionographisWorker {
         logger_ = logger;
         metaFuncMap_ = metaFuncMap;
         xfer_ = xfer;
+        isOK_ = isOK;
     }
 
     public int run() {
+        if (isOK_.getAsInt() == 0) {
+            return 0;
+        }
+
         String systemID = null;
         try {
             systemID = uri_.toString();
@@ -78,6 +86,10 @@ final class ChionographisWorker {
                     docElem.insertBefore(metas, docElem.getFirstChild());
                 }
 
+                if (isOK_.getAsInt() == 0) {
+                    return 0;
+                }
+
                 source = new DOMSource(document, systemID);
 
             } else {
@@ -92,50 +104,46 @@ final class ChionographisWorker {
                 }
             }
 
-            // Do processing.
             Result result = sink_.startOne(index_, fileName_, lastModified_, referredContents);
-            if (result != null) {
-                try {
-                    xfer_.transfer(source, result);
-                    if (Thread.interrupted()) {
-                        throw new InterruptedException();
-                    }
-                } catch (BuildException | InterruptedException e) {
-                    logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
-                    if (e instanceof BuildException) {
-                        if (!(e instanceof ChionographisBuildException) ||
-                            !((ChionographisBuildException) e).isLoggedAlready()) {
-                            logger_.accept("  Cause: " + e, Logger.Level.WARN);
-                            e.printStackTrace();    // TODO: Use "log"
-                        }
-                    }
-                    try {
-                        sink_.abortOne(result);
-                    } catch (FatalityException ex) {
-                        throw ex;
-                    } catch (Exception ex) {
-                        throw new FatalityException(ex);
-                    }
-                    return 0;
-                }
-                sink_.finishOne(result);
+            if (result == null) {
+                return 1;
             }
 
+            try {
+                xfer_.transfer(source, result);
+            } catch (BuildException e) {
+                logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
+                logCause(e);
+                try {
+                    sink_.abortOne(result);
+                } catch (FatalityException ex) {
+                    throw ex;
+                } catch (Exception ex) {
+                    throw new FatalityException(e);
+                }
+                return 0;
+            }
+            if (isOK_.getAsInt() == 0) {
+                return 0;
+            }
+
+            sink_.finishOne(result);
             return 1;
 
         } catch (FatalityException e) {
             throw e;
-        } catch (ChionographisBuildException e) {
-            return 0;
         } catch (Exception e) {
-            logger_.accept(e.toString(), Logger.Level.WARN);
-            logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
-            if (!(e instanceof ChionographisBuildException) ||
-                !((ChionographisBuildException) e).isLoggedAlready()) {
-                logger_.accept("  Cause: " + e, Logger.Level.WARN);
-                e.printStackTrace();    // TODO: Use "log"
-            }
+            logger_.accept("Failed to process " + systemID, Logger.Level.WARN);
+            logCause(e);
             return 0;
+        }
+    }
+
+    private void logCause(Exception e) {
+        if (!(e instanceof ChionographisBuildException) ||
+            !((ChionographisBuildException) e).isLoggedAlready()) {
+            logger_.accept("  Cause: " + e, Logger.Level.WARN);
+            e.printStackTrace();    // TODO: Use "log"
         }
     }
 
