@@ -387,6 +387,8 @@ public final class Transform extends Sink implements Driver {
                 try {
                     return tfac_.newTemplates(new StreamSource(styleSystemID));
                 } catch (TransformerConfigurationException e) {
+                    sinks_.log(Transform.this, "Failed to compile stylesheet: " + styleSystemID, Logger.Level.WARN);
+                    sinks_.log(Transform.this, "  Cause: " + e, Logger.Level.WARN);
                     throw new FatalityException(e);
                 }
             }

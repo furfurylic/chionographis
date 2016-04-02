@@ -11,9 +11,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
@@ -52,7 +55,7 @@ public final class Output extends Sink {
     private Function<String, Set<Path>> destMapping_ = null;
     private List<XPathExpression> referents_;
 
-    private Queue<ByteArrayOutputStream> buffers_;
+    private Queue<OutputStream> buffers_;
     private AtomicInteger countInBundle_;
 
     Output(Logger logger) {
@@ -278,14 +281,14 @@ public final class Output extends Sink {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> referredContents) {
-        ByteArrayOutputStream buffer = null;
+        OutputStream buffer = null;
         if (buffers_ != null) {
             synchronized (buffers_) {
                 buffer = buffers_.poll();
             }
         }
         if (buffer == null) {
-            buffer = new ByteArrayOutputStream();
+            buffer = new ExposingByteArrayOutputStream();
         }
 
         // Configure dests.
@@ -331,7 +334,7 @@ public final class Output extends Sink {
         assert result != null;
         assert result instanceof OutputStreamResult : result.getClass();
         OutputStreamResult r = (OutputStreamResult) result;
-        ByteArrayOutputStream buffer = (ByteArrayOutputStream) r.getOutputStream();
+        ExposingByteArrayOutputStream out = (ExposingByteArrayOutputStream) r.getOutputStream();
 
         // Write the buffer contents to currentDests_.
         try {
@@ -342,16 +345,25 @@ public final class Output extends Sink {
                         Files.createDirectories(parent);
                     }
                 }
-                logger_.log(this, "Creating " + mapped.toAbsolutePath(), Logger.Level.FINE);
-                try (OutputStream channel = Files.newOutputStream(mapped)) {
-                    buffer.writeTo(channel);
+                Path absolute = mapped.toAbsolutePath();
+                logger_.log(this, "Creating " + absolute, Logger.Level.FINE);
+                // We take advantage of FileChannel for its capability to be interrupted
+                try {
+                    try (FileChannel channel = FileChannel.open(absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
+                        channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
+                    }
+                } catch (IOException e) {
+                    logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
+                    logger_.log(this, "  Cause: " + e, Logger.Level.WARN);
+                    e.printStackTrace();    // TODO: use "log"
+                     throw new ChionographisBuildException(e);
                 }
             }
         } catch (IOException e) {
             throw new BuildException(e);
         }
 
-        placeBackBuffer(buffer);
+        placeBackBuffer(out);
 
         countInBundle_.incrementAndGet();
     }
@@ -380,13 +392,20 @@ public final class Output extends Sink {
 
         Set<Path> destinations_;
 
-        public OutputStreamResult(ByteArrayOutputStream outputStream, Set<Path> destinations) {
+        public OutputStreamResult(OutputStream outputStream, Set<Path> destinations) {
             super(outputStream);
             destinations_ = destinations;
         }
 
         Set<Path> getDestinations() {
             return destinations_;
+        }
+    }
+
+    public static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
+
+        public byte[] buffer() {
+            return buf;
         }
     }
 }
