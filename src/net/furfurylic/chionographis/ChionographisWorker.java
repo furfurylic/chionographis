@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -28,7 +27,7 @@ import org.xml.sax.helpers.XMLFilterImpl;
 
 import net.furfurylic.chionographis.Logger.Level;
 
-final class ChionographisCallable implements Callable<Integer> {
+final class ChionographisWorker {
 
     private int index_;
     private URI uri_;
@@ -41,12 +40,10 @@ final class ChionographisCallable implements Callable<Integer> {
 
     private XMLTransfer xfer_;
 
-    private Runnable ruin_;
-
-    public ChionographisCallable(
+    public ChionographisWorker(
                 int index, URI uri, String fileName, long lastModified,
                 Sink sink, BiConsumer<String, Level> logger,
-                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer, Runnable ruin) {
+                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer) {
         index_ = index;
         uri_ = uri;
         fileName_ = fileName;
@@ -55,13 +52,12 @@ final class ChionographisCallable implements Callable<Integer> {
         logger_ = logger;
         metaFuncMap_ = metaFuncMap;
         xfer_ = xfer;
-        ruin_ = ruin;
     }
 
-    @Override
-    public Integer call() {
+    public int run() {
+        String systemID = null;
         try {
-            String systemID = uri_.toString();
+            systemID = uri_.toString();
             logger_.accept("Processing " + systemID, Logger.Level.VERBOSE);
 
             List<XPathExpression> referents = sink_.referents();
@@ -106,30 +102,40 @@ final class ChionographisCallable implements Callable<Integer> {
                     }
                 } catch (BuildException | InterruptedException e) {
                     logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
+                    if (e instanceof BuildException) {
+                        if (!(e instanceof ChionographisBuildException) ||
+                            !((ChionographisBuildException) e).isLoggedAlready()) {
+                            logger_.accept("  Cause: " + e, Logger.Level.WARN);
+                            e.printStackTrace();    // TODO: Use "log"
+                        }
+                    }
                     try {
                         sink_.abortOne(result);
-                    } catch (Error ex) {
-                        throw ex;
                     } catch (FatalityException ex) {
                         throw ex;
                     } catch (Exception ex) {
                         throw new FatalityException(ex);
                     }
-                    return Integer.valueOf(0);
+                    return 0;
                 }
                 sink_.finishOne(result);
             }
 
-            return Integer.valueOf(1);
+            return 1;
 
-        } catch (Error e) {
-            ruin_.run();
-            throw e;
         } catch (FatalityException e) {
-            ruin_.run();
             throw e;
+        } catch (ChionographisBuildException e) {
+            return 0;
         } catch (Exception e) {
-            return Integer.valueOf(0);
+            logger_.accept(e.toString(), Logger.Level.WARN);
+            logger_.accept("Aborting processing " + systemID, Logger.Level.WARN);
+            if (!(e instanceof ChionographisBuildException) ||
+                !((ChionographisBuildException) e).isLoggedAlready()) {
+                logger_.accept("  Cause: " + e, Logger.Level.WARN);
+                e.printStackTrace();    // TODO: Use "log"
+            }
+            return 0;
         }
     }
 

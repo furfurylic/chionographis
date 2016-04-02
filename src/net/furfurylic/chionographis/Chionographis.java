@@ -20,11 +20,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -312,36 +314,23 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         BiConsumer<String, Logger.Level> logger = (s, l) -> sinks_.log(this, s, l);
 
-        Stream<ChionographisCallable> callables =
+        Stream<ChionographisWorker> workers =
             IntStream.range(0, includedFiles.length)
                      .filter(i -> (includes == null) || includes[i])
-                     .mapToObj(i -> new ChionographisCallable(
+                     .mapToObj(i -> new ChionographisWorker(
                                             i, includedURIs[i], includedFiles[i],
                                             includedFileLastModifiedTimes[i],
-                                            sinks_, logger, metaFuncMap, xfer,
-                                            () -> {
-                                                if (ForkJoinTask.getPool() != null) {
-                                                    ForkJoinTask.getPool().shutdownNow();
-                                                }
-                                            }));
+                                            sinks_, logger, metaFuncMap, xfer));
 
         int count;
-        ForkJoinPool pool = null;
-        if (parallelism > 1) {
-            pool = new ForkJoinPool(parallelism);
-            List<ForkJoinTask<Integer>> tasks = callables.map(pool::submit)
-                                                         .collect(Collectors.toList());
-            count = tasks.stream()
-                         .mapToInt(t -> {
-                             try {
-                                 return t.join();
-                             } catch (CancellationException e) {
-                                 return 0;
-                             }
-                         })
-                         .sum();
+        ForkJoinPool pool = (parallelism > 1) ? new ForkJoinPool(parallelism) : null;
+        if (pool != null) {
+            List<ForkJoinTask<Integer>> tasks = workers.map(w -> makeRunOrRuinCallable(w::run))
+                                                       .map(w -> pool.submit(w))
+                                                       .collect(Collectors.toList());
+            count = tasks.stream().mapToInt(t -> join(t::join)).sum();
         } else {
-            count = callables.mapToInt(ChionographisCallable::call).sum();
+            count = workers.mapToInt(ChionographisWorker::run).sum();
         }
 
         if (count > 0) {
@@ -355,6 +344,34 @@ public final class Chionographis extends MatchingTask implements Driver {
             pool.submit(() -> sinks_.finishBundle()).join();
         } else {
             sinks_.finishBundle();
+        }
+    }
+
+    private static void ruin() {
+        if (ForkJoinTask.getPool() != null) {
+            ForkJoinTask.getPool().shutdownNow();
+        }
+    }
+
+    private static Callable<Integer> makeRunOrRuinCallable(IntSupplier worker) {
+        return () -> {
+            try {
+                return worker.getAsInt();
+            } catch (Error e) {
+                ruin();
+                throw e;
+            } catch (RuntimeException e) {
+                ruin();
+                throw e;
+            }
+        };
+    }
+
+    private static int join(IntSupplier task) {
+        try {
+            return task.getAsInt();
+        } catch (CancellationException e) {
+            return 0;
         }
     }
 
