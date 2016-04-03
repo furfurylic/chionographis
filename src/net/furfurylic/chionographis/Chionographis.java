@@ -47,7 +47,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean usesCache_ = true;
     private boolean force_ = false;
     private boolean verbose_ = false;
-    private int maxWorkers_ = 0;
+    private boolean parallel_ = true;
 
     private Auxiliaries<Namespace> namespaces_ = new Auxiliaries<>();
     private Auxiliaries<Meta> metas_ = new Auxiliaries<>();
@@ -126,21 +126,18 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
-     * Sets the maximum number of concurrent workers.
+     * Sets whether parallel execution is employed.
      *
-     * <p>If not positive, the maximun number of workers is decided as
-     * "available processor count + maximum worker count (this attribute)".</p>
+     * <p>If set to "yes", execution is done with {@link ForkJoinPool}, which is a statically held
+     * thread pool and whose maximum thread count is the available processor count.</p>
      *
-     * <p>In any case, the actual number of workers is not greater than the available processor
-     * count, and is not less than 1.</p>
+     * <p>This attribute is defaulted to "yes".</p>
      *
-     * <p>This attribute is defaulted to 0.</p>
-     *
-     * @param maxWorkers
-     *      the number of concurrent workers.
+     * @param parallel
+     *      {@code true} if parallel execution is employed; {@code false} otherwise.
      */
-    public void setMaxWorkers(int maxWorkers) {
-        maxWorkers_ = maxWorkers;
+    public void setParallel(boolean parallel) {
+        parallel_ = parallel;
     }
 
     /**
@@ -272,17 +269,6 @@ public final class Chionographis extends MatchingTask implements Driver {
             }
         }
 
-        // Decide parallelism.
-        int parallelism;
-        {
-            int processors = Runtime.getRuntime().availableProcessors();
-            if (maxWorkers_ <= 0) {
-                parallelism = Math.max(processors + maxWorkers_, 1);
-            } else {
-                parallelism = Math.min(maxWorkers_, processors);
-            }
-        }
-
         sinks_.startBundle();
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
@@ -295,7 +281,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                      .mapToObj(wfac::create);
 
         int count;
-        ForkJoinPool pool = (parallelism > 1) ? new ForkJoinPool(parallelism) : null;
+        ForkJoinPool pool = parallel_ ? ForkJoinPool.commonPool() : null;
         if (pool != null) {
             List<ForkJoinTask<Integer>> tasks = workers.map(wfac::convertToCallable)
                                                        .map(w -> pool.submit(w))
