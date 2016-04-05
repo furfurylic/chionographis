@@ -21,7 +21,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
@@ -225,18 +224,18 @@ public final class Chionographis extends MatchingTask implements Driver {
         setUpDirectories();
 
         // Find files to process.
-        String[] includedFiles;
+        String[] includedFileNames;
         URI[] includedURIs;
         long[] includedFileLastModifiedTimes;
         {
             DirectoryScanner scanner = getDirectoryScanner(srcDir_.toFile());
             scanner.scan();
-            includedFiles = scanner.getIncludedFiles();
-            if (includedFiles.length == 0) {
+            includedFileNames = scanner.getIncludedFiles();
+            if (includedFileNames.length == 0) {
                 sinks_.log(this, "No input sources found", Logger.Level.INFO);
                 return;
             }
-            includedURIs = Arrays.stream(includedFiles)
+            includedURIs = Arrays.stream(includedFileNames)
                                  .map(srcDir_::resolve)
                                  .map(Path::toUri)
                                  .toArray(URI[]::new);
@@ -255,10 +254,10 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         // Tell whether destinations are older.
         boolean[] includes = force_ ?
-            null : sinks_.preexamineBundle(includedFiles, includedFileLastModifiedTimes);
+            null : sinks_.preexamineBundle(includedFileNames, includedFileLastModifiedTimes);
         int includedCount;
         if (includes == null) {
-            includedCount = includedFiles.length;
+            includedCount = includedFileNames.length;
         } else {
             includedCount = 0;
             for (int i = 0; i < includes.length; ++i) {
@@ -287,18 +286,14 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         sinks_.startBundle();
 
-        EntityResolver resolver = createEntityResolver();
-        XMLTransfer xfer = new XMLTransfer(resolver);
-
-        BiConsumer<String, Logger.Level> logger = (s, l) -> sinks_.log(this, s, l);
+        ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
+            includedURIs, includedFileNames, includedFileLastModifiedTimes,
+            createEntityResolver(), metaFuncMap);
 
         Stream<ChionographisWorker> workers =
-            IntStream.range(0, includedFiles.length)
+            IntStream.range(0, includedFileNames.length)
                      .filter(i -> (includes == null) || includes[i])
-                     .mapToObj(i -> new ChionographisWorker(
-                                            i, includedURIs[i], includedFiles[i],
-                                            includedFileLastModifiedTimes[i],
-                                            sinks_, logger, metaFuncMap, xfer));
+                     .mapToObj(wfac::create);
 
         int count;
         ForkJoinPool pool = (parallelism > 1) ? new ForkJoinPool(parallelism) : null;
@@ -328,6 +323,30 @@ public final class Chionographis extends MatchingTask implements Driver {
     private static void ruin() {
         if (ForkJoinTask.getPool() != null) {
             ForkJoinTask.getPool().shutdownNow();
+        }
+    }
+
+    private class ChionographisWorkerFactory {
+        private URI[] uris_;
+        private String[] fileNames_;
+        private long[] lastModifiedTimes_;
+        private XMLTransfer xfer_;
+        private Map<String, Function<URI, String>> metaFuncMap_;
+
+        public ChionographisWorkerFactory(URI[] uris, String[] fileNames,
+                long[] lastModifiedTimes,
+                EntityResolver resolver, Map<String, Function<URI, String>> metaFuncMap) {
+            uris_ = uris;
+            fileNames_ = fileNames;
+            lastModifiedTimes_ = lastModifiedTimes;
+            xfer_ = new XMLTransfer(resolver);
+            metaFuncMap_ = metaFuncMap;
+        }
+
+        public ChionographisWorker create(int index) {
+            return new ChionographisWorker(index,
+                uris_[index], fileNames_[index], lastModifiedTimes_[index],
+                sinks_, (s, l) -> sinks_.log(Chionographis.this, s, l), metaFuncMap_, xfer_);
         }
     }
 
