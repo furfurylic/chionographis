@@ -9,12 +9,10 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import javax.xml.namespace.NamespaceContext;
@@ -46,7 +44,7 @@ public final class Transform extends Sink implements Driver {
     private String style_ = null;
     private boolean usesCache_ = true;
     private boolean force_ = false;
-    private List<Param> params_ = Collections.emptyList();
+    private Auxiliaries<Param> params_ = new Auxiliaries<>();
 
     private URI styleURI_;
     private Map<String, Object> paramMap_ = null;
@@ -104,16 +102,7 @@ public final class Transform extends Sink implements Driver {
      */
     public Param createParam() {
         Param param = new Param(sinks_);
-        if (params_.isEmpty()) {
-            params_ = Collections.singletonList(param);
-        } else {
-            if (params_.size() == 1) {
-                Param first = params_.get(0);
-                params_ = new ArrayList<>();
-                params_.add(first);
-            }
-            params_.add(param);
-        }
+        params_.add(param);
         return param;
     }
 
@@ -154,7 +143,7 @@ public final class Transform extends Sink implements Driver {
      */
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        setUpParamMap(namespaceContext);
+        paramMap_ = createParamMap(namespaceContext);
 
         styleURI_ = URI.create(style_);
         if (!styleURI_.isAbsolute()) {
@@ -166,28 +155,12 @@ public final class Transform extends Sink implements Driver {
         sinks_.init(baseDir, namespaceContext, force_);
     }
 
-    private void setUpParamMap(NamespaceContext namespaceContext) {
-        if (params_.isEmpty()) {
-            paramMap_ = Collections.emptyMap();
-            return;
-        }
-        if (params_.size() == 1) {
-            Map.Entry<String, Object> entry = params_.get(0).yield(namespaceContext);
-            sinks_.log(this, "Adding a stylesheet parameter: " + entry, Logger.Level.DEBUG);
-            paramMap_ = Collections.singletonMap(entry.getKey(), entry.getValue());
-            return;
-        }
-
-        paramMap_ = new TreeMap<>();
-        for (Param param : params_) {
-            Map.Entry<String, Object> entry = param.yield(namespaceContext);
-            sinks_.log(this, "Adding a stylesheet parameter: " + entry, Logger.Level.DEBUG);
-            if (paramMap_.put(entry.getKey(), entry.getValue()) != null) {
-                sinks_.log(this,
-                    "Stylesheet parameter named " + entry.getKey() + " added twice", Logger.Level.ERR);
-                throw new BuildException();
-            }
-        }
+    private Map<String, Object> createParamMap(NamespaceContext namespaceContext) {
+        return params_.toMap(p -> p.yield(namespaceContext),
+            e -> sinks_.log(this,
+                    "Adding a stylesheet parameter: " + e, Logger.Level.DEBUG),
+            k -> sinks_.log(this,
+                    "Stylesheet parameter named " + k + " added twice", Logger.Level.ERR));
     }
 
     @Override
