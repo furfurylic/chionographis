@@ -11,15 +11,12 @@ import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinPool;
@@ -33,7 +30,6 @@ import java.util.stream.Stream;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
-import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
@@ -54,8 +50,8 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean verbose_ = false;
     private int maxWorkers_ = 0;
 
-    private List<Namespace> namespaces_ = Collections.emptyList();
-    private List<Meta> metas_ = Collections.emptyList();
+    private Auxiliaries<Namespace> namespaces_ = new Auxiliaries<>();
+    private Auxiliaries<Meta> metas_ = new Auxiliaries<>();
     private Sinks sinks_ = new Sinks(new ChionographisLogger());
 
     /**
@@ -159,16 +155,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     public Meta createMeta() {
         Meta meta = new Meta(sinks_);
-        if (metas_.isEmpty()) {
-            metas_ = Collections.singletonList(meta);
-        } else {
-            if (metas_.size() == 1) {
-                Meta first = metas_.get(0);
-                metas_ = new ArrayList<>();
-                metas_.add(first);
-            }
-            metas_.add(meta);
-        }
+        metas_.add(meta);
         return meta;
     }
 
@@ -190,16 +177,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     public Namespace createNamespace() {
         Namespace namespace = new Namespace(sinks_);
-        if (namespaces_.isEmpty()) {
-            namespaces_ = Collections.singletonList(namespace);
-        } else {
-            if (namespaces_.size() == 1) {
-                Namespace first = namespaces_.get(0);
-                namespaces_ = new ArrayList<>();
-                namespaces_.add(first);
-            }
-            namespaces_.add(namespace);
-        }
+        namespaces_.add(namespace);
         return namespace;
     }
 
@@ -423,61 +401,21 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private Map<String, Function<URI, String>> createMetaFuncMap() {
-        if (metas_.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        if (metas_.size() == 1) {
-            Map.Entry<String, Function<URI, String>> entry = metas_.get(0).yield();
-            sinks_.log(this,
-                "Adding a meta-information instruction: name=" + entry.getKey(),
-                Logger.Level.DEBUG);
-            return Collections.singletonMap(entry.getKey(), entry.getValue());
-        }
-
-        Map<String, Function<URI, String>> metaMap = new TreeMap<>();
-        for (Meta meta : metas_) {
-            Map.Entry<String, Function<URI, String>> entry;
-            try {
-                entry = meta.yield();
-            } catch (BuildException e) {
-                sinks_.log(this, e.getMessage(), Logger.Level.ERR);
-                throw e;
-            }
-            sinks_.log(this,
-                "Adding a meta-information instruction: name=" + entry.getKey(),
-                Logger.Level.DEBUG);
-            if (metaMap.put(entry.getKey(), entry.getValue()) != null) {
-                sinks_.log(this,
-                    "Meta-information instruction named " + entry.getKey() + " added twice",
-                    Logger.Level.ERR);
-                throw new BuildException();
-            }
-        }
-        return metaMap;
+        return metas_.toMap(Meta::yield,
+            e -> sinks_.log(this,
+                            "Adding a meta-information instruction: name=" + e.getKey(),
+                            Logger.Level.DEBUG),
+            k -> sinks_.log(this,
+                            "Meta-information instruction named " + k + " added twice",
+                            Logger.Level.ERR));
     }
 
     private NamespaceContext createNamespaceContext() {
-        if (namespaces_.isEmpty()) {
-            return new PrefixMap(Collections.emptyMap());
-        }
-        if (namespaces_.size() == 1) {
-            Map.Entry<String, String> spec = namespaces_.get(0).yield();
-            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, Logger.Level.DEBUG);
-            return new PrefixMap(
-                Collections.singletonMap(spec.getKey(), spec.getValue()));
-        }
-
-        Map<String, String> namespaceMap = new HashMap<>();
-        for (Namespace namespace : namespaces_) {
-            Map.Entry<String, String> spec = namespace.yield();
-            sinks_.log(this, "Adding a namespace prefix mapping: " + spec, Logger.Level.DEBUG);
-            if (namespaceMap.put(spec.getKey(), spec.getValue()) != null) {
-                sinks_.log(this,
-                    "Namespace prefix " + spec.getKey() + " added twice",
-                    Logger.Level.ERR);
-                throw new BuildException();
-            }
-        }
+        Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
+            e -> sinks_.log(this,
+                    "Adding namespace prefix mapping: " + e, Logger.Level.DEBUG),
+            k -> sinks_.log(this,
+                    "Namespace prefix " + k + " added twice", Logger.Level.ERR));
         return new PrefixMap(namespaceMap);
     }
 
