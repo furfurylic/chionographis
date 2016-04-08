@@ -354,8 +354,7 @@ public final class Output extends Sink {
                     }
                 } catch (IOException e) {
                     logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
-                    logger_.log(this, "  Cause: " + e, Logger.Level.WARN);
-                    e.printStackTrace();    // TODO: use "log"
+                    logger_.log(this, e, "  Cause: ", Logger.Level.VERBOSE);
                      throw new ChionographisBuildException(e);
                 }
             }

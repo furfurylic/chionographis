@@ -8,6 +8,9 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,6 +25,8 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -401,22 +406,49 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         @Override
         public void log(Object issuer, String message, Logger.Level level) {
-            Chionographis.this.log(format(issuer, message), translateLevel(level));
+            Chionographis.this.log(head(issuer) + message, translateLevel(level));
         }
 
         @Override
-        public void log(Object issuer, String message, Throwable ex, Logger.Level level) {
-            Chionographis.this.log(format(issuer, message), ex, translateLevel(level));
+        public void log(Object issuer, Throwable ex, String heading, Logger.Level level) {
+            String indent;
+            String trimmedHead;
+            {
+                Pattern lineHeadSpace = Pattern.compile("^([\\s]+)(.*)");
+                Matcher matcher = lineHeadSpace.matcher(heading);
+                if (matcher.find()) {
+                    indent = matcher.group(1);
+                    trimmedHead = matcher.group(2);
+                } else {
+                    indent = "";
+                    trimmedHead = "";
+                }
+            }
+
+            String body;
+            try (StringWriter writer = new StringWriter();
+                 PrintWriter out = new PrintWriter(writer)) {
+                out.print(trimmedHead);
+                ex.printStackTrace(out);
+                body = writer.toString();
+                body = body.replaceAll("(\\r\\n|\\r|\\n)+$", "")
+                           .replaceAll("\t", "    ");   // Maybe controversial
+                body = Pattern.compile("^(.*)$", Pattern.MULTILINE)
+                           .matcher(body).replaceAll(head(issuer) + indent + "$1");
+            } catch (IOException e) {
+                return; // Not likely to reach here
+            }
+
+            Chionographis.this.log(body, translateLevel(level));
         }
 
-        private String format(Object issuer, String message) {
+        private String head(Object issuer) {
             try (Formatter formatter = new Formatter()) {
                 String className = issuer.getClass().getSimpleName();
-                formatter.format("%13s@%08x(%02x): %s",
+                formatter.format("%13s@%08x(%02x): ",
                     className.substring(0, Math.min(13, className.length())),
                     System.identityHashCode(issuer),
-                    Thread.currentThread().getId(),
-                    message);
+                    Thread.currentThread().getId());
                 return formatter.toString();
             }
         }

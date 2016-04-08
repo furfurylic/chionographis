@@ -164,7 +164,8 @@ public final class Transform extends Sink implements Driver {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(
+            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         if (!force_) {
             long styleLastModified = lastModified(styleURI_);
             if (styleLastModified > 0) {
@@ -321,7 +322,8 @@ public final class Transform extends Sink implements Driver {
             return transformer;
         }
 
-        public TransformerHandler newTransformerHandler() throws TransformerConfigurationException {
+        public TransformerHandler newTransformerHandler()
+                throws TransformerConfigurationException {
             Templates compiledStylesheet = getCompiledStylesheet();
             TransformerHandler styler;
             synchronized (LOCK) {
@@ -360,8 +362,8 @@ public final class Transform extends Sink implements Driver {
                 try {
                     return tfac_.newTemplates(new StreamSource(styleSystemID));
                 } catch (TransformerConfigurationException e) {
-                    sinks_.log(Transform.this, "Failed to compile stylesheet: " + styleSystemID, Logger.Level.WARN);
-                    sinks_.log(Transform.this, "  Cause: " + e, Logger.Level.WARN);
+                    sinks_.log(Transform.this,
+                        "Failed to compile stylesheet: " + styleSystemID, Logger.Level.ERR);
                     throw new FatalityException(e);
                 }
             }
