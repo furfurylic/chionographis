@@ -63,8 +63,8 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    public void log(Object issuer, String message, Throwable ex, Logger.Level level) {
-        logger_.log(issuer, message, ex, level);
+    public void log(Object issuer, Throwable ex, String heading, Logger.Level level) {
+        logger_.log(issuer, ex, heading, level);
     }
 
     public Transform createTransform() {
