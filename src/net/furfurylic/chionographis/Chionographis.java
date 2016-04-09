@@ -8,7 +8,6 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
@@ -245,7 +244,11 @@ public final class Chionographis extends MatchingTask implements Driver {
                     .mapToLong(File::lastModified)
                     .toArray();
         }
-        sinks_.log(this, includedURIs.length + " input sources found", Logger.Level.INFO);
+        if (includedURIs.length > 1) {
+            sinks_.log(this, includedURIs.length + " input sources found", Logger.Level.INFO);
+        } else {
+            sinks_.log(this, "1 input source found", Logger.Level.INFO);
+        }
 
         // Set up namespace context.
         Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
@@ -296,11 +299,17 @@ public final class Chionographis extends MatchingTask implements Driver {
             count = workers.mapToInt(IntSupplier::getAsInt).sum();
         }
 
-        if (count > 0) {
+        switch (count) {
+        case 0:
+            sinks_.log(this, "No input sources processed", Logger.Level.INFO);
+            break;
+        case 1:
+            sinks_.log(this, "Finishing the result of 1 input source", Logger.Level.DEBUG);
+            break;
+        default:
             sinks_.log(this,
                 "Finishing results of " + count +" input sources", Logger.Level.DEBUG);
-        } else {
-            sinks_.log(this, "No input sources processed", Logger.Level.INFO);
+            break;
         }
 
         if (pool != null) {
@@ -410,7 +419,8 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         @Override
-        public void log(Object issuer, Throwable ex, String heading, Logger.Level level) {
+        public void log(Object issuer, Throwable ex, String heading,
+                Logger.Level headingLevel, Logger.Level bodyLevel) {
             String indent;
             String trimmedHead;
             {
@@ -425,21 +435,36 @@ public final class Chionographis extends MatchingTask implements Driver {
                 }
             }
 
-            String body;
-            try (StringWriter writer = new StringWriter();
-                 PrintWriter out = new PrintWriter(writer)) {
-                out.print(trimmedHead);
-                ex.printStackTrace(out);
-                body = writer.toString();
-                body = body.replaceAll("(\\r\\n|\\r|\\n)+$", "")
-                           .replaceAll("\t", "    ");   // Maybe controversial
-                body = Pattern.compile("^(.*)$", Pattern.MULTILINE)
-                           .matcher(body).replaceAll(head(issuer) + indent + "$1");
-            } catch (IOException e) {
-                return; // Not likely to reach here
+            List<String> lines;
+            {
+                String all;
+                StringWriter writer = new StringWriter();
+                try (PrintWriter out = new PrintWriter(writer)) {
+                    out.print(trimmedHead);
+                    ex.printStackTrace(out);
+                }
+                all = writer.toString();
+                // StringWriter.close() has no effect so we don't close
+                all = all.replaceAll("\t", "    ");   // Maybe controversial
+
+                String[] linesArray = all.split("\\r\\n|\\r|\\n");
+                for (int i = 0; i < linesArray.length; ++i) {
+                    linesArray[i] = head(issuer) + indent + linesArray[i];
+                }
+                lines = Arrays.asList(linesArray);
             }
 
-            Chionographis.this.log(body, translateLevel(level));
+            if (lines.size() > 0) {
+                synchronized (this) {
+                    Chionographis.this.log(lines.get(0), translateLevel(headingLevel));
+                    if (lines.size() > 1) {
+                        String delimiter = System.getProperty("line.separator");
+                        Chionographis.this.log(
+                            String.join(delimiter, lines.subList(1, lines.size())),
+                            translateLevel(bodyLevel));
+                    }
+                }
+            }
         }
 
         private String head(Object issuer) {
