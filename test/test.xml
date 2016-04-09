@@ -30,8 +30,20 @@
         <antcall target="crossing-cache"/>
         <antcall target="crossing-cache-refer-content"/>
         <antcall target="crossing-parallel-sinks"/>
-        <antcall target="crossing-abort"/>
+        <antcall target="crossing-abort-sources"/>
+        <antcall target="crossing-abort-sinks-dom"/>
+        <antcall target="crossing-abort-sinks-sax"/>
     </target>
+
+    <macrodef name="assertfilenotexists">
+        <attribute name="name"/>
+        <attribute name="file"/>
+        <sequential>
+            <fail message="@{name}: @{file} DOES exist">
+                <condition><resourceexists><file file="@{file}"/></resourceexists></condition>
+            </fail>
+        </sequential>
+    </macrodef>
 
     <macrodef name="assertfileeq">
         <attribute name="name"/>
@@ -851,9 +863,9 @@
         <delete dir="${dir.output}"/>
     </target>
 
-    <target name="crossing-abort">
+    <target name="crossing-abort-sources">
         <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="abort"/>
+        <property name="test.title" value="abort-sources"/>
         <property name="test.name" value="${test.prefix}-${test.title}"/>
         <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
         <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
@@ -874,6 +886,78 @@
 
         <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/1/output.txt"/>
         <assertfileeq name="${test.name} - 3" expected="${dir.input}/expected3.txt" actual="${dir.output}/3/output.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="crossing-abort-sinks-dom">
+        <property name="test.prefix" value="crossing"/>
+        <property name="test.title" value="abort-sinks-dom"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
+            <!-- a: this will fail due to "makedirs='no'" -->
+            <transform style="../flatten.xsl">
+                <output dest="output-${test.title}/a/output.txt" mkdirs="no"/>
+            </transform>
+            <!-- b, c, and d below shall be aborted in collateral of a -->
+            <!-- b: DOM-based multiple sink driver -->
+            <transform style="../flatten.xsl">
+                <output destdir="${dir.output}" refer="local-name(/*/@*)">
+                    <globmapper from="*" to="*1/output.txt"/>
+                </output>
+                <output destdir="${dir.output}" refer="local-name(/*/@*)">
+                    <globmapper from="*" to="*2/output.txt"/>
+                </output>
+            </transform>
+            <!-- c: SAX-based multiple sink driver -->
+            <transform style="../flatten.xsl">
+                <output dest="${dir.output}/c1/output.txt"/>
+                <output dest="${dir.output}/c2/output.txt"/>
+            </transform>
+            <!-- d: single sink driver -->
+            <transform style="../flatten.xsl">
+                <output dest="${dir.output}/d/output.txt"/>
+            </transform>
+        </chionographis>
+
+        <assertfilenotexists name="${test.name} - b1" file="${dir.output}/b1/output.txt"/>
+        <assertfilenotexists name="${test.name} - b2" file="${dir.output}/b2/output.txt"/>
+        <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
+        <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
+        <assertfilenotexists name="${test.name} - d" file="${dir.output}/d/output.txt"/>
+
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <target name="crossing-abort-sinks-sax">
+        <property name="test.prefix" value="crossing"/>
+        <property name="test.title" value="abort-sinks-sax"/>
+        <property name="test.name" value="${test.prefix}-${test.title}"/>
+        <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
+        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+        <delete dir="${dir.output}"/>
+
+        <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
+            <!-- a: this will fail due to "makedirs='no'" -->
+            <transform style="../flatten.xsl">
+                <output dest="${dir.output}/a/output.txt" mkdirs="no"/>
+            </transform>
+            <!-- c below shall be aborted in collateral of a -->
+            <!-- c: SAX-based multiple sink driver -->
+            <transform style="../flatten.xsl">
+                <output dest="${dir.output}/c1/output.txt"/>
+                <output dest="${dir.output}/c2/output.txt"/>
+            </transform>
+        </chionographis>
+
+        <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
+        <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
 
         <delete dir="${dir.output}"/>
     </target>
