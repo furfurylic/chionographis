@@ -94,6 +94,12 @@ public final class Meta {
     private Type type_ = null;
     private String name_ = null;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Meta(Logger logger) {
         logger_ = logger;
     }
@@ -140,6 +146,17 @@ public final class Meta {
         name_ = name;
     }
 
+    /**
+     * Creates a key-value pair from this object's content.
+     *
+     * @return
+     *      a key-value pair for this object's content, which shall not be {@code null}.
+     *      The key is the meta-information name, and the value is the function which decudes the
+     *      string value from the URI of the original source.
+     *
+     * @throws BuildException
+     *      if the {@linkplain #setType(String) type} is not set.
+     */
     Map.Entry<String, Function<URI, String>> yield() {
         if (type_ == null) {
             String message = "Incomplete meta-information instruction found";

@@ -1,12 +1,25 @@
+/*
+ * Chionographis
+ *
+ * These codes are licensed under CC0.
+ * https://creativecommons.org/publicdomain/zero/1.0/deed
+ */
+
 package net.furfurylic.chionographis;
 
 import org.apache.tools.ant.BuildException;
 
+/**
+ * An exception class capable of signaling "this content is logged already".
+ *
+ * <p><i>{@linkplain Chionographis}</i> task inhibits redundant logging
+ * if an instance of this class is caught and it is logged already.</p>
+ */
 class ChionographisBuildException extends BuildException {
 
     private static final long serialVersionUID = 2661858972149686128L;
 
-    boolean isLoggedAlready_;
+    private boolean isLoggedAlready_;
 
     public ChionographisBuildException() {
         this(true);

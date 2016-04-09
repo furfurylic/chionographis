@@ -25,34 +25,34 @@ public interface Driver {
     void setForce(boolean force);
 
     /**
-     * Adds an <i>Transform</i> filter which consumes the output of this driver object.
+     * Adds a {@code Transform} filter which consumes the output of this driver object.
      *
      * @return
-     *      a <i>Transform</i> filter object.
+     *      a {@code Transform} filter object.
      */
     Transform createTransform();
 
     /**
-     * Adds an <i>All</i> filter which consumes the output of this driver object.
+     * Adds an {@code All} filter which consumes the output of this driver object.
      *
      * @return
-     *      a <i>all</i> filter object.
+     *      an {@code All} filter object.
      */
     All createAll();
 
     /**
-     * Adds an <i>Snip</i> filter which consumes the output of this driver object.
+     * Adds a {@code Snip} filter which consumes the output of this driver object.
      *
      * @return
-     *      a <i>snip</i> filter object.
+     *      a {@code Snip} filter object.
      */
     Snip createSnip();
 
     /**
-     * Adds an <i>Output</i> sink which consumes the output of this driver object.
+     * Adds an {@code Output} sink which consumes the output of this driver object.
      *
      * @return
-     *      a <i>output</i> sink object.
+     *      an {@code Output} sink object.
      */
     Output createOutput();
 }

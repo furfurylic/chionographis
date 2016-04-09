@@ -48,6 +48,12 @@ public final class Snip extends Sink implements Driver {
 
     private XMLTransfer xfer_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Snip(Logger logger) {
         sinks_ = new Sinks(logger);
     }
