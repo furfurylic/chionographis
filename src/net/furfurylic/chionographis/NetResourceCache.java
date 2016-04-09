@@ -67,7 +67,7 @@ final class NetResourceCache<T> {
         Map<URI, Optional<T>> strongOne = null;
         synchronized (LOCK) {
             if (cache_ == null) {
-                canonURIs_ = Collections.synchronizedMap(new WeakHashMap<>());
+                canonURIs_ = new WeakHashMap<>();
             } else {
                 strongOne = cache_.get();
             }
@@ -80,7 +80,7 @@ final class NetResourceCache<T> {
         // Get the privately-canonicalized form.
         URI canonicalizedURI = canonicalizeURI(uri);
 
-        // From here uri shall not be in the canonicalized form.
+        // From here uri shall NOT be in the canonicalized form.
         if (canonicalizedURI == uri) {
             uri = URI.create(uri.toString());
         }
@@ -112,21 +112,25 @@ final class NetResourceCache<T> {
      * Canonicalizes a URI so that URIs which have the same logical content are one same object.
      *
      * @param uri
-     *      a URI to canonicalize.
+     *      a URI to canonicalize, which must not come from this method.
      *
      * @return
      *      the canonicalized form of the URI,
-     *      which is different object from the parameter <i>uri</i>
-     *      if it did not come from this method.
+     *      which is different object from the parameter {@code uri}
+     *      only if it has been the first object for its logical content.
      */
     private URI canonicalizeURI(URI uri) {
         assert uri != null;
-        WeakReference<URI> ref = canonURIs_.putIfAbsent(uri, new WeakReference<>(uri));
-        URI existing = (ref != null) ? ref.get() : null;
-        if (existing == null) {
-            return uri;
-        } else {
-            return existing;
+        synchronized (canonURIs_) {
+            WeakReference<URI> ref = canonURIs_.get(uri);
+            if (ref == null) {
+                ref = new WeakReference<>(uri);
+                canonURIs_.put(uri, ref);
+                return uri;
+            } else {
+                assert ref.get() != null;
+                return ref.get();
+            }
         }
     }
 }
