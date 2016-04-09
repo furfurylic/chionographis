@@ -9,10 +9,19 @@ package net.furfurylic.chionographis;
 
 import org.apache.tools.ant.BuildException;
 
+/**
+ * An exception class which signals an serious problem not likely recoverable.
+ */
 class FatalityException extends BuildException {
 
     private static final long serialVersionUID = 6599412493707856208L;
 
+    /**
+     * Constructs an object with the causal exception object.
+     *
+     * @param cause
+     *      the causal exception object.
+     */
     public FatalityException(Throwable cause) {
         super(cause);
     }

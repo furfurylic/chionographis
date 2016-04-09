@@ -1,3 +1,10 @@
+/*
+ * Chionographis
+ *
+ * These codes are licensed under CC0.
+ * https://creativecommons.org/publicdomain/zero/1.0/deed
+ */
+
 package net.furfurylic.chionographis;
 
 import java.util.ArrayList;
@@ -49,7 +56,12 @@ final class Auxiliaries<T> {
      * Maps each element of this collection to a key-value pair to yield a map.
      *
      * <p>This method does not change the state of this object;
-     * i.e., this method can be invoked mutiple times.</p>
+     * that is, this method can be invoked mutiple times.</p>
+     *
+     * @param <K>
+     *      the type of the keys of the map.
+     * @param <V>
+     *      the type of the values of the map.
      *
      * @param yield
      *      a function which make a key-value pair from an element of this collection.

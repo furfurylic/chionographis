@@ -56,12 +56,22 @@ final class XMLTransfer {
     private ThreadLocal<Supplier<DocumentBuilder>> builder_;
     private ThreadLocal<Supplier<Transformer>> identity_;
 
+    /**
+     * Creates a new instance which uses the specified entity resolver.
+     *
+     * @param resolver
+     *      a SAX entity resolver.
+     *      If {@code null} is specified, no special resolution of external entities are done.
+     */
     public XMLTransfer(EntityResolver resolver) {
         reader_ = ThreadLocal.withInitial(() -> createXMLReaderSupplier(resolver));
         builder_ = ThreadLocal.withInitial(() -> createDocumentBuilderSupplier(resolver));
         identity_ = ThreadLocal.withInitial(() -> createIdentityTransformerSupplier());
     }
 
+    /**
+     * Identical to {@code XMLTransfer(null)}.
+     */
     public XMLTransfer() {
         this(null);
     }
@@ -82,6 +92,11 @@ final class XMLTransfer {
      *      a TrAX {@code Source} object, which must not be {@code null}.
      * @param result
      *      a TrAX {@code Result} object, which must not be {@code null}.
+     *
+     * @throws FatalityException
+     *      if a serious configuration problem occurs.
+     * @throws BuildException
+     *      if a recoverable error occurs.
      */
     public void transfer(Source source, Result result) {
         try {
@@ -137,7 +152,12 @@ final class XMLTransfer {
      * @param result
      *      a TrAX {@code DOMResult} object, which must not be {@code null}.
      * @param adopts
-     *      {@code true} if nodes are moved; {@code false} otherwise, i.e., they are copied.
+     *      {@code true} if nodes are moved; {@code false} otherwise, that is, they are copied.
+     *
+     * @throws FatalityException
+     *      if a serious configuration problem occurs.
+     * @throws BuildException
+     *      if a recoverable error occurs.
      */
     public void transfer(DOMSource source, Result result, boolean adopts) {
         if (result instanceof DOMResult) {
@@ -162,6 +182,20 @@ final class XMLTransfer {
         }
     }
 
+    /**
+     * Reads an external document and parses it into a DOM document.
+     *
+     * @param source
+     *      a TrAX {@code StreamSource} object to be read,which must not be {@code null}.
+     *
+     * @return
+     *      the resulted DOM document.
+     *
+     * @throws FatalityException
+     *      if a serious configuration problem occurs.
+     * @throws BuildException
+     *      if a recoverable error occurs.
+     */
     public Document parse(StreamSource source) {
         try {
             return builder_.get().get().parse(SAXSource.sourceToInputSource(source));
@@ -170,6 +204,15 @@ final class XMLTransfer {
         }
     }
 
+    /**
+     * Creates a new empty document.
+     *
+     * @return
+     *      the resulted DOM document.
+     *
+     * @throws FatalityException
+     *      if a serious configuration problem occurs.
+     */
     public Document newDocument() {
         return builder_.get().get().newDocument();
     }

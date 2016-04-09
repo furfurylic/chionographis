@@ -24,6 +24,12 @@ public final class Namespace {
     private String prefix_ = null;
     private String namespaceURI_ = null;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Namespace(Logger logger) {
         logger_ = logger;
     }
@@ -33,6 +39,9 @@ public final class Namespace {
      *
      * @param prefix
      *      the namespace prefix.
+     *
+     * @throws BuildException
+     *      if {@code prefix} violates the rule in the XML specification.
      */
     public void setPrefix(String prefix) {
         if (prefix.isEmpty()) {
@@ -56,6 +65,17 @@ public final class Namespace {
         namespaceURI_ = uri;
     }
 
+    /**
+     * Creates a key-value pair from this object's content.
+     *
+     * @return
+     *      a key-value pair for this object's content, which shall not be {@code null}.
+     *      The key is the namespace prefix, and the value is the namespace URI.
+     *
+     * @throws BuildException
+     *      if either the {@linkplain #setPrefix(String) prefix}
+     *      or the {@linkplain #setURI(String) URI} is not set.
+     */
     Map.Entry<String, String> yield() {
         if (prefix_ == null) {
             String message = "Incomplete namespace prefix mapping found";

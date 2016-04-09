@@ -41,7 +41,7 @@ import net.furfurylic.chionographis.Logger.Level;
  * An Ant task class that performs cascading transformation to XML documents.
  * As of now, only files can be original sources of the processing.
  *
- * <p>An object of this class behaves as a <i>sink driver</i>.</p>
+ * <p>An object of this class behaves as a <i>driver</i>.</p>
  */
 public final class Chionographis extends MatchingTask implements Driver {
 
