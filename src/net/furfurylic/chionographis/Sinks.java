@@ -177,32 +177,66 @@ final class Sinks extends Sink implements Logger {
         List<Sink> activeSinks = null;
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int i = 0;
-        for (int j = 0; j < sinks_.size(); ++j) {
-            if (includes_ != null) {
-                boolean[] includesOne = includes_[j];
-                if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
-                    continue;
-                }
-            }
-            List<String> referredContentsOne =
-                referredContents.subList(i, i + sinks_.get(j).referents().size());
-            Result result = sinks_.get(j).startOne(
-                originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
-                referredContentsOne);
-            if (result != null) {
-                builder.add(result);
-                if (activeSinks == null) {
-                    activeSinks = Collections.singletonList(sinks_.get(j));
-                } else{
-                    if (activeSinks.size() == 1) {
-                        Sink s = activeSinks.get(0);
-                        activeSinks = new ArrayList<>();
-                        activeSinks.add(s);
+        int j = 0;
+        try {
+            for (; j < sinks_.size(); ++j) {
+                if (includes_ != null) {
+                    boolean[] includesOne = includes_[j];
+                    if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
+                        continue;
                     }
-                    activeSinks.add(sinks_.get(j));
+                }
+                List<String> referredContentsOne =
+                    referredContents.subList(i, i + sinks_.get(j).referents().size());
+                Result result = sinks_.get(j).startOne(
+                    originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
+                    referredContentsOne);
+                if (result != null) {
+                    // First, we populate acriveSinks.
+                    if (activeSinks == null) {
+                        activeSinks = Collections.singletonList(sinks_.get(j));
+                    } else{
+                        if (activeSinks.size() == 1) {
+                            Sink s = activeSinks.get(0);
+                            activeSinks = new ArrayList<>();
+                            activeSinks.add(s);
+                        }
+                        activeSinks.add(sinks_.get(j));
+                    }
+                    // Second, we populate builder.
+                    try {
+                        builder.add(result);
+                    } catch (RuntimeException e) {
+                        Sink lastSink = activeSinks.get(activeSinks.size() - 1);
+                        activeSinks.remove(activeSinks.size() - 1);
+                        try {
+                            lastSink.abortOne(result);
+                        } catch (FatalityException ex) {
+                            throw e;
+                        } catch (RuntimeException ex) {
+                            throw new FatalityException(ex);
+                        }
+                        throw e;    // activeSinks will be aborted in the catch site.
+                    }
                 }
             }
+        } catch (RuntimeException e) {
+            // We shall abort already-started results.
+            Result r = builder.newCompositeResult();
+            if (r != null) {
+                try {
+                    abortSinks(r, activeSinks);
+                } catch (FatalityException ex) {
+                    throw ex;
+                } catch (RuntimeException ex) {
+                    if (!(e instanceof FatalityException)) {
+                        throw new FatalityException(ex);
+                    }
+                }
+            }
+            throw e;
         }
+
         Result r = builder.newCompositeResult();
         synchronized (activeSinkMap_) {
             activeSinkMap_.put(r, activeSinks);
@@ -258,7 +292,7 @@ final class Sinks extends Sink implements Logger {
             } catch (RuntimeException e) {
                 IntStream.concat(IntStream.range(i + 1, activeSinks.size()), IntStream.of(j))
                          .distinct()
-                         .forEach(k -> Sinks.abortSink(activeSinks.get(k), r.resultOf(k)));
+                         .forEach(k -> Sinks.abortSinkSilent(activeSinks.get(k), r.resultOf(k)));
                 throw e;
             }
 
@@ -277,7 +311,7 @@ final class Sinks extends Sink implements Logger {
                 }
             } catch (RuntimeException e) {
                 IntStream.range(i + 1, activeSinks.size())
-                         .forEach(k -> Sinks.abortSink(activeSinks.get(k), r.resultOf(k)));
+                         .forEach(k -> Sinks.abortSinkSilent(activeSinks.get(k), r.resultOf(k)));
                 throw e;
             }
         }
@@ -292,14 +326,33 @@ final class Sinks extends Sink implements Logger {
             activeSinkMap_.remove(result);
         }
         assert activeSinks != null;
-        if (activeSinks.size() == 1) {
-            activeSinks.get(0).abortOne(result);
+        abortSinks(result, activeSinks);
+    }
+
+    /**
+     * Does the maximum effort to abort all results.
+     *
+     * @param result
+     *      a possibly-composite TrAX result object, which shall not be {@code null}.
+     * @param sinks
+     *      a list of {@link Sink}s, which shall be coincident with {@code result}
+     *      and shall not be neither {@code null} nor empty.
+     *
+     * @throws RuntimeException
+     *      if one of {@code sinks} throws a {@link RuntimeException}.
+     *      This situation should be considered as unrecoverable.
+     */
+    private static void abortSinks(Result result, List<Sink> sinks) {
+        assert result != null;
+        assert sinks != null;
+        assert !sinks.isEmpty();
+        if (sinks.size() == 1) {
+            sinks.get(0).abortOne(result);
         } else {
-            assert result instanceof CompositeSAXResult : result.getClass();
-            CompositeSAXResult r = (CompositeSAXResult) result;
+            CompositeResult r = (CompositeResult) result;
             Optional<RuntimeException> ex =
-                IntStream.range(0, activeSinks.size())
-                         .mapToObj(i -> Sinks.abortSink(activeSinks.get(i), r.resultOf(i)))
+                IntStream.range(0, sinks.size())
+                         .mapToObj(i -> Sinks.abortSinkSilent(sinks.get(i), r.resultOf(i)))
                          .filter(e -> e != null)
                          .findAny();
             if (ex.isPresent()) {
@@ -308,7 +361,10 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
-    private static RuntimeException abortSink(Sink sink, Result result) {
+    private static RuntimeException abortSinkSilent(Sink sink, Result result) {
+        if (result == null) {
+            return null;
+        }
         try {
             sink.abortOne(result);
             return null;
@@ -330,7 +386,11 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
-    private static class CompositeSAXResult extends SAXResult {
+    private static interface CompositeResult {
+        Result resultOf(int index);
+    }
+
+    private static class CompositeSAXResult extends SAXResult implements CompositeResult {
 
         List<Result> results_;
 
@@ -339,12 +399,13 @@ final class Sinks extends Sink implements Logger {
             results_ = results;
         }
 
-        Result resultOf(int index) {
+        @Override
+        public Result resultOf(int index) {
             return results_.get(index);
         }
     }
 
-    private static class CompositeDOMResult extends DOMResult {
+    private static class CompositeDOMResult extends DOMResult implements CompositeResult {
 
         List<Result> results_;
 
@@ -353,7 +414,8 @@ final class Sinks extends Sink implements Logger {
             results_ = results;
         }
 
-        Result resultOf(int index) {
+        @Override
+        public Result resultOf(int index) {
             return results_.get(index);
         }
     }
