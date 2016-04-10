@@ -308,11 +308,15 @@ public final class Output extends Sink {
         }
         if (!force_
          && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
-            String files = dests.stream()
-                                .map(Path::toString)
-                                .reduce((ss, s) -> ss + ", " + s)
-                                .orElse(null);
-            logger_.log(this, "output files are up to date: " + files, Logger.Level.DEBUG);
+            if (dests.size() > 1) {
+                String files = dests.stream()
+                    .map(Path::toString)
+                    .collect(Collectors.joining(", "));
+                logger_.log(this, "Output files are up to date: " + files, Logger.Level.DEBUG);
+            } else {
+                logger_.log(this, "The output file is up to date: " + dests.iterator().next(),
+                    Logger.Level.DEBUG);
+            }
             return null;
        }
 
@@ -354,7 +358,7 @@ public final class Output extends Sink {
                     }
                 } catch (IOException e) {
                     logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
-                    logger_.log(this, e, "  Cause: ", Logger.Level.VERBOSE);
+                    logger_.log(this, e, "  Cause: ", Logger.Level.INFO, Logger.Level.VERBOSE);
                      throw new ChionographisBuildException(e);
                 }
             }
@@ -384,7 +388,17 @@ public final class Output extends Sink {
 
     @Override
     void finishBundle() {
-        logger_.log(this, countInBundle_ + " output files created", Logger.Level.INFO);
+        switch (countInBundle_.get()) {
+        case 0:
+            logger_.log(this, "No output files created", Logger.Level.INFO);
+            break;
+        case 1:
+            logger_.log(this, "1 output file created", Logger.Level.INFO);
+            break;
+        default:
+            logger_.log(this, countInBundle_ + " output files created", Logger.Level.INFO);
+            break;
+        }
     }
 
     private static class OutputStreamResult extends StreamResult {

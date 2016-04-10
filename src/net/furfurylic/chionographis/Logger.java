@@ -15,5 +15,6 @@ interface Logger {
 
     void log(Object issuer, String message, Level level);
 
-    public void log(Object issuer, Throwable ex, String heading, Logger.Level level);
+    public void log(Object issuer, Throwable ex, String heading,
+        Logger.Level headingLevel, Logger.Level bodyLevel);
 }
