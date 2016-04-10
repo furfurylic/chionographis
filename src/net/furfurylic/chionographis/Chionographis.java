@@ -38,6 +38,8 @@ import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.xml.sax.EntityResolver;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An Ant task class that performs cascading transformation to XML documents.
  * As of now, only files can be original sources of the processing.
@@ -251,7 +253,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         // Set up namespace context.
-        Map<String, Function<URI, String>> metaFuncMap = createMetaFuncMap();
         NamespaceContext namespaceContext = createNamespaceContext();
 
         sinks_.init(baseDir_.toFile(), namespaceContext, force_);
@@ -281,7 +282,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
             includedURIs, includedFileNames, includedFileLastModifiedTimes,
-            createEntityResolver(), metaFuncMap);
+            sinks_, createEntityResolver(), new ChionographisBoundLogger(), createMetaFuncMap());
 
         Stream<IntSupplier> workers =
             IntStream.range(0, includedFileNames.length)
@@ -319,21 +320,27 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
-    private class ChionographisWorkerFactory {
+    private static final class ChionographisWorkerFactory {
         private URI[] uris_;
         private String[] fileNames_;
         private long[] lastModifiedTimes_;
         private XMLTransfer xfer_;
+        private Sink sink_;
+        private ChionographisWorker.BoundLogger logger_;
         private Map<String, Function<URI, String>> metaFuncMap_;
         private volatile int isOK_;
 
-        public ChionographisWorkerFactory(URI[] uris, String[] fileNames,
-                long[] lastModifiedTimes,
-                EntityResolver resolver, Map<String, Function<URI, String>> metaFuncMap) {
+        public ChionographisWorkerFactory(
+                URI[] uris, String[] fileNames, long[] lastModifiedTimes,
+                Sink sink, EntityResolver resolver,
+                ChionographisWorker.BoundLogger logger,
+                Map<String, Function<URI, String>> metaFuncMap) {
             uris_ = uris;
             fileNames_ = fileNames;
             lastModifiedTimes_ = lastModifiedTimes;
+            sink_ = sink;
             xfer_ = new XMLTransfer(resolver);
+            logger_ = logger;
             metaFuncMap_ = metaFuncMap;
             isOK_ = 1;
         }
@@ -341,7 +348,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         public IntSupplier create(int index) {
             return new ChionographisWorker(index,
                 uris_[index], fileNames_[index], lastModifiedTimes_[index],
-                sinks_, (s, l) -> sinks_.log(Chionographis.this, s, l), metaFuncMap_, xfer_,
+                sink_, logger_, metaFuncMap_, xfer_,
                 () -> isOK_)::run;
         }
 
@@ -412,7 +419,6 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private final class ChionographisLogger implements Logger {
-
         @Override
         public void log(Object issuer, String message, Logger.Level level) {
             Chionographis.this.log(head(issuer) + message, translateLevel(level));
@@ -504,6 +510,18 @@ public final class Chionographis extends MatchingTask implements Driver {
                 break;
             }
             return mutated.getLevel();
+        }
+    }
+
+    private final class ChionographisBoundLogger implements ChionographisWorker.BoundLogger {
+        @Override
+        public void log(String message, Level level) {
+            sinks_.log(Chionographis.this, message, level);
+        }
+
+        @Override
+        public void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel) {
+            sinks_.log(Chionographis.this, ex, heading, headingLevel, bodyLevel);
         }
     }
 
