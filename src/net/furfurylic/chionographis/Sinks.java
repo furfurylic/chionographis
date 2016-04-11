@@ -36,6 +36,9 @@ import org.xml.sax.Locator;
 import org.xml.sax.SAXException;
 import org.xml.sax.ext.LexicalHandler;
 
+/**
+ * Represents a composite of {@code Sink} objects.
+ */
 final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
@@ -52,6 +55,12 @@ final class Sinks extends Sink implements Logger {
 
     private Map<Result, List<Sink>> activeSinkMap_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     public Sinks(Logger logger) {
         logger_ = logger;
         sinks_ = new ArrayList<>();
@@ -68,24 +77,48 @@ final class Sinks extends Sink implements Logger {
         logger_.log(issuer, ex, heading, headingLevel, bodyLevel);
     }
 
+    /**
+     * Adds a {@link Transform} filter into this composite.
+     *
+     * @return
+     *      a {@link Transform} filter object.
+     */
     public Transform createTransform() {
         Transform sink = new Transform(logger_);
         sinks_.add(sink);
         return sink;
     }
 
+    /**
+     * Adds an {@link All} filter into this composite.
+     *
+     * @return
+     *      an {@link All} filter object.
+     */
     public All createAll() {
         All sink = new All(logger_);
         sinks_.add(sink);
         return sink;
     }
 
+    /**
+     * Adds a {@link Snip} filter into this composite.
+     *
+     * @return
+     *      a {@link Snip} filter object.
+     */
     public Snip createSnip() {
         Snip sink = new Snip(logger_);
         sinks_.add(sink);
         return sink;
     }
 
+    /**
+     * Adds an {@link Output} sink into this composite.
+     *
+     * @return
+     *      an {@link Output} sink object.
+     */
     public Output createOutput() {
         Output sink = new Output(logger_);
         sinks_.add(sink);
@@ -106,7 +139,8 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(
+            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
             .map(s -> s.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes))
@@ -153,7 +187,8 @@ final class Sinks extends Sink implements Logger {
             List<String> referredContentsOne =
                 referredContents.subList(i, i + sinks_.get(j).referents().size());
             Result result = sinks_.get(j).startOne(
-                originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime, referredContentsOne);
+                originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
+                referredContentsOne);
             if (result != null) {
                 builder.add(result);
                 if (activeSinks == null) {
@@ -369,7 +404,8 @@ final class Sinks extends Sink implements Logger {
                         lexicalHandlers.add(identity);
                     }
                 }
-                return new CompositeSAXResult(new CompositeHandler(contentHandlers, lexicalHandlers), results_);
+                return new CompositeSAXResult(
+                    new CompositeHandler(contentHandlers, lexicalHandlers), results_);
             } catch (TransformerConfigurationException e) {
                 throw new FatalityException(e);
             }
@@ -387,7 +423,8 @@ final class Sinks extends Sink implements Logger {
             }
 
             @Override
-            public void startDTD(String name, String publicId, String systemId) throws SAXException {
+            public void startDTD(String name, String publicId, String systemId)
+                    throws SAXException {
                 for (LexicalHandler handler : lexicalHandlers_) {
                     handler.startDTD(name, publicId, systemId);
                 }
@@ -479,7 +516,8 @@ final class Sinks extends Sink implements Logger {
             }
 
             @Override
-            public void endElement(String uri, String localName, String qName) throws SAXException {
+            public void endElement(String uri, String localName, String qName)
+                    throws SAXException {
                 for (ContentHandler handler : contentHandlers_) {
                     handler.endElement(uri, localName, qName);
                 }
@@ -493,7 +531,8 @@ final class Sinks extends Sink implements Logger {
             }
 
             @Override
-            public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
+            public void ignorableWhitespace(char[] ch, int start, int length)
+                    throws SAXException {
                 for (ContentHandler handler : contentHandlers_) {
                     handler.ignorableWhitespace(ch, start, length);
                 }

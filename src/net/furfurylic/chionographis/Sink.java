@@ -17,7 +17,7 @@ import javax.xml.xpath.XPathExpression;
 
 /**
  * A <i>sink</i> object is a destination of processed documents.
- * Objects which supplies documents to sinks are called <i>{@linkplain Driver sink drivers}</i>.
+ * Objects which supplies documents to sinks are called <i>{@linkplain Driver drivers}</i>.
  */
 public abstract class Sink {
 
@@ -26,6 +26,9 @@ public abstract class Sink {
      * its subclasses from exposing methods to public.
      */
 
+    /**
+     * Sole constructor which does not anything specific.
+     */
     Sink()
     {}
 
@@ -82,7 +85,8 @@ public abstract class Sink {
      * @return
      *      an array of necessity for a process for each input source;
      *      {@code false} means that this object doesn't require the corresponding input source
-     *      to be included in the process, i.e., the corresponding output is already up-to-date.
+     *      to be included in the process,
+     *      that is, the corresponding output is already up to date.
      */
     abstract boolean[] preexamineBundle(
         String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes);
@@ -94,7 +98,7 @@ public abstract class Sink {
      *
      * <p>If this sink object has returned a non-empty list in prior invocation of {@link
      * #referents()}, the driver may pass the referred source contents as
-     * <i>referredContents</i> argument. Note this behavior is optional (i.e. the driver can
+     * <i>referredContents</i> argument. Note this behavior is optional (that is, the driver can
      * ignore the request made by {@link #referents()}).</p>
      *
      * <p>This method, {@link #finishOne(Result)}, and {@link #abortOne(Result)}
@@ -143,7 +147,7 @@ public abstract class Sink {
      * Aborts processing one source document.
      *
      * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
-     * is considered fatal situation (i.e. the build process itself will be aborted).</p>
+     * is considered fatal situation (that is, the build process itself will be aborted).</p>
      *
      * <p>{@link #startOne(int, String, long, List)}, {@link #finishOne(Result)}, and this method
      * can be invoked simultaneously by multiple threads.</p>

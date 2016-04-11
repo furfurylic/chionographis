@@ -56,6 +56,12 @@ public final class All extends Sink implements Driver {
     private XMLTransfer xfer_;
     private Queue<Node> nodes_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     All(Logger logger) {
         sinks_ = new Sinks(logger);
     }

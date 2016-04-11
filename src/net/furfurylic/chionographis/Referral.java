@@ -16,6 +16,9 @@ import javax.xml.xpath.XPathExpressionException;
 
 import org.w3c.dom.Node;
 
+/**
+ * A helper class to extract information from XML documents by XPath expressions.
+ */
 final class Referral {
 
     /**
@@ -27,7 +30,7 @@ final class Referral {
      *      the XPath expressions.
      *
      * @return
-     *      the extracted string values arranged in a list in the same order than <i>referents</i>.
+     *      the extracted string values arranged in a list in the same order as {@code referents}.
      */
     public static List<String> extract(Node node, List<XPathExpression> referents) {
         List<String> referredContents;
