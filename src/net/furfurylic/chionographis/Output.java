@@ -58,6 +58,12 @@ public final class Output extends Sink {
     private Queue<OutputStream> buffers_;
     private AtomicInteger countInBundle_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Output(Logger logger) {
         logger_ = logger;
     }
@@ -105,7 +111,7 @@ public final class Output extends Sink {
      * For the {@linkplain Chionographis task} and <i>{@linkplain Snip Snip}</i> drivers,
      * the source documents in which the PI is searched for are the same as their output.
      * On the other hand, for {@linkplain Transform Transform} drivers, they are the literally the
-     * source documents (i.e., the documents not styled by the XSLT stylesheets yet).
+     * source documents (that is, the documents not styled by the XSLT stylesheets yet).
      * And <i>{@linkplain All All}</i> drivers don't do any search because they don't have any
      * particular one source document.</p>
      *
@@ -189,10 +195,12 @@ public final class Output extends Sink {
         if (dest_ != null) {
             // A predefined destination path exists.
             if (referent_ != null) {
-                logger_.log(this, "\"dest\" and \"refer\" can be set exclusively", Logger.Level.ERR);
+                logger_.log(this,
+                    "\"dest\" and \"refer\" can be set exclusively", Logger.Level.ERR);
                 throw new BuildException();
             } else if (mapper_ != null) {
-                logger_.log(this, "\"dest\" and file mappers can be set exclusively", Logger.Level.ERR);
+                logger_.log(this,
+                    "\"dest\" and file mappers can be set exclusively", Logger.Level.ERR);
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
@@ -207,7 +215,8 @@ public final class Output extends Sink {
                 xpath.setNamespaceContext(namespaceContext);
                 referents_ = Collections.singletonList(xpath.compile(referent_));
             } catch (XPathExpressionException e) {
-                logger_.log(this, "Failed to compile XPath expression: " + referent_, Logger.Level.ERR);
+                logger_.log(this,
+                    "Failed to compile XPath expression: " + referent_, Logger.Level.ERR);
                 throw new BuildException(e);
             }
 
@@ -216,7 +225,8 @@ public final class Output extends Sink {
             // neither does reference to the source document contents,
             // neither do file mappers.
             // -> No clue to decide the output path.
-            logger_.log(this, "Neither \"dest\", \"refer\" nor file mappers are set", Logger.Level.ERR);
+            logger_.log(this,
+                "Neither \"dest\", \"refer\" nor file mappers are set", Logger.Level.ERR);
             throw new BuildException();
         }
 
@@ -259,7 +269,8 @@ public final class Output extends Sink {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(
+            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         boolean[] includes = new boolean[originalSrcFileNames.length];
         if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
@@ -323,13 +334,15 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOriginalSrcNewer(long originalSrcLastModifiedTime, Set<Path> dests) {
+    private static boolean isOriginalSrcNewer(
+            long originalSrcLastModifiedTime, Set<Path> dests) {
         if (originalSrcLastModifiedTime <= 0) {
             return true;
         } else {
-            return dests.stream()
-                        .anyMatch(f -> (!Files.exists(f)
-                                     || (f.toFile().lastModified() < originalSrcLastModifiedTime)));
+            return
+                dests.stream()
+                     .anyMatch(f -> (!Files.exists(f)
+                                  || (f.toFile().lastModified() < originalSrcLastModifiedTime)));
         }
     }
 
@@ -353,7 +366,8 @@ public final class Output extends Sink {
                 logger_.log(this, "Creating " + absolute, Logger.Level.FINE);
                 // We take advantage of FileChannel for its capability to be interrupted
                 try {
-                    try (FileChannel channel = FileChannel.open(absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
+                    try (FileChannel channel = FileChannel.open(
+                            absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
                     }
                 } catch (IOException e) {
@@ -415,7 +429,7 @@ public final class Output extends Sink {
         }
     }
 
-    public static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
+    private static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
 
         public byte[] buffer() {
             return buf;

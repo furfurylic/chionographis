@@ -27,6 +27,12 @@ public final class Param {
     private String name_ = null;
     private Object value_ = null;
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Param(Logger logger) {
         logger_ = logger;
     }
@@ -65,6 +71,21 @@ public final class Param {
         value_ = value;
     }
 
+    /**
+     * Creates a key-value pair from this object's content.
+     *
+     * @param namespaceContext
+     *      a namespace prefix-namespace name mapping, which shall not be {@code null}.
+     *
+     * @return
+     *      a key-value pair for this object's content, which shall not be {@code null}.
+     *      The key is the parameter name in {@code localName} or {@code {namespaceURI}localName}
+     *      form, and the value is the parameter value.
+     *
+     * @throws BuildException
+     *      if either the {@linkplain #setName(String) name} or the {@linkplain #addText(String)
+     *      value} is not set.
+     */
     Map.Entry<String, Object> yield(NamespaceContext namespaceContext) {
         if (name_ == null) {
             String message = "Incomplete stylesheet parameter found";

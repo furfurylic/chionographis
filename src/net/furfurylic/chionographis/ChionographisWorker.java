@@ -1,3 +1,10 @@
+/*
+ * Chionographis
+ *
+ * These codes are licensed under CC0.
+ * https://creativecommons.org/publicdomain/zero/1.0/deed
+ */
+
 package net.furfurylic.chionographis;
 
 import java.net.URI;
@@ -28,6 +35,9 @@ import org.xml.sax.helpers.XMLFilterImpl;
 
 import net.furfurylic.chionographis.Logger.Level;
 
+/**
+ * A class for worker objects which reads an original source and send it to a sink.
+ */
 final class ChionographisWorker {
     /**
      * A logger type which resembles {@link Logger},
@@ -74,6 +84,30 @@ final class ChionographisWorker {
     private Map<String, Function<URI, String>> metaFuncMap_;
     private XMLTransfer xfer_;
 
+    /**
+     * Sole constructor.
+     *
+     * @param index
+     *      an opaque index of the original source.
+     * @param uri
+     *      the URI of the original source.
+     * @param fileName
+     *      the file name of the original source.
+     * @param lastModified
+     *      the last modified time of the original source, which is the number of milliseconds
+     *      from the epoch.
+     * @param sink
+     *      a sink which receives the document.
+     * @param logger
+     *      a logger.
+     * @param metaFuncMap
+     *      a key-value pairs of the meta-information name and the function which deduces
+     *      the meta-information value from the URI of the original source URI.
+     * @param xfer
+     *      an object which transfers XML documents.
+     * @param isOK
+     *      a function which tells whether the execution is go (1) or no-go (0).
+     */
     public ChionographisWorker(
                 int index, URI uri, String fileName, long lastModified,
                 Sink sink, BoundLogger logger,
@@ -90,6 +124,12 @@ final class ChionographisWorker {
         isOK_ = isOK;
     }
 
+    /**
+     * Executes the work.
+     *
+     * @return
+     *      1 if successful, 0 otherwise.
+     */
     public int run() {
         if (isOK_.getAsInt() == 0) {
             return 0;

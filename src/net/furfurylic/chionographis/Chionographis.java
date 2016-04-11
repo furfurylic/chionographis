@@ -19,14 +19,11 @@ import java.util.Formatter;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -44,7 +41,7 @@ import net.furfurylic.chionographis.Logger.Level;
  * An Ant task class that performs cascading transformation to XML documents.
  * As of now, only files can be original sources of the processing.
  *
- * <p>An object of this class behaves as a <i>sink driver</i>.</p>
+ * <p>An object of this class behaves as a <i>driver</i>.</p>
  */
 public final class Chionographis extends MatchingTask implements Driver {
 
@@ -292,10 +289,11 @@ public final class Chionographis extends MatchingTask implements Driver {
         int count;
         ForkJoinPool pool = parallel_ ? ForkJoinPool.commonPool() : null;
         if (pool != null) {
-            List<ForkJoinTask<Integer>> tasks = workers.map(wfac::convertToCallable)
-                                                       .map(w -> pool.submit(w))
-                                                       .collect(Collectors.toList());
-            count = tasks.stream().mapToInt(t -> t.join()).sum();
+            count = pool.submit(() -> workers.parallel()
+                                             .map(wfac::convertToRuiner)
+                                             .mapToInt(IntSupplier::getAsInt)
+                                             .sum())
+                        .join();
         } else {
             count = workers.mapToInt(IntSupplier::getAsInt).sum();
         }
@@ -352,7 +350,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 () -> isOK_)::run;
         }
 
-        public Callable<Integer> convertToCallable(IntSupplier worker) {
+        public IntSupplier convertToRuiner(IntSupplier worker) {
             return () -> {
                 try {
                     return worker.getAsInt();

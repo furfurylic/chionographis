@@ -51,6 +51,12 @@ public final class Transform extends Sink implements Driver {
 
     private Stylesheet stylesheet_ = new Stylesheet();
 
+    /**
+     * Sole constructor.
+     *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     */
     Transform(Logger logger) {
         sinks_ = new Sinks(logger);
     }
