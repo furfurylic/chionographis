@@ -53,7 +53,6 @@ public final class All extends Sink implements Driver {
     private Document resultDocument_;
     private long lastModifiedTime_;
 
-    private XMLTransfer xfer_;
     private Queue<Node> nodes_;
 
     /**
@@ -143,7 +142,6 @@ public final class All extends Sink implements Driver {
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
-        xfer_ = new XMLTransfer();
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
     }
@@ -168,7 +166,7 @@ public final class All extends Sink implements Driver {
     void startBundle() {
         sinks_.log(this, "Starting to collect input sources into " + rootQ_, Logger.Level.DEBUG);
         sinks_.startBundle();
-        resultDocument_ = xfer_.newDocument();
+        resultDocument_ = XMLTransfer.getDefault().newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
             docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI,
@@ -201,7 +199,7 @@ public final class All extends Sink implements Driver {
         assert ((DOMResult) result).getNode() != null;
         DOMResult r = (DOMResult) result;
         synchronized (resultDocument_) {
-            xfer_.transfer(new DOMSource(r.getNode()),
+            XMLTransfer.getDefault().transfer(new DOMSource(r.getNode()),
                 new DOMResult(resultDocument_.getDocumentElement()), true);
         }
         assert r.getNode() != null;
@@ -239,7 +237,7 @@ public final class All extends Sink implements Driver {
         Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
             // Send fragment to sink
-            xfer_.transfer(new DOMSource(resultDocument_), result);
+            XMLTransfer.getDefault().transfer(new DOMSource(resultDocument_), result);
             resultDocument_ = null;
             // Finish sink
             sinks_.finishOne(result);
