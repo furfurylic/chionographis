@@ -43,7 +43,6 @@ final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
     private List<Sink> sinks_;
-    private XMLTransfer xfer_ = null;
 
     /**
      * {@code includes_[i][j]} tells whether {@code sinks_.get(i)} wants the source indexed by
@@ -192,7 +191,7 @@ final class Sinks extends Sink implements Logger {
                     originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
                     referredContentsOne);
                 if (result != null) {
-                    // First, we populate acriveSinks.
+                    // First, we populate activeSinks.
                     if (activeSinks == null) {
                         activeSinks = Collections.singletonList(sinks_.get(j));
                     } else{
@@ -204,20 +203,8 @@ final class Sinks extends Sink implements Logger {
                         activeSinks.add(sinks_.get(j));
                     }
                     // Second, we populate builder.
-                    try {
-                        builder.add(result);
-                    } catch (RuntimeException e) {
-                        Sink lastSink = activeSinks.get(activeSinks.size() - 1);
-                        activeSinks.remove(activeSinks.size() - 1);
-                        try {
-                            lastSink.abortOne(result);
-                        } catch (FatalityException ex) {
-                            throw e;
-                        } catch (RuntimeException ex) {
-                            throw new FatalityException(ex);
-                        }
-                        throw e;    // activeSinks will be aborted in the catch site.
-                    }
+                    builder.add(result);    // We don't assume if any exception thrown here
+                                            // it is a recoverable situation.
                 }
             }
         } catch (RuntimeException e) {
@@ -225,13 +212,9 @@ final class Sinks extends Sink implements Logger {
             Result r = builder.newCompositeResult();
             if (r != null) {
                 try {
-                    abortSinks(r, activeSinks);
-                } catch (FatalityException ex) {
-                    throw ex;
+                    abort(r, activeSinks);
                 } catch (RuntimeException ex) {
-                    if (!(e instanceof FatalityException)) {
-                        throw new FatalityException(ex);
-                    }
+                    // e is more essential than ex for this abortion.
                 }
             }
             throw e;
@@ -256,64 +239,9 @@ final class Sinks extends Sink implements Logger {
 
         if (activeSinks.size() == 1) {
             activeSinks.get(0).finishOne(result);
-
-        } else if (result instanceof CompositeDOMResult) {
-            CompositeDOMResult r = (CompositeDOMResult) result;
-            DOMSource source = new DOMSource(r.getNode());
-            if (xfer_ == null) {
-                xfer_ = new XMLTransfer(null);
-            }
-
-            // Search a real DOMResult
-            // First whose getNode() == null
-            OptionalInt realDOM = IntStream.range(1, activeSinks.size())
-                                           .filter(i -> (r.resultOf(i) instanceof DOMResult)
-                                                     && ((DOMResult) r).getNode() == null)
-                                           .findAny();
-            // Second any DOMResult
-            if (!realDOM.isPresent()) {
-                realDOM = IntStream.range(1, activeSinks.size())
-                                   .filter(i -> r.resultOf(i) instanceof DOMResult)
-                                   .findAny();
-            }
-            assert realDOM.isPresent();
-            int j = realDOM.getAsInt();
-
-            // For indices other than j, send the result by copy
-            int i = 0;
-            try {
-                while (i < activeSinks.size()) {
-                    if (i != j) {
-                        xfer_.transfer(source, r.resultOf(i), false);
-                        activeSinks.get(i).finishOne(r.resultOf(i));
-                    }
-                    ++i;
-                }
-            } catch (RuntimeException e) {
-                IntStream.concat(IntStream.range(i + 1, activeSinks.size()), IntStream.of(j))
-                         .distinct()
-                         .forEach(k -> Sinks.abortSinkSilent(activeSinks.get(k), r.resultOf(k)));
-                throw e;
-            }
-
-            // For the index j, send the result by move
-            xfer_.transfer(source, r.resultOf(j), true);
-            activeSinks.get(j).finishOne(r.resultOf(j));
-
         } else {
-            assert result instanceof CompositeSAXResult : result.getClass();
-            CompositeSAXResult r = (CompositeSAXResult) result;
-            int i = 0;
-            try {
-                while (i < activeSinks.size()) {
-                    activeSinks.get(i).finishOne(r.resultOf(i));
-                    ++i;
-                }
-            } catch (RuntimeException e) {
-                IntStream.range(i + 1, activeSinks.size())
-                         .forEach(k -> Sinks.abortSinkSilent(activeSinks.get(k), r.resultOf(k)));
-                throw e;
-            }
+            assert result instanceof CompositeResult;
+            ((CompositeResult) result).results().finish(activeSinks);
         }
     }
 
@@ -325,51 +253,18 @@ final class Sinks extends Sink implements Logger {
             activeSinks = activeSinkMap_.get(result);
             activeSinkMap_.remove(result);
         }
-        assert activeSinks != null;
-        abortSinks(result, activeSinks);
+        abort(result, activeSinks);
     }
 
-    /**
-     * Does the maximum effort to abort all results.
-     *
-     * @param result
-     *      a possibly-composite TrAX result object, which shall not be {@code null}.
-     * @param sinks
-     *      a list of {@link Sink}s, which shall be coincident with {@code result}
-     *      and shall not be neither {@code null} nor empty.
-     *
-     * @throws RuntimeException
-     *      if one of {@code sinks} throws a {@link RuntimeException}.
-     *      This situation should be considered as unrecoverable.
-     */
-    private static void abortSinks(Result result, List<Sink> sinks) {
-        assert result != null;
+    private static void abort(Result result, List<Sink> sinks) {
         assert sinks != null;
         assert !sinks.isEmpty();
         if (sinks.size() == 1) {
+
             sinks.get(0).abortOne(result);
         } else {
-            CompositeResult r = (CompositeResult) result;
-            Optional<RuntimeException> ex =
-                IntStream.range(0, sinks.size())
-                         .mapToObj(i -> Sinks.abortSinkSilent(sinks.get(i), r.resultOf(i)))
-                         .filter(e -> e != null)
-                         .findAny();
-            if (ex.isPresent()) {
-                throw ex.get();
-            }
-        }
-    }
-
-    private static RuntimeException abortSinkSilent(Sink sink, Result result) {
-        if (result == null) {
-            return null;
-        }
-        try {
-            sink.abortOne(result);
-            return null;
-        } catch (RuntimeException e) {
-            return e;
+            assert result instanceof CompositeResult;
+            ((CompositeResult) result).results().abort(sinks);
         }
     }
 
@@ -386,37 +281,142 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
+    /** A collection of TrAX Results. */
+    private static abstract class Results {
+        private List<Result> results_;
+
+        public Results(List<Result> results) {
+            results_ = results;
+        }
+
+        public abstract void finish(List<Sink> sinks);
+
+        /**
+         * Does the maximum effort to abort all results.
+         *
+         * @param sinks
+         *      a list of {@link Sink}s, which shall be coincident with this object
+         *      and shall not be neither {@code null} nor empty.
+         *
+         * @throws RuntimeException
+         *      if one of {@code sinks} throws a {@link RuntimeException}.
+         *      This situation should be considered as unrecoverable.
+         */
+        public void abort(List<Sink> sinks) {
+            Optional<RuntimeException> ex =
+                IntStream.range(0, sinks.size())
+                         .mapToObj(i -> abortSinkSilent(sinks.get(i), results_.get(i)))
+                         .filter(e -> e != null)
+                         .reduce((e1, e2) -> (e2 instanceof FatalityException) ? e2 : e1);
+            if (ex.isPresent()) {
+                throw ex.get();
+            }
+        }
+
+        protected void abortSilent(IntStream indices, List<Sink> sinks) {
+            indices.forEach(k -> abortSinkSilent(sinks.get(k), results_.get(k)));
+        }
+
+        protected final List<Result> asList() {
+            return results_;
+        }
+
+        private static RuntimeException abortSinkSilent(Sink sink, Result result) {
+            try {
+                sink.abortOne(result);
+                return null;
+            } catch (RuntimeException e) {
+                return e;
+            }
+        }
+    }
+
     private static interface CompositeResult {
-        Result resultOf(int index);
+        Results results();
     }
 
     private static class CompositeSAXResult extends SAXResult implements CompositeResult {
 
-        List<Result> results_;
+        private Results results_;
 
         public CompositeSAXResult(ContentHandler handler, List<Result> results) {
             super(handler);
-            results_ = results;
+            results_ = new Results(results) {
+                @Override
+                public void finish(List<Sink> sinks) {
+                    List<Result> rs = results_.asList();
+                    int i = 0;
+                    try {
+                        while (i < sinks.size()) {
+                            sinks.get(i).finishOne(rs.get(i));
+                            ++i;
+                        }
+                    } catch (RuntimeException e) {
+                        abortSilent(IntStream.range(i + 1, sinks.size()), sinks);
+                        throw e;
+                    }
+                }
+            };
         }
 
         @Override
-        public Result resultOf(int index) {
-            return results_.get(index);
+        public Results results() {
+            return results_;
         }
     }
 
     private static class CompositeDOMResult extends DOMResult implements CompositeResult {
 
-        List<Result> results_;
+        private Results results_;
 
         public CompositeDOMResult(Node node, List<Result> results) {
             super(node);
-            results_ = results;
+            results_ = new Results(results) {
+                @Override
+                public void finish(List<Sink> sinks) {
+                    List<Result> rs = results_.asList();
+
+                    // Search a real DOMResult
+                    // Those which getNode() == null have high priority
+                    OptionalInt realDOM = IntStream.range(0, sinks.size())
+                        .filter(i -> rs.get(i) instanceof DOMResult)
+                        .reduce((i, j) -> (((DOMResult) rs.get(j)).getNode() == null) ? j : i);
+                    assert realDOM.isPresent();
+                    int j = realDOM.getAsInt();
+
+                    XMLTransfer xfer = XMLTransfer.getDefault();
+                    DOMSource source = new DOMSource(getNode());
+
+                    // For indices other than j, send the result by copy
+                    int i = 0;
+                    try {
+                        while (i < sinks.size()) {
+                            if (i != j) {
+                                xfer.transfer(source, rs.get(i), false);
+                                ++i;
+                                sinks.get(i - 1).finishOne(rs.get(i - 1));
+                            } else {
+                                ++i;
+                            }
+                        }
+                    } catch (RuntimeException e) {
+                        abortSilent(
+                            IntStream.concat(IntStream.range(i, sinks.size()), IntStream.of(j))
+                                     .distinct(),
+                            sinks);
+                        throw e;
+                    }
+
+                    // For the index j, send the result by move
+                    xfer.transfer(source, rs.get(j), true);
+                    sinks.get(j).finishOne(rs.get(j));
+                }
+            };
         }
 
         @Override
-        public Result resultOf(int index) {
-            return results_.get(index);
+        public Results results() {
+            return results_;
         }
     }
 
@@ -440,7 +440,7 @@ final class Sinks extends Sink implements Logger {
                 return results_.get(0);
             }
             if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
-                return new CompositeDOMResult(new XMLTransfer().newDocument(), results_);
+                return new CompositeDOMResult(XMLTransfer.getDefault().newDocument(), results_);
             }
 
             try {
