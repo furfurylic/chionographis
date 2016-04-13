@@ -28,7 +28,7 @@ Chionographis has five actors synopsized below:
 | _Output_ |Sink|Receives XML documents from its driver and writes them into files.
 |=================
 
-== _Chionographis_ driver
+=== _Chionographis_ driver
 
 A _Chionographis_ driver reads external XML documents from files and emits them into sinks it has.
 As of now, the sources of XML documents (called _original_ sources) are files only.
@@ -38,21 +38,21 @@ Ant framework. For example, it can have filesets and exclude patterns of Ant.
 For full set of its ability to accept the source information, consult Ant's document
 (this task extends from _MatchingTask_, which is a common base class of Ant's core tasks, e.g. Javac and Delete.)
 
-=== Attributes
+==== Attributes
 
 [options="header", cols="1,3,1"]
 |=================
 | Attribute | Description | Required
 |basedir|The base directory of this task.| No; defaults to the project's base directory
 |srcdir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
-|force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`
+|force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to `no`.| No; defaults to `no`
 |cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to `no`, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to `no`
 |verbose|Whether this task promotes log levels from "verbose" to "info" for some log entries, such as reports of document output.| No; defaults to `no`
 |parallel|Whether parallel execution is employed. The parallel execution is done with static thread pool whose maximum thread count coincides with the available processor count.| No; defaults to `yes`
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
 |=================
 
-=== Nested elements
+==== Nested elements
 
 [options="header", cols="1,3,1"]
 |=================
@@ -66,7 +66,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 |Other _MatchingTask_'s nested elements|Please consult Ant's document.|No
 |=================
 
-==== Meta element's attributes
+===== Meta element's attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -81,7 +81,7 @@ When "file-title", the data shall be the substring of the file name before its l
 
 |=================
 
-==== Namespace element's attributes
+===== Namespace element's attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -91,12 +91,12 @@ When "file-title", the data shall be the substring of the file name before its l
 |=================
 
 
-== _Transform_ filter
+=== _Transform_ filter
 
 A _Transform_ filter receives XML documents, and apply transformation by an XSLT stylesheet,
 generates output XML documents one per one input document and pass them to sinks it has.
 
-=== Attributes
+==== Attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -104,13 +104,13 @@ generates output XML documents one per one input document and pass them to sinks
 
 |style|The URI of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
 
-|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`
+|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to `no`.| No; defaults to `no`
 
 |cache|Whether this driver uses a document cache shared in Chionographis library for `xsl:include`, `xsl:import`, XPath `document` functions, and external entities referred by documents above.  +
  When set to `no`, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to `yes`
 |=================
 
-=== Nested elements
+==== Nested elements
 
 [options="header", cols="1,3,1"]
 |=================
@@ -123,7 +123,7 @@ generates output XML documents one per one input document and pass them to sinks
 |=================
 
 
-==== Param element's attributes / text content
+===== Param element's attributes / text content
 
 [options="header", cols="1,3,1"]
 |=================
@@ -136,14 +136,14 @@ Supported forms are `localName`, `prefix:localName` and `{namespaceURI}localName
 |=================
 
 
-== _All_ filter
+=== _All_ filter
 
 An _All_ filter receives XML documents, collects all of their document elements,
 arranges them as child elements of a newly-created XML document's document element,
 and passes the resulted document to sinks it has.
 The number of document passed to the sinks is always one.
 
-=== Attributes
+==== Attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -152,7 +152,7 @@ The number of document passed to the sinks is always one.
 |root|The name of the document element of the resulted document. +
 Supported forms are `localName`, `prefix:localName` and `{namespaceURI}localName`. In first form, the name doesn't belong to any namespace. In second form, the name belongs to a namespace whose name is mapped from the prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
-|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`; see note
+|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to `no`.| No; defaults to `no`; see note
 |=================
 
 [NOTE]
@@ -163,7 +163,7 @@ Otherwise, setting _force_ to `no` is possibly dangerous because the _All_
 filter can overlook the possible changes in resulted document when source
 documents are added or removed.
 
-=== Nested elements
+==== Nested elements
 
 [options="header", cols="1,3,1"]
 |=================
@@ -175,12 +175,12 @@ documents are added or removed.
 |=================
 
 
-== _Snip_ filter
+=== _Snip_ filter
 
 A _Snip_ filter receives XML documents, generates document fragments pointed by an XPath criteria from them,
 and passes the resulted document fragments as independent documents to sinks it has.
 
-=== Attributes
+==== Attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -189,10 +189,10 @@ and passes the resulted document fragments as independent documents to sinks it 
 |select|An XPath expression which specifies the unit in which the source document is snipped. +
 It can include include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the _Chinographis_'s child _namespace_ elements.| Yes
 
-|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this configuration.| No; defaults to `no`
+|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to `no`.| No; defaults to `no`
 |=================
 
-=== Nested elements
+==== Nested elements
 
 [options="header", cols="1,3,1"]
 |=================
@@ -204,7 +204,7 @@ It can include include names which belong some namespaces only when the namespac
 |=================
 
 
-== _Output_ sink
+=== _Output_ sink
 
 An _Ouput_ sink receives XML documents and writes them into filesystem files.
 
@@ -216,11 +216,12 @@ stylesheet files.
 As of now, last modification times of external entities,
 included or imported stylesheet files,
 and document files read through XSLT `document` functions are not reflected on
-the decision. In addition, if the stylesheets are not files (i.e. have URIs
-with schemes other than `file`), their last modified times
-are regarded "very new", so the destination files are always overwritten.
+the decision. In addition, if the stylesheets are not files
+(that is, they have URIs with schemes other than `file`),
+their last modified times are regarded "very new",
+so the destination files are always overwritten.
 
-=== Attributes
+==== Attributes
 
 [options="header", cols="1,3,1"]
 |=================
@@ -240,7 +241,7 @@ The XPath expression can include include names which belong some namespaces only
 |force|Whether this sink creates output files even if existing files seem new enough.| No; defaults to `no`
 |=================
 
-=== Nested elements
+==== Nested elements
 
 [options="header", cols="1,3,1"]
 |=================
@@ -250,3 +251,19 @@ The XPath expression can include include names which belong some namespaces only
 
 [NOTE]
 _dest_ and file mappers can be specified exclusively. _dest_ and _refer_ can be specified exclusively. At least one of _dest_, _refer_ and a file mapper must be specified. At most one file mapper can be installed .
+
+
+== Parallelism
+
+Chionographis task tries to execute in parallel unless the _Chionographis_ driver's _parallel_ attribute is set to `no`.
+Actually, Chionographis task employs parallel execution only in following two situations:
+
+Multiple original sources:: In this case, the _Chionographis_ driver reads, parses and passes them to its sinks in parallel.
+Multiple fragments generated by a Snip filter:: In this case, the _Snip_ filter passes them to its sinks in parallel.
+
+It is notable that an _All_ filter is an end point of parallel execution, for _All_ filters inherently have to wait for all the source documents to be accumulated.
+Of course, if there is a _Snip_ filter in descendant of an _All_ filter, it will be a beginning point of parallelism again.
+
+All Chionographis tasks share one common thread pool for parallelism.
+So if you run multiple Chinograhis tasks simultaneously in an Ant's _parallel_ task, they are likely to share the resource
+(to be specific, it is not the case that each Chinonographis task tries to utilize all the available processors as if there are no other processor users).
