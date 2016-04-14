@@ -46,8 +46,6 @@ public final class Snip extends Sink implements Driver {
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
 
-    private XMLTransfer xfer_;
-
     /**
      * Sole constructor.
      *
@@ -118,7 +116,6 @@ public final class Snip extends Sink implements Driver {
      */
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        xfer_ = new XMLTransfer();
         force_ = force_ || force;
         sinks_.init(baseDir, namespaceContext, force_);
         namespaceContext_ = namespaceContext;
@@ -198,7 +195,7 @@ public final class Snip extends Sink implements Driver {
     }
 
     private Document newFragmentDocument(Node node) {
-        Document document = xfer_.newDocument();
+        Document document = XMLTransfer.getDefault().newDocument();
         document.appendChild(document.adoptNode(node));
         return document;
     }
@@ -220,7 +217,7 @@ public final class Snip extends Sink implements Driver {
             result.originalSrcLastModifiedTime(), referredContents);
         if (rr != null) {
             // Send fragment to sink
-            xfer_.transfer(new DOMSource(document), rr);
+            XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
             // Finish sink
             sinks_.finishOne(rr);
         }
