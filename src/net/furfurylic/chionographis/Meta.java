@@ -108,6 +108,8 @@ public final class Meta {
      * Sets the type of the meta-information.
      * Only {@link Type} objects' string expression can be accepted.
      *
+     * <p>This is a mandatory attribute.</p>
+     *
      * @param type
      *      a {@link Type} object's string expression.
      */

@@ -260,7 +260,6 @@ final class Sinks extends Sink implements Logger {
         assert sinks != null;
         assert !sinks.isEmpty();
         if (sinks.size() == 1) {
-
             sinks.get(0).abortOne(result);
         } else {
             assert result instanceof CompositeResult;
@@ -616,5 +615,4 @@ final class Sinks extends Sink implements Logger {
         }
     }
 }
-
 

@@ -21,8 +21,14 @@ import org.w3c.dom.Node;
  */
 final class Referral {
 
+    /** A private default constructor which inhibits instantiation; that is, a misuse. */
+    private Referral() {
+    }
+
     /**
      * Extracts string values from XPath expressions.
+     *
+     * <p>This method synchronizes on each elemnts of {@code referents}.</p>
      *
      * @param node
      *      a node to apply the XPath expressions.
@@ -33,16 +39,17 @@ final class Referral {
      *      the extracted string values arranged in a list in the same order as {@code referents}.
      */
     public static List<String> extract(Node node, List<XPathExpression> referents) {
-        List<String> referredContents;
-        referredContents = referents.stream().map(r -> {
-            try {
-                synchronized (r) {  // TODO: synchronizing unit is OK?
-                    return (String) r.evaluate(node, XPathConstants.STRING);
-                }
-            } catch (XPathExpressionException e) {
-                return null;
+        return referents.stream().map(r -> extractOne(node, r))
+                                 .collect(Collectors.toList());
+    }
+
+    private static String extractOne(Node node, XPathExpression expr) {
+        try {
+            synchronized (expr) {
+                return (String) expr.evaluate(node, XPathConstants.STRING);
             }
-        }).collect(Collectors.toList());
-        return referredContents;
+        } catch (XPathExpressionException e) {
+            return null;
+        }
     }
 }
