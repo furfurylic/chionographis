@@ -56,15 +56,10 @@ final class XMLTransfer {
     private ThreadLocal<Supplier<DocumentBuilder>> builder_;
     private ThreadLocal<Supplier<Transformer>> identity_;
 
-    private static XMLTransfer default_;
+    private static final XMLTransfer DEFAULT = new XMLTransfer();
 
     public static XMLTransfer getDefault() {
-        synchronized (XMLTransfer.class) {  // TODO: synchronization unit OK?
-            if (default_ == null) {
-                default_ = new XMLTransfer();
-            }
-            return default_;
-        }
+        return DEFAULT;
     }
 
     /**

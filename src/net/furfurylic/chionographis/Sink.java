@@ -34,13 +34,16 @@ public abstract class Sink {
 
     /**
      * Initializes this object. This method can be invoked once at most in one lifetime.
+     * This method shall not be called simultaneously by multiple threads on one object.
      *
      * @param baseDir
      *      the base directory of the {@linkplain Chionographis task},
      *      which represents an absolute file path and is never {@code null}.
      * @param namespaceContext
      *      the namespace context used to resolve prefixes in the configurations of this object.
-     * @param force TODO
+     * @param force
+     *      whether the driver wants this object to process all inputs regardless
+     *      if the output files are up to date or not.
      */
     abstract void init(File baseDir, NamespaceContext namespaceContext, boolean force);
 
@@ -53,6 +56,8 @@ public abstract class Sink {
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,
      * boolean)} arbitrary number of times. If the driver is not responsive to this sink's request,
      * this method might never be invoked.</p>
+     *
+     * <p>This method may be called simultaneously by multiple threads on one object.</p>
      *
      * <p>The {@code referents} method of {@code Sink} returns an empty list.</p>
      *
@@ -71,6 +76,8 @@ public abstract class Sink {
      * but as of this version, is invoked once at most in one lifetime.
      * If the driver consider all of the candidate are to be included to the processing,
      * this method might never be invoked.</p>
+     *
+     * <p>This method may be called simultaneously by multiple threads on one object.</p>
      *
      * <p>Callees must not try to modify arrays passed as parameters.</p>
      *
@@ -98,11 +105,10 @@ public abstract class Sink {
      *
      * <p>If this sink object has returned a non-empty list in prior invocation of {@link
      * #referents()}, the driver may pass the referred source contents as
-     * <i>referredContents</i> argument. Note this behavior is optional (that is, the driver can
+     * {@code referredContents} argument. Note this behavior is optional (that is, the driver can
      * ignore the request made by {@link #referents()}).</p>
      *
-     * <p>This method, {@link #finishOne(Result)}, and {@link #abortOne(Result)}
-     * can be invoked simultaneously by multiple threads.</p>
+     * <p>This method may be called simultaneously by multiple threads on one object.</p>
      *
      * @param originalSrcIndex
      *      the index of the corresponding original source,
@@ -134,27 +140,34 @@ public abstract class Sink {
     /**
      * Finishes to receive one input document.
      *
-     * <p>{@link #startOne(int, String, long, List)}, this method, and {@link #abortOne(Result)}
-     * can be invoked simultaneously by multiple threads.</p>
+     * <p>This method may be called simultaneously by multiple threads on one object.
+     * It is not guaranteed that the thread which calls this method is identical to the one that
+     * called {@link　#startOne(int, String, long, List)}.</p>
      *
      * @param result
-     *      an TrAX {@code Result} object which is returned by {@link #startOne(int, String, long,
-     *      List)} of this object.
+     *      an TrAX {@code Result} object identical to what has been returned by
+     *      {@link #startOne(int, String, long, List)} of this object.
      */
     abstract void finishOne(Result result);
 
     /**
      * Aborts processing one source document.
      *
-     * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
-     * is considered fatal situation (that is, the build process itself will be aborted).</p>
+     * <p>This method will be called when {@link #startOne(int, String, long, List)}
+     * has been returned successfully and then something that prevents {@link #finishOne(Result)}
+     * from being called happened. If {@link #finishOne(Result)} throws an exception, this method
+     * will not be invoked.</p>
      *
-     * <p>{@link #startOne(int, String, long, List)}, {@link #finishOne(Result)}, and this method
-     * can be invoked simultaneously by multiple threads.</p>
+     * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
+     * is a considered fatal situation (that is, the build process itself will be aborted).</p>
+     *
+     * <p>This method may be called simultaneously by multiple threads on one object.
+     * It is not guaranteed that the thread which calls this method is identical to the one that
+     * called {@link　#startOne(int, String, long, List)}.</p>
      *
      * @param result
-     *      an TrAX {@code Result} object which is returned by {@link #startOne(int, String, long,
-     *      List)} of this object.
+     *      an TrAX {@code Result} object identical to what has been returned by
+     *      {@link #startOne(int, String, long, List)} of this object.
      */
     abstract void abortOne(Result result);
 

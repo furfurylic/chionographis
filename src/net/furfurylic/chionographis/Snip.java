@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -45,6 +46,7 @@ public final class Snip extends Sink implements Driver {
 
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
+    private final ReentrantLock lock_ = new ReentrantLock();
 
     /**
      * Sole constructor.
@@ -147,15 +149,7 @@ public final class Snip extends Sink implements Driver {
             // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criteria " + select_ +
                 "; the original source is " + r.originalSrcFileName(), Logger.Level.DEBUG);
-            NodeList nodes;
-            synchronized (this) {   // TODO: synchronization unit is OK?
-                if (expr_ == null) {
-                    XPath xpath = XPathFactory.newInstance().newXPath();
-                    xpath.setNamespaceContext(namespaceContext_);
-                    expr_ = xpath.compile(select_);
-                }
-                nodes = (NodeList) expr_.evaluate(r.getNode(), XPathConstants.NODESET);
-            }
+            NodeList nodes = extractNodes(r);
 
             int count;
             ForkJoinPool pool = ForkJoinTask.getPool();
@@ -191,6 +185,22 @@ public final class Snip extends Sink implements Driver {
 
         } catch (XPathExpressionException e) {
             throw new BuildException(e);
+        }
+    }
+
+    private NodeList extractNodes(DOMResult result) throws XPathExpressionException {
+        lock_.lock();
+        try {
+            NodeList nodes;
+            if (expr_ == null) {
+                XPath xpath = XPathFactory.newInstance().newXPath();
+                xpath.setNamespaceContext(namespaceContext_);
+                expr_ = xpath.compile(select_);
+            }
+            nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
+            return nodes;
+        } finally {
+            lock_.unlock();
         }
     }
 
