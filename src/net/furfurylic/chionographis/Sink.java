@@ -142,7 +142,7 @@ public abstract class Sink {
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
-     * called {@link　#startOne(int, String, long, List)}.</p>
+     * called {@link #startOne(int, String, long, List)}.</p>
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
@@ -163,7 +163,7 @@ public abstract class Sink {
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
-     * called {@link　#startOne(int, String, long, List)}.</p>
+     * called {@link #startOne(int, String, long, List)}.</p>
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
