@@ -11,7 +11,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.ref.SoftReference;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -41,7 +40,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
     private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
     private static final NetResourceCache<Source> TREES = new NetResourceCache<>();
 
-    private static final ThreadLocal<SoftReference<byte[]>> BUFFER = new ThreadLocal<>();
+    private static final Pool<byte[]> BUFFER = new Pool<>(() -> new byte[4096]);
 
     private Consumer<URI> listenStored_;
     private Consumer<URI> listenHit_;
@@ -76,23 +75,17 @@ final class CachingResolver implements EntityResolver, URIResolver {
                 if (u.getScheme().equalsIgnoreCase("file")) {
                     return Files.readAllBytes(Paths.get(u));
                 } else {
-                    byte[] buffer = null;
-                    {
-                        SoftReference<byte[]> ref = BUFFER.get();
-                        if (ref != null) {
-                            buffer = ref.get();
-                        }
-                        if (buffer == null) {
-                            buffer = new byte[4096];
-                            BUFFER.set(new SoftReference<byte[]>(buffer));
-                        }
-                    }
                     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                    try (InputStream in = u.toURL().openStream()) {
-                        int length;
-                        while ((length = in.read(buffer)) != -1) {
-                            bytes.write(buffer, 0, length);
+                    byte[] buffer = BUFFER.get();
+                    try {
+                        try (InputStream in = u.toURL().openStream()) {
+                            int length;
+                            while ((length = in.read(buffer)) != -1) {
+                                bytes.write(buffer, 0, length);
+                            }
                         }
+                    } finally {
+                        BUFFER.release(buffer);
                     }
                     return bytes.toByteArray();
                 }
@@ -159,7 +152,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             try {
                 uri = Paths.get(uri).toRealPath().toUri();
             } catch (IOException e) {
-                return null;
+                return uri;
             }
         } else {
             uri = uri.normalize();

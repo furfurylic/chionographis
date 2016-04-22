@@ -35,7 +35,7 @@ public final class Namespace {
     }
 
     /**
-     * Sets the namespace prefix.
+     * Sets the namespace prefix. This is a mandatory attribute.
      *
      * @param prefix
      *      the namespace prefix.
@@ -56,7 +56,7 @@ public final class Namespace {
     }
 
     /**
-     * Sets the namespace URI.
+     * Sets the namespace URI. This is a mandatory attribute.
      *
      * @param uri
      *      the namespace URI.

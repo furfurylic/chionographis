@@ -15,6 +15,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -29,7 +30,7 @@ import java.util.function.Function;
  */
 final class NetResourceCache<T> {
 
-    private final Object LOCK = new Object();
+    private final ReentrantLock LOCK = new ReentrantLock();
 
     /** A synchronized canonicalization mapping for URIs. */
     private Map<URI, WeakReference<URI>> canonURIs_ = null;
@@ -65,7 +66,8 @@ final class NetResourceCache<T> {
         assert uri.isAbsolute();
 
         Map<URI, Optional<T>> strongOne = null;
-        synchronized (LOCK) {
+        LOCK.lock();
+        try {
             if (cache_ == null) {
                 canonURIs_ = new WeakHashMap<>();
             } else {
@@ -75,6 +77,8 @@ final class NetResourceCache<T> {
                 strongOne = Collections.synchronizedMap(new IdentityHashMap<>());
                 cache_ = new SoftReference<>(strongOne);
             }
+        } finally {
+            LOCK.unlock();
         }
 
         // Get the privately-canonicalized form.

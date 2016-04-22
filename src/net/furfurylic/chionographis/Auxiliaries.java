@@ -69,7 +69,8 @@ final class Auxiliaries<T> {
      *      a logger called just after an key-value pair is stored to the resulting map.
      * @param logTwice
      *      a logger called when duplicated keys are found.
-     *      This method will fail just after this logger is called.
+     *      It is receommended that this logger exits with an appropriate exception to signal
+     *      this error. This method will fail just after this logger normally returns, however.
      *
      * @return
      *      the resulting map, which is not {@code null}.

@@ -1,1 +1,1 @@
-<a b="c">d</a>
+<a b="c" xmlns:d="http://www.furfurylic.net/chionographis/test/crossing/ns/d"><![CDATA[d]]><!--//--></a>

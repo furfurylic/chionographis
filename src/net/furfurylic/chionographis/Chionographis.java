@@ -402,17 +402,23 @@ public final class Chionographis extends MatchingTask implements Driver {
             e -> sinks_.log(this,
                             "Adding a meta-information instruction: name=" + e.getKey(),
                             Logger.Level.DEBUG),
-            k -> sinks_.log(this,
-                            "Meta-information instruction named " + k + " added twice",
-                            Logger.Level.ERR));
+            k -> {
+                sinks_.log(this,
+                    "Meta-information instruction named " + k + " added twice",
+                    Logger.Level.ERR);
+                throw new ChionographisBuildException(true);
+            });
     }
 
     private NamespaceContext createNamespaceContext() {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
             e -> sinks_.log(this,
                     "Adding namespace prefix mapping: " + e, Logger.Level.DEBUG),
-            k -> sinks_.log(this,
-                    "Namespace prefix " + k + " added twice", Logger.Level.ERR));
+            k -> {
+                sinks_.log(this,
+                    "Namespace prefix " + k + " added twice", Logger.Level.ERR);
+                throw new ChionographisBuildException(true);
+            });
         return new PrefixMap(namespaceMap);
     }
 
