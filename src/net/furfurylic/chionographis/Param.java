@@ -38,7 +38,7 @@ public final class Param {
     }
 
     /**
-     * Sets the name of this parameter.
+     * Sets the name of this parameter. This is a mandatory attribute.
      *
      * <p>The name is able to be specified in the following three ways:</p>
      * <ul>

@@ -432,6 +432,7 @@
             <namespace prefix="p1" uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
             <namespace prefix="p2" uri="http://www.furfurylic.net/chionographis/test/transform/ns/2"/>
             <transform style="input/flatten-ns.xsl" cache="no">
+                <param name="p">v0</param>
                 <param name="p1:p">v1</param>
                 <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
                 <output dest="output-${test.title}/actual.txt"/>

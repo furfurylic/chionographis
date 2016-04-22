@@ -165,8 +165,11 @@ public final class Transform extends Sink implements Driver {
         return params_.toMap(p -> p.yield(namespaceContext),
             e -> sinks_.log(this,
                     "Adding a stylesheet parameter: " + e, Logger.Level.DEBUG),
-            k -> sinks_.log(this,
-                    "Stylesheet parameter named " + k + " added twice", Logger.Level.ERR));
+            k -> {
+                sinks_.log(this,
+                    "Stylesheet parameter named " + k + " added twice", Logger.Level.ERR);
+                throw new ChionographisBuildException(true);
+            });
     }
 
     @Override

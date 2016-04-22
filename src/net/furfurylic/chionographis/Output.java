@@ -17,11 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -42,7 +40,8 @@ import org.apache.tools.ant.util.FileNameMapper;
  * An <i>Output</i> {@linkplain Sink sink} writes each source document into an filesystem file.
  */
 public final class Output extends Sink {
-    private final Object LOCK = new Object();
+    private static final Pool<OutputStream> BUFFER =
+        new Pool<>(() -> new ExposingByteArrayOutputStream());
 
     private Path destDir_ = null;
     private Path dest_ = null;
@@ -55,7 +54,6 @@ public final class Output extends Sink {
     private Function<String, Set<Path>> destMapping_ = null;
     private List<XPathExpression> referents_;
 
-    private Queue<OutputStream> buffers_;
     private AtomicInteger countInBundle_;
 
     /**
@@ -292,15 +290,7 @@ public final class Output extends Sink {
     @Override
     Result startOne(int originalSrcIndex, String originalSrcFileName,
             long originalSrcLastModifiedTime, List<String> referredContents) {
-        OutputStream buffer = null;
-        if (buffers_ != null) {
-            synchronized (buffers_) {
-                buffer = buffers_.poll();
-            }
-        }
-        if (buffer == null) {
-            buffer = new ExposingByteArrayOutputStream();
-        }
+        OutputStream buffer = BUFFER.get();
 
         // Configure dests.
         Set<Path> dests;
@@ -392,12 +382,7 @@ public final class Output extends Sink {
 
     private void placeBackBuffer(ByteArrayOutputStream buffer) {
         buffer.reset();
-        synchronized (LOCK) {
-            if (buffers_ == null) {
-                buffers_ = new ArrayDeque<>();
-            }
-            buffers_.offer(buffer);
-        }
+        BUFFER.release(buffer);
     }
 
     @Override
