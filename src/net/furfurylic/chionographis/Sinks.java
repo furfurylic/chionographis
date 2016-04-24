@@ -175,18 +175,19 @@ final class Sinks extends Sink implements Logger {
             long originalSrcLastModifiedTime, List<String> referredContents) {
         List<Sink> activeSinks = null;
         CompositeResultBuilder builder = new CompositeResultBuilder();
-        int i = 0;
         int j = 0;
         try {
+            int i = 0;
             for (; j < sinks_.size(); ++j) {
+                List<String> referredContentsOne =
+                    referredContents.subList(i, i + sinks_.get(j).referents().size());
+                i += sinks_.get(j).referents().size();
                 if (includes_ != null) {
                     boolean[] includesOne = includes_[j];
                     if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
                         continue;
                     }
                 }
-                List<String> referredContentsOne =
-                    referredContents.subList(i, i + sinks_.get(j).referents().size());
                 Result result = sinks_.get(j).startOne(
                     originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
                     referredContentsOne);
