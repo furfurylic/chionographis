@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -51,6 +52,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean force_ = false;
     private boolean verbose_ = false;
     private boolean parallel_ = true;
+    private Depends depends_ = null;
 
     private Auxiliaries<Namespace> namespaces_ = new Auxiliaries<>();
     private Auxiliaries<Meta> metas_ = new Auxiliaries<>();
@@ -181,6 +183,20 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
+     * Adds an additional depended resources by this task.
+     *
+     * <p>The depended resources are simply used for the decision
+     * whether the outputs are up to date.</p>
+     *
+     * @return
+     *      an empty additional depended resource container object.
+     */
+    public Depends createDepends() {
+        depends_ = new Depends(sinks_);
+        return depends_;
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -223,50 +239,37 @@ public final class Chionographis extends MatchingTask implements Driver {
         setUpDirectories();
 
         // Find files to process.
-        String[] includedFileNames;
-        URI[] includedURIs;
-        long[] includedFileLastModifiedTimes;
-        {
-            DirectoryScanner scanner = getDirectoryScanner(srcDir_.toFile());
-            scanner.scan();
-            includedFileNames = scanner.getIncludedFiles();
-            if (includedFileNames.length == 0) {
-                sinks_.log(this, "No input sources found", Logger.Level.INFO);
-                return;
-            }
-            includedURIs = Arrays.stream(includedFileNames)
-                                 .map(srcDir_::resolve)
-                                 .map(Path::toUri)
-                                 .toArray(URI[]::new);
-            includedFileLastModifiedTimes = Arrays.stream(includedURIs)
-                    .map(File::new)
-                    .mapToLong(File::lastModified)
-                    .toArray();
-        }
-        if (includedURIs.length > 1) {
-            sinks_.log(this, includedURIs.length + " input sources found", Logger.Level.INFO);
-        } else {
+        String[] srcFileNames = getIncludedFileNames();
+        switch (srcFileNames.length) {
+        case 0:
+            sinks_.log(this, "No input sources found", Logger.Level.INFO);
+            return;
+        case 1:
             sinks_.log(this, "1 input source found", Logger.Level.INFO);
+            break;
+        default:
+            sinks_.log(this, srcFileNames.length + " input sources found", Logger.Level.INFO);
+            break;
         }
 
-        // Set up namespace context.
-        NamespaceContext namespaceContext = createNamespaceContext();
+        URI[] srcURIs = Stream.of(srcFileNames)
+                              .map(srcDir_::resolve)
+                              .map(Path::toUri)
+                              .toArray(URI[]::new);
+        long[] srcLastModifiedTimes = getLastModifiedTimes(srcURIs);
 
-        sinks_.init(baseDir_.toFile(), namespaceContext, force_);
+        sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_);
 
         // Tell whether destinations are older.
-        boolean[] includes = force_ ?
-            null : sinks_.preexamineBundle(includedFileNames, includedFileLastModifiedTimes);
-        int includedCount;
-        if (includes == null) {
-            includedCount = includedFileNames.length;
-        } else {
-            includedCount = 0;
+        boolean[] includes = (force_ || (srcLastModifiedTimes == null)) ?
+            null : sinks_.preexamineBundle(srcFileNames, srcLastModifiedTimes);
+        if (includes != null) {
+            int includedCount = 0;
             for (int i = 0; i < includes.length; ++i) {
                 if (includes[i]) {
                     ++includedCount;
                 } else {
-                    sinks_.log(this, "Skipping " + includedURIs[i], Logger.Level.DEBUG);
+                    sinks_.log(this, "Skipping " + srcURIs[i], Logger.Level.DEBUG);
                 }
             }
             if (includedCount == 0) {
@@ -278,13 +281,12 @@ public final class Chionographis extends MatchingTask implements Driver {
         sinks_.startBundle();
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
-            includedURIs, includedFileNames, includedFileLastModifiedTimes,
+            srcURIs, srcFileNames, srcLastModifiedTimes,
             sinks_, createEntityResolver(), new ChionographisBoundLogger(), createMetaFuncMap());
 
-        Stream<IntSupplier> workers =
-            IntStream.range(0, includedFileNames.length)
-                     .filter(i -> (includes == null) || includes[i])
-                     .mapToObj(wfac::create);
+        Stream<IntSupplier> workers = IntStream.range(0, srcFileNames.length)
+                                               .filter(i -> (includes == null) || includes[i])
+                                               .mapToObj(wfac::create);
 
         int count;
         ForkJoinPool pool = parallel_ ? ForkJoinPool.commonPool() : null;
@@ -318,57 +320,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
-    private static final class ChionographisWorkerFactory {
-        private URI[] uris_;
-        private String[] fileNames_;
-        private long[] lastModifiedTimes_;
-        private XMLTransfer xfer_;
-        private Sink sink_;
-        private ChionographisWorker.BoundLogger logger_;
-        private Map<String, Function<URI, String>> metaFuncMap_;
-        private volatile int isOK_;
-
-        public ChionographisWorkerFactory(
-                URI[] uris, String[] fileNames, long[] lastModifiedTimes,
-                Sink sink, EntityResolver resolver,
-                ChionographisWorker.BoundLogger logger,
-                Map<String, Function<URI, String>> metaFuncMap) {
-            uris_ = uris;
-            fileNames_ = fileNames;
-            lastModifiedTimes_ = lastModifiedTimes;
-            sink_ = sink;
-            xfer_ = new XMLTransfer(resolver);
-            logger_ = logger;
-            metaFuncMap_ = metaFuncMap;
-            isOK_ = 1;
-        }
-
-        public IntSupplier create(int index) {
-            return new ChionographisWorker(index,
-                uris_[index], fileNames_[index], lastModifiedTimes_[index],
-                sink_, logger_, metaFuncMap_, xfer_,
-                () -> isOK_)::run;
-        }
-
-        public IntSupplier convertToRuiner(IntSupplier worker) {
-            return () -> {
-                try {
-                    return worker.getAsInt();
-                } catch (Error e) {
-                    ruin();
-                    throw e;
-                } catch (RuntimeException e) {
-                    ruin();
-                    throw e;
-                }
-            };
-        }
-
-        private void ruin() {
-            isOK_ = 0;
-        }
-    }
-
     private void setUpDirectories() {
         File projectBaseDir = getProject().getBaseDir();
         if (projectBaseDir == null) {
@@ -385,6 +336,27 @@ public final class Chionographis extends MatchingTask implements Driver {
         } else {
             srcDir_ = baseDir_.resolve(srcDir_);
         }
+    }
+
+    private String[] getIncludedFileNames() {
+        DirectoryScanner scanner = getDirectoryScanner(srcDir_.toFile());
+        scanner.scan();
+        return scanner.getIncludedFiles();
+    }
+
+    private long[] getLastModifiedTimes(URI[] uris) {
+        LongUnaryOperator mutateLastModified;
+        if (depends_ != null) {
+            long depends = depends_.lastModified();
+            mutateLastModified = l -> Math.max(l, depends);
+        } else {
+            mutateLastModified = l -> l;
+        }
+        return Stream.of(uris)
+                      .map(File::new)
+                      .mapToLong(File::lastModified)
+                      .map(mutateLastModified)
+                      .toArray();
     }
 
     private EntityResolver createEntityResolver() {
@@ -420,6 +392,59 @@ public final class Chionographis extends MatchingTask implements Driver {
                 throw new ChionographisBuildException(true);
             });
         return new PrefixMap(namespaceMap);
+    }
+
+    private static final class ChionographisWorkerFactory {
+        private URI[] uris_;
+        private String[] fileNames_;
+        private long[] lastModifiedTimes_;
+        private XMLTransfer xfer_;
+        private Sink sink_;
+        private ChionographisWorker.BoundLogger logger_;
+        private Map<String, Function<URI, String>> metaFuncMap_;
+        private volatile int isOK_;
+
+        public ChionographisWorkerFactory(
+                URI[] uris, String[] fileNames, long[] lastModifiedTimes,
+                Sink sink, EntityResolver resolver,
+                ChionographisWorker.BoundLogger logger,
+                Map<String, Function<URI, String>> metaFuncMap) {
+            uris_ = uris;
+            fileNames_ = fileNames;
+            lastModifiedTimes_ = lastModifiedTimes;
+            sink_ = sink;
+            xfer_ = new XMLTransfer(resolver);
+            logger_ = logger;
+            metaFuncMap_ = metaFuncMap;
+            isOK_ = 1;
+        }
+
+        public IntSupplier create(int index) {
+            long lastModifiedTime = (lastModifiedTimes_ != null)
+                ? lastModifiedTimes_[index] : 0;
+            return new ChionographisWorker(index,
+                uris_[index], fileNames_[index], lastModifiedTime,
+                sink_, logger_, metaFuncMap_, xfer_,
+                () -> isOK_)::run;
+        }
+
+        public IntSupplier convertToRuiner(IntSupplier worker) {
+            return () -> {
+                try {
+                    return worker.getAsInt();
+                } catch (Error e) {
+                    ruin();
+                    throw e;
+                } catch (RuntimeException e) {
+                    ruin();
+                    throw e;
+                }
+            };
+        }
+
+        private void ruin() {
+            isOK_ = 0;
+        }
     }
 
     private final class ChionographisLogger implements Logger {
