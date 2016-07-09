@@ -5,10 +5,12 @@
   <target name="full">
     <antcall target="basic-mapper"/>
     <antcall target="basic-mapper-up-to-date"/>
+    <antcall target="basic-up-to-date-by-depends-ignore"/>
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
     <antcall target="basic-force-task"/>
     <antcall target="basic-up-to-date-at-start"/>
+    <antcall target="basic-not-up-to-date-at-start-by-depends"/>
     <antcall target="basic-force-at-start"/>
     <antcall target="basic-meta"/>
     <antcall target="basic-meta-refer-content"/>
@@ -17,6 +19,8 @@
     <antcall target="transform-params-ns"/>
     <antcall target="transform-refer-content"/>
     <antcall target="transform-not-up-to-date"/>
+    <antcall target="transform-not-up-to-date-by-depends"/>
+    <antcall target="transform-not-up-to-date-by-depends-new"/>
     <antcall target="transform-force"/>
     <antcall target="all"/>
     <antcall target="all-up-to-date"/>
@@ -182,6 +186,39 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="basic-up-to-date-by-depends-ignore">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="mapper-up-to-date-by-depends-ignore"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:15 AM"/>
+
+    <!-- input1 and 2: older -->
+    <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
+    <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" cache="no">
+      <depends absent="ignore"><fileset file="${dir.output}/ghost"/></depends>
+      <output destdir="${test.prefix}/output-${test.title}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilelastmodified name="${test.name} - 1"
+      file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <assertfilelastmodified name="${test.name} - 2"
+      file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:15 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
   <target name="basic-refer-content">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="refer-content"/>
@@ -322,6 +359,41 @@
       file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
     <assertfileeq name="${test.name}"
       expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-not-up-to-date-at-start-by-depends">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="not-up-to-date-at-start-by-depends"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-up-to-date-at-start"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <!-- output: older -->
+    <touch file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <!-- dummy: newer -->
+    <touch file="${dir.output}/dummy.txt" datetime="01/01/2001 00:01:40 AM"/>
+
+    <copy todir="${dir.output}">
+      <fileset dir="${dir.input}" includes="input2.xml"/>
+    </copy>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input2.xml" cache="no">
+      <depends>
+        <fileset file="${dir.output}/dummy.txt"/>
+      </depends>
+      <output dest="output.xml"/>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
   </target>
@@ -528,6 +600,77 @@
     <!-- Shall be processed -->
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
       <transform style="output-${test.title}/flatten.xsl" cache="no">
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="transform/input/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-not-up-to-date-by-depends">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="not-up-to-date-by-depends"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- dummy for "depends": newer -->
+    <touch file="${dir.output}/dummy.xml" datetime="01/01/2001 00:01:15 AM"/>
+
+    <!-- input: older -->
+    <copy file="transform/input/input.xml" todir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- style: older -->
+    <copy file="flatten.xsl" todir="${dir.output}"/>
+    <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:01:05 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="output-${test.title}/flatten.xsl" cache="no">
+        <depends><fileset file="${dir.output}/dummy.xml"/></depends>
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="transform/input/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-not-up-to-date-by-depends-new">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="not-up-to-date-by-depends-new"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input: older -->
+    <copy file="transform/input/input.xml" todir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- style: older -->
+    <copy file="flatten.xsl" todir="${dir.output}"/>
+    <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:01:05 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="output-${test.title}/flatten.xsl" cache="no">
+        <depends absent="new"><fileset file="${dir.output}/dummy.xml"/></depends>
         <output dest="output-${test.title}/actual.txt"/>
       </transform>
     </chionographis>
