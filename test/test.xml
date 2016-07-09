@@ -1,966 +1,1049 @@
 <project name="chinographis-test" basedir="." default="full">
 
-    <taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
-
-    <target name="full">
-        <antcall target="basic-mapper"/>
-        <antcall target="basic-mapper-up-to-date"/>
-        <antcall target="basic-refer-content"/>
-        <antcall target="basic-force-output"/>
-        <antcall target="basic-force-task"/>
-        <antcall target="basic-up-to-date-at-start"/>
-        <antcall target="basic-force-at-start"/>
-        <antcall target="basic-meta"/>
-        <antcall target="basic-meta-refer-content"/>
-        <antcall target="transform"/>
-        <antcall target="transform-params"/>
-        <antcall target="transform-params-ns"/>
-        <antcall target="transform-refer-content"/>
-        <antcall target="transform-not-up-to-date"/>
-        <antcall target="transform-force"/>
-        <antcall target="all"/>
-        <antcall target="all-up-to-date"/>
-        <antcall target="all-up-to-date-late"/>
-        <antcall target="all-not-up-to-date-late"/>
-        <antcall target="all-ns"/>
-        <antcall target="all-force"/>
-        <antcall target="snip-1"/>
-        <antcall target="snip-2"/>
-        <antcall target="snip-ns"/>
-        <antcall target="crossing-cache"/>
-        <antcall target="crossing-cache-refer-content"/>
-        <antcall target="crossing-parallel-sinks"/>
-        <antcall target="crossing-abort-sources"/>
-        <antcall target="crossing-abort-sinks-dom"/>
-        <antcall target="crossing-abort-sinks-sax"/>
-    </target>
-
-    <macrodef name="assertfilenotexists">
-        <attribute name="name"/>
-        <attribute name="file"/>
-        <sequential>
-            <fail message="@{name}: @{file} DOES exist">
-                <condition><resourceexists><file file="@{file}"/></resourceexists></condition>
-            </fail>
-        </sequential>
-    </macrodef>
-
-    <macrodef name="assertfileeq">
-        <attribute name="name"/>
-        <attribute name="expected"/>
-        <attribute name="actual"/>
-        <sequential>
-            <fail message="@{name}: @{actual} doesn't exist">
-                <condition><not><resourceexists><file file="@{actual}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{expected} doesn't exist">
-                <condition><not><resourceexists><file file="@{expected}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{actual} doesn't match with @{expected}">
-                <condition><not><filesmatch file1="@{actual}" file2="@{expected}"/></not></condition>
-            </fail>
-        </sequential>
-    </macrodef>
-
-    <macrodef name="assertfileeq2">
-        <attribute name="name"/>
-        <attribute name="expected1"/>
-        <attribute name="expected2"/>
-        <attribute name="actual"/>
-        <sequential>
-            <fail message="@{name}: @{actual} doesn't exist">
-                <condition><not><resourceexists><file file="@{actual}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{expected1} doesn't exist">
-                <condition><not><resourceexists><file file="@{expected1}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{expected2} doesn't exist">
-                <condition><not><resourceexists><file file="@{expected2}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{actual} doesn't match with neither @{expected1} nor @{expected2}">
-                <condition>
-                    <not>
-                        <or>
-                            <filesmatch file1="@{actual}" file2="@{expected1}"/>
-                            <filesmatch file1="@{actual}" file2="@{expected2}"/>
-                        </or>
-                    </not>
-                </condition>
-            </fail>
-        </sequential>
-    </macrodef>
-
-        <macrodef name="assertfilelastmodified">
-        <attribute name="name"/>
-        <attribute name="file"/>
-        <attribute name="datetime"/>
-        <sequential>
-            <fail message="@{name}: @{file} doesn't exist">
-                <condition><not><resourceexists><file file="@{file}"/> </resourceexists></not></condition>
-            </fail>
-            <fail message="@{name}: @{file} doesn't have last modified time &quot;@{datetime}&quot;">
-                <condition>
-                    <not>
-                        <islastmodified datetime="@{datetime}" mode="equals">
-                            <file file="@{file}"/>
-                        </islastmodified>
-                    </not>
-                </condition>
-            </fail>
-        </sequential>
-    </macrodef>
-
-    <target name="basic-mapper">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="mapper"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" srcdir="input" includes="*.xml" cache="no">
-            <output destdir="output-${test.title}">
-                <globmapper from="input*.xml" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
-        <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-mapper-up-to-date">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="mapper-up-to-date"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-        <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1: older -->
-        <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input2: newer -->
-        <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" cache="no">
-            <output destdir="${test.prefix}/output-${test.title}">
-                <globmapper from="input*.xml" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <assertfilelastmodified name="${test.name}" file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-refer-content">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="refer-content"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="basic" srcdir="input-${test.title}" includes="*.xml" cache="no">
-            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]"/>
-            <output destdir="output-${test.title}" refer="//processing-instruction('chionographis-output')[1]">
-                <globmapper from="output*.xml" to="output*.2.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-force-output">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="force-output"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-        <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1: older -->
-        <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input2: newer -->
-        <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <!-- output1 shall not be processed and output2 shall be processed -->
-        <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" cache="no">
-            <output destdir="${test.prefix}/output-${test.title}" force="yes">
-                <globmapper from="input*.xml" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1" actual="${dir.output}/actual1.txt" expected="${dir.input}/expected1.txt"/>
-        <assertfileeq name="${test.name} - 2" actual="${dir.output}/actual2.txt" expected="${dir.input}/expected2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-force-task">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="force-task"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-        <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1: older -->
-        <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input2: newer -->
-        <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <!-- output1 shall not be processed and output2 shall be processed -->
-        <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" force="yes" cache="no">
-            <output destdir="${test.prefix}/output-${test.title}">
-                <globmapper from="input*.xml" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1" actual="${dir.output}/actual1.txt" expected="${dir.input}/expected1.txt"/>
-        <assertfileeq name="${test.name} - 2" actual="${dir.output}/actual2.txt" expected="${dir.input}/expected2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-up-to-date-at-start">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="up-to-date-at-start"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-        <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <copy todir="${dir.output}">
-            <fileset dir="${dir.input}" includes="*.xml"/>
-        </copy>
-        <!-- input1: older -->
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-        <!-- input2: newer -->
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:40 AM"/>
-
-        <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
-            <output refer="/*/@num">
-                <globmapper from="*" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="output2.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfilelastmodified name="${test.name} - 1" file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-force-at-start">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="force-at-start"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-up-to-date-at-start"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
-        <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <copy todir="${dir.output}">
-            <fileset dir="${dir.input}" includes="*.xml"/>
-        </copy>
-        <!-- input1 & 2: older -->
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <chionographis basedir="${dir.output}" includes="input*.xml" force="yes" cache="no">
-            <output refer="/*/@num">
-                <globmapper from="*" to="output*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="output*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-meta">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="meta"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
-            <meta type="file-name"/>
-            <meta type="file-title"/>
-            <output dest="${dir.output}/output.xml"/>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="basic-meta-refer-content">
-        <property name="test.prefix" value="basic"/>
-        <property name="test.title" value="meta-refer-content"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-meta"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
-            <meta type="file-name"/>
-            <meta type="file-title"/>
-            <output destdir="${dir.output}" refer="local-name(/*)">
-                <globmapper from="in*" to="out*.xml"/>
-            </output>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.name" value="${test.prefix}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-            <transform style="../flatten.xsl" cache="no">
-                <output dest="output/actual.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform-params">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.title" value="params"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-            <transform style="input/flatten-nons.xsl" cache="no">
-                <param name="p1">v1</param>
-                <param name="p2">v2</param>
-                <output dest="output-${test.title}/actual.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected-params.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform-params-ns">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.title" value="params-ns"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-            <namespace prefix="p1" uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
-            <namespace prefix="p2" uri="http://www.furfurylic.net/chionographis/test/transform/ns/2"/>
-            <transform style="input/flatten-ns.xsl" cache="no">
-                <param name="p">v0</param>
-                <param name="p1:p">v1</param>
-                <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
-                <output dest="output-${test.title}/actual.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected-params.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform-refer-content">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.title" value="refer-content"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis includes="${test.prefix}/input/*-${test.title}.xml" cache="no">
-            <transform style="flatten.xsl" cache="no">
-                <output destdir="${test.prefix}/output-${test.title}" refer="/*/processing-instruction('chionographis-output')[1]"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected-${test.title}.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform-not-up-to-date">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.title" value="not-up-to-date"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input: older -->
-        <copy file="transform/input/input.xml" todir="${dir.output}"/>
-        <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <!-- style: newer -->
-        <copy file="flatten.xsl" todir="${dir.output}"/>
-        <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- Shall be processed -->
-        <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-            <transform style="output-${test.title}/flatten.xsl" cache="no">
-                <output dest="output-${test.title}/actual.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="transform/input/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="transform-force">
-        <property name="test.prefix" value="transform"/>
-        <property name="test.title" value="force"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input: older -->
-        <copy file="transform/input/input.xml" todir="${dir.output}"/>
-        <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <!-- style: older -->
-        <copy file="flatten.xsl" todir="${dir.output}"/>
-        <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:00:50 AM"/>
-
-        <!-- Shall be processed -->
-        <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-            <transform style="output-${test.title}/flatten.xsl" force="yes" cache="no">
-                <output dest="output-${test.title}/actual.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all">
-        <property name="test.prefix" value="all"/>
-        <property name="test.name" value="${test.prefix}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" includes="input/*.xml" cache="no">
-            <all root="q">
-                <output dest="output/output.xml"/>
-            </all>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all-up-to-date">
-        <property name="test.prefix" value="all"/>
-        <property name="test.title" value="up-to-date"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1 and 2: older -->
-        <copy todir="${dir.output}">
-            <fileset dir="all/input" includes="*.xml"/>
-        </copy>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <!-- Shall not be processed -->
-        <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q">
-                <output dest="output-${test.title}/output.xml"/>
-            </all>
-        </chionographis>
-
-        <assertfilelastmodified name="${test.name}" file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all-up-to-date-late">
-        <property name="test.prefix" value="all"/>
-        <property name="test.title" value="up-to-date-late"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1 and 2: older -->
-        <copy todir="${dir.output}">
-            <fileset dir="all/input" includes="*.xml"/>
-        </copy>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <!-- Shall not be processed (decided later) -->
-        <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q">
-                <output destdir="output-${test.title}" refer="local-name(/*)">
-                    <globmapper from="*" to="*.xml"/>
-                </output>
-            </all>
-        </chionographis>
-
-        <assertfilelastmodified name="${test.name}" file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all-not-up-to-date-late">
-        <property name="test.prefix" value="all"/>
-        <property name="test.title" value="not-up-to-date-late"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <copy todir="${dir.output}">
-            <fileset dir="all/input" includes="*.xml"/>
-        </copy>
-
-        <!-- input1: older -->
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-
-        <!-- input2: newer -->
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
-
-        <!-- Shall be processed -->
-        <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q">
-                <output destdir="output-${test.title}" refer="local-name(/*)">
-                    <globmapper from="*" to="*.xml"/>
-                </output>
-            </all>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" in="${dir.output}/q.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all-ns">
-        <property name="test.prefix" value="all"/>
-        <property name="test.title" value="ns"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" includes="input-${test.title}/*.xml" cache="no">
-            <namespace prefix="all" uri="http://www.furfurylic.net/chionographis/test/all/ns/task1"/>
-            <all root="all:p">
-                <all root="{http://www.furfurylic.net/chionographis/test/all/ns/task2}q">
-                    <output dest="output-${test.title}/output.xml"/>
-                </all>
-            </all>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="all-force">
-        <property name="test.prefix" value="all"/>
-        <property name="test.title" value="force"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}"/>
-
-        <touch file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-        <!-- input1 and 2: older -->
-        <copy todir="${dir.output}">
-            <fileset dir="all/input" includes="*.xml"/>
-        </copy>
-        <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
-        <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
-
-        <!-- Shall BE processed -->
-        <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
-            <all root="q" force="yes">
-                <output dest="output-${test.title}/output.xml"/>
-            </all>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
-        <assertfileeq2 name="${test.name}" expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt" actual="${dir.output}/actual.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="snip-1">
-        <property name="test.prefix" value="snip"/>
-        <property name="test.title" value="1"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml" cache="no">
-            <snip select="//b">
-                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')"/>
-            </snip>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1a" expected="${dir.input}/expected1a.txt" actual="${dir.output}/actual1a.txt"/>
-        <assertfileeq name="${test.name} - 1b" expected="${dir.input}/expected1b.txt" actual="${dir.output}/actual1b.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="snip-2">
-        <property name="test.prefix" value="snip"/>
-        <property name="test.title" value="2"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml" cache="no">
-            <snip select="a/b">
-                <output destdir="${test.prefix}/output${test.title}" refer="//processing-instruction('chionographis-output')"/>
-            </snip>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 1a" expected="${dir.input}/expected1a.txt" actual="${dir.output}/actual1a.txt"/>
-        <assertfileeq name="${test.name} - 1b" expected="${dir.input}/expected1b.txt" actual="${dir.output}/actual1b.txt"/>
-        <assertfileeq name="${test.name} - 2a" expected="${dir.input}/expected2a.txt" actual="${dir.output}/actual2a.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="snip-ns">
-        <property name="test.prefix" value="snip"/>
-        <property name="test.title" value="ns"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml" cache="no">
-            <namespace prefix="q" uri="http://www.furfurylic.net/chionographis/test"/>
-            <snip select="//q:a[2]">
-                <output destdir="${test.prefix}/output-${test.title}" refer="//processing-instruction('chionographis-output')"/>
-            </snip>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name}" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-cache">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="cache"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}/input-${test.title}" includes="input.xml" verbose="yes">
-            <meta type="file-title"/>
-            <transform style="style1.xsl">
-                <output dest="../output-${test.title}/actual1.txt"/>
-            </transform>
-            <transform style="style2.xsl">
-                <output dest="../output-${test.title}/actual2.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
-        <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-cache-refer-content">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="cache-refer-content"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-cache"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${dir.input}" includes="input.xml" verbose="yes">
-            <meta type="file-title"/>
-            <output destdir="../output-${test.title}" refer="count(/*/*)">
-                <globmapper from="*" to="output*.xml"/>
-            </output>
-            <transform style="style2.xsl">
-                <output dest="../output-${test.title}/actual2.txt"/>
-            </transform>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq name="${test.name} - 0" expected="${dir.input}/expected0.txt" actual="${dir.output}/actual0.txt"/>
-        <assertfileeq name="${test.name} - 2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-parallel-sinks">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="parallel-sinks"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="*.xml" cache="no">
-            <!-- Original sources are: input1.xml and input2.xml. The latter contains document element's sibling. -->
-            <all root="p">
-                <output dest="output-${test.title}/output-p.xml"/>
-            </all>
-            <output destdir="${dir.output}">
-                <globmapper from="in*.xml" to="out*.xml"/>
-            </output>
-            <all root="q">
-                <output dest="output-${test.title}/output-q.xml"/>
-            </all>
-        </chionographis>
-
-        <xslt style="${basedir}/flatten.xsl" basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
-            <globmapper from="output*.xml" to="actual*.txt"/>
-        </xslt>
-        <assertfileeq2 name="${test.name} - all-p" expected1="${dir.input}/expected-p-a.txt" expected2="${dir.input}/expected-p-b.txt" actual="${dir.output}/actual-p.txt"/>
-        <assertfileeq2 name="${test.name} - all-q" expected1="${dir.input}/expected-q-a.txt" expected2="${dir.input}/expected-q-b.txt" actual="${dir.output}/actual-q.txt"/>
-        <assertfileeq name="${test.name} - output1" expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
-        <assertfileeq name="${test.name} - output2" expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-abort-sources">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="abort-sources"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-        <mkdir dir="${dir.output}/1"/>
-        <mkdir dir="${dir.output}/3"/>
-
-        <chionographis basedir="${test.prefix}" srcdir="input-${test.title}" includes="input*.xml" cache="no">
-            <!-- Original sources are: input1.xml, input2.xml, input3.xml.
-                 input2.xml's output shall fail due to absence of the parent directory.  -->
-            <transform style="../flatten.xsl">
-                <output destdir="output-${test.title}" mkdirs="no">
-                    <regexpmapper from="^input([0-9])\.xml$$" to="\1/output.txt"/>
-                </output>
-            </transform>
-        </chionographis>
-
-        <assertfileeq name="${test.name} - 1" expected="${dir.input}/expected1.txt" actual="${dir.output}/1/output.txt"/>
-        <assertfileeq name="${test.name} - 3" expected="${dir.input}/expected3.txt" actual="${dir.output}/3/output.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-abort-sinks-dom">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="abort-sinks-dom"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
-            <!-- a: this will fail due to "makedirs='no'" -->
-            <transform style="../flatten.xsl">
-                <output dest="output-${test.title}/a/output.txt" mkdirs="no"/>
-            </transform>
-            <!-- b, c, and d below shall be aborted in collateral of a -->
-            <!-- b: DOM-based multiple sink driver -->
-            <transform style="../flatten.xsl">
-                <output destdir="${dir.output}" refer="local-name(/*/@*)">
-                    <globmapper from="*" to="*1/output.txt"/>
-                </output>
-                <output destdir="${dir.output}" refer="local-name(/*/@*)">
-                    <globmapper from="*" to="*2/output.txt"/>
-                </output>
-            </transform>
-            <!-- c: SAX-based multiple sink driver -->
-            <transform style="../flatten.xsl">
-                <output dest="${dir.output}/c1/output.txt"/>
-                <output dest="${dir.output}/c2/output.txt"/>
-            </transform>
-            <!-- d: single sink driver -->
-            <transform style="../flatten.xsl">
-                <output dest="${dir.output}/d/output.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfilenotexists name="${test.name} - b1" file="${dir.output}/b1/output.txt"/>
-        <assertfilenotexists name="${test.name} - b2" file="${dir.output}/b2/output.txt"/>
-        <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
-        <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
-        <assertfilenotexists name="${test.name} - d" file="${dir.output}/d/output.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
-
-    <target name="crossing-abort-sinks-sax">
-        <property name="test.prefix" value="crossing"/>
-        <property name="test.title" value="abort-sinks-sax"/>
-        <property name="test.name" value="${test.prefix}-${test.title}"/>
-        <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
-        <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-        <delete dir="${dir.output}"/>
-
-        <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
-            <!-- a: this will fail due to "makedirs='no'" -->
-            <transform style="../flatten.xsl">
-                <output dest="${dir.output}/a/output.txt" mkdirs="no"/>
-            </transform>
-            <!-- c below shall be aborted in collateral of a -->
-            <!-- c: SAX-based multiple sink driver -->
-            <transform style="../flatten.xsl">
-                <output dest="${dir.output}/c1/output.txt"/>
-                <output dest="${dir.output}/c2/output.txt"/>
-            </transform>
-        </chionographis>
-
-        <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
-        <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
-
-        <delete dir="${dir.output}"/>
-    </target>
+  <taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
+
+  <target name="full">
+    <antcall target="basic-mapper"/>
+    <antcall target="basic-mapper-up-to-date"/>
+    <antcall target="basic-refer-content"/>
+    <antcall target="basic-force-output"/>
+    <antcall target="basic-force-task"/>
+    <antcall target="basic-up-to-date-at-start"/>
+    <antcall target="basic-force-at-start"/>
+    <antcall target="basic-meta"/>
+    <antcall target="basic-meta-refer-content"/>
+    <antcall target="transform"/>
+    <antcall target="transform-params"/>
+    <antcall target="transform-params-ns"/>
+    <antcall target="transform-refer-content"/>
+    <antcall target="transform-not-up-to-date"/>
+    <antcall target="transform-force"/>
+    <antcall target="all"/>
+    <antcall target="all-up-to-date"/>
+    <antcall target="all-up-to-date-late"/>
+    <antcall target="all-not-up-to-date-late"/>
+    <antcall target="all-ns"/>
+    <antcall target="all-force"/>
+    <antcall target="snip-1"/>
+    <antcall target="snip-2"/>
+    <antcall target="snip-ns"/>
+    <antcall target="crossing-cache"/>
+    <antcall target="crossing-cache-refer-content"/>
+    <antcall target="crossing-parallel-sinks"/>
+    <antcall target="crossing-abort-sources"/>
+    <antcall target="crossing-abort-sinks-dom"/>
+    <antcall target="crossing-abort-sinks-sax"/>
+  </target>
+
+  <macrodef name="assertfilenotexists">
+    <attribute name="name"/>
+    <attribute name="file"/>
+    <sequential>
+      <fail message="@{name}: @{file} DOES exist">
+        <condition><resourceexists><file file="@{file}"/></resourceexists></condition>
+      </fail>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="assertfileeq">
+    <attribute name="name"/>
+    <attribute name="expected"/>
+    <attribute name="actual"/>
+    <sequential>
+      <fail message="@{name}: @{actual} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{actual}"/></resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{expected} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{expected}"/></resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{actual} doesn't match with @{expected}">
+        <condition>
+          <not><filesmatch file1="@{actual}" file2="@{expected}"/></not>
+        </condition>
+      </fail>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="assertfileeq2">
+    <attribute name="name"/>
+    <attribute name="expected1"/>
+    <attribute name="expected2"/>
+    <attribute name="actual"/>
+    <sequential>
+      <fail message="@{name}: @{actual} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{actual}"/> </resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{expected1} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{expected1}"/> </resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{expected2} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{expected2}"/> </resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{actual} doesn't match with neither @{expected1} nor @{expected2}">
+        <condition>
+          <not>
+            <or>
+              <filesmatch file1="@{actual}" file2="@{expected1}"/>
+              <filesmatch file1="@{actual}" file2="@{expected2}"/>
+            </or>
+          </not>
+        </condition>
+      </fail>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="assertfilelastmodified">
+    <attribute name="name"/>
+    <attribute name="file"/>
+    <attribute name="datetime"/>
+    <sequential>
+      <fail message="@{name}: @{file} doesn't exist">
+        <condition>
+          <not><resourceexists><file file="@{file}"/></resourceexists></not>
+        </condition>
+      </fail>
+      <fail message="@{name}: @{file} doesn't have last modified time &quot;@{datetime}&quot;">
+        <condition>
+          <not>
+            <islastmodified datetime="@{datetime}" mode="equals">
+              <file file="@{file}"/>
+            </islastmodified>
+          </not>
+        </condition>
+      </fail>
+    </sequential>
+  </macrodef>
+
+  <target name="basic-mapper">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="mapper"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" srcdir="input" includes="*.xml" cache="no">
+      <output destdir="output-${test.title}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1"
+                  expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+    <assertfileeq name="${test.name} - 2"
+                  expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-mapper-up-to-date">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="mapper-up-to-date"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1: older -->
+    <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input2: newer -->
+    <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <chionographis srcdir="${dir.output}" includes="input*.xml" cache="no">
+      <output destdir="${test.prefix}/output-${test.title}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilelastmodified name="${test.name}"
+      file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-refer-content">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="refer-content"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="basic" srcdir="input-${test.title}" includes="*.xml" cache="no">
+      <output destdir="output-${test.title}"
+                  refer="//processing-instruction('chionographis-output')[1]"/>
+      <output destdir="output-${test.title}"
+                  refer="//processing-instruction('chionographis-output')[1]">
+        <globmapper from="output*.xml" to="output*.2.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+            basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-force-output">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="force-output"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1: older -->
+    <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input2: newer -->
+    <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <!-- output1 shall not be processed and output2 shall be processed -->
+    <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" cache="no">
+      <output destdir="${test.prefix}/output-${test.title}" force="yes">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1"
+      actual="${dir.output}/actual1.txt" expected="${dir.input}/expected1.txt"/>
+    <assertfileeq name="${test.name} - 2"
+      actual="${dir.output}/actual2.txt" expected="${dir.input}/expected2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-force-task">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="force-task"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1: older -->
+    <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input2: newer -->
+    <copy file="${dir.input}/input2.xml" tofile="${dir.output}/input2.xml"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <!-- output1 shall not be processed and output2 shall be processed -->
+    <chionographis srcdir="${test.prefix}/output-${test.title}"
+                   includes="input*.xml" force="yes" cache="no">
+      <output destdir="${test.prefix}/output-${test.title}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1"
+      actual="${dir.output}/actual1.txt" expected="${dir.input}/expected1.txt"/>
+    <assertfileeq name="${test.name} - 2"
+      actual="${dir.output}/actual2.txt" expected="${dir.input}/expected2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-up-to-date-at-start">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="up-to-date-at-start"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <copy todir="${dir.output}">
+      <fileset dir="${dir.input}" includes="*.xml"/>
+    </copy>
+    <!-- input1: older -->
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <!-- input2: newer -->
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:40 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
+      <output refer="/*/@num">
+        <globmapper from="*" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output2.xml" out="${dir.output}/actual2.txt"/>
+    <assertfilelastmodified name="${test.name} - 1"
+      file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-force-at-start">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="force-at-start"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-up-to-date-at-start"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <copy todir="${dir.output}">
+      <fileset dir="${dir.input}" includes="*.xml"/>
+    </copy>
+    <!-- input1 & 2: older -->
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input*.xml" force="yes" cache="no">
+      <output refer="/*/@num">
+        <globmapper from="*" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="output*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-meta">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="meta"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
+      <meta type="file-name"/>
+      <meta type="file-title"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-meta-refer-content">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="meta-refer-content"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
+      <meta type="file-name"/>
+      <meta type="file-title"/>
+      <output destdir="${dir.output}" refer="local-name(/*)">
+        <globmapper from="in*" to="out*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.name" value="${test.prefix}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="../flatten.xsl" cache="no">
+        <output dest="output/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-params">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="params"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="input/flatten-nons.xsl" cache="no">
+        <param name="p1">v1</param>
+        <param name="p2">v2</param>
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected-params.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-params-ns">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="params-ns"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <namespace prefix="p1"
+                 uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
+      <namespace prefix="p2"
+                 uri="http://www.furfurylic.net/chionographis/test/transform/ns/2"/>
+      <transform style="input/flatten-ns.xsl" cache="no">
+        <param name="p">v0</param>
+        <param name="p1:p">v1</param>
+        <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected-params.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-refer-content">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="refer-content"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis includes="${test.prefix}/input/*-${test.title}.xml" cache="no">
+      <transform style="flatten.xsl" cache="no">
+        <output destdir="${test.prefix}/output-${test.title}"
+                refer="/*/processing-instruction('chionographis-output')[1]"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected-${test.title}.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-not-up-to-date">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="not-up-to-date"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input: older -->
+    <copy file="transform/input/input.xml" todir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- style: newer -->
+    <copy file="flatten.xsl" todir="${dir.output}"/>
+    <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="output-${test.title}/flatten.xsl" cache="no">
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="transform/input/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-force">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="force"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input: older -->
+    <copy file="transform/input/input.xml" todir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- style: older -->
+    <copy file="flatten.xsl" todir="${dir.output}"/>
+    <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:00:50 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="output-${test.title}/flatten.xsl" force="yes" cache="no">
+        <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all">
+    <property name="test.prefix" value="all"/>
+    <property name="test.name" value="${test.prefix}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input/*.xml" cache="no">
+      <all root="q">
+        <output dest="output/output.xml"/>
+      </all>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq2 name="${test.name}"
+      expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt"
+      actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-up-to-date">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="up-to-date"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1 and 2: older -->
+    <copy todir="${dir.output}">
+      <fileset dir="all/input" includes="*.xml"/>
+    </copy>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- Shall not be processed -->
+    <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
+      <all root="q">
+        <output dest="output-${test.title}/output.xml"/>
+      </all>
+    </chionographis>
+
+    <assertfilelastmodified name="${test.name}"
+      file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-up-to-date-late">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="up-to-date-late"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1 and 2: older -->
+    <copy todir="${dir.output}">
+      <fileset dir="all/input" includes="*.xml"/>
+    </copy>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- Shall not be processed (decided later) -->
+    <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
+      <all root="q">
+        <output destdir="output-${test.title}" refer="local-name(/*)">
+          <globmapper from="*" to="*.xml"/>
+        </output>
+      </all>
+    </chionographis>
+
+    <assertfilelastmodified name="${test.name}"
+      file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-not-up-to-date-late">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="not-up-to-date-late"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/q.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <copy todir="${dir.output}">
+      <fileset dir="all/input" includes="*.xml"/>
+    </copy>
+
+    <!-- input1: older -->
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input2: newer -->
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:30 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
+      <all root="q">
+        <output destdir="output-${test.title}" refer="local-name(/*)">
+          <globmapper from="*" to="*.xml"/>
+        </output>
+      </all>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl" in="${dir.output}/q.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq2 name="${test.name}"
+      expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt"
+      actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-ns">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="ns"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input-${test.title}/*.xml" cache="no">
+      <namespace prefix="all" uri="http://www.furfurylic.net/chionographis/test/all/ns/task1"/>
+      <all root="all:p">
+        <all root="{http://www.furfurylic.net/chionographis/test/all/ns/task2}q">
+          <output dest="output-${test.title}/output.xml"/>
+        </all>
+      </all>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-force">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="force"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/output.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1 and 2: older -->
+    <copy todir="${dir.output}">
+      <fileset dir="all/input" includes="*.xml"/>
+    </copy>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+
+    <!-- Shall BE processed -->
+    <chionographis basedir="${test.prefix}" includes="output-${test.title}/input*.xml" cache="no">
+
+      <all root="q" force="yes">
+        <output dest="output-${test.title}/output.xml"/>
+      </all>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq2 name="${test.name}"
+      expected1="${dir.input}/expected-a.txt" expected2="${dir.input}/expected-b.txt"
+      actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="snip-1">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="1"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml" cache="no">
+      <snip select="//b">
+        <output destdir="${test.prefix}/output${test.title}"
+                refer="//processing-instruction('chionographis-output')"/>
+      </snip>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1a"
+      expected="${dir.input}/expected1a.txt" actual="${dir.output}/actual1a.txt"/>
+    <assertfileeq name="${test.name} - 1b"
+      expected="${dir.input}/expected1b.txt" actual="${dir.output}/actual1b.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="snip-2">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="2"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${test.prefix}/input${test.title}" includes="*.xml" cache="no">
+      <snip select="a/b">
+        <output destdir="${test.prefix}/output${test.title}"
+                refer="//processing-instruction('chionographis-output')"/>
+      </snip>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 1a"
+      expected="${dir.input}/expected1a.txt" actual="${dir.output}/actual1a.txt"/>
+    <assertfileeq name="${test.name} - 1b"
+      expected="${dir.input}/expected1b.txt" actual="${dir.output}/actual1b.txt"/>
+    <assertfileeq name="${test.name} - 2a"
+      expected="${dir.input}/expected2a.txt" actual="${dir.output}/actual2a.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="snip-ns">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="ns"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml" cache="no">
+      <namespace prefix="q" uri="http://www.furfurylic.net/chionographis/test"/>
+      <snip select="//q:a[2]">
+        <output destdir="${test.prefix}/output-${test.title}"
+                refer="//processing-instruction('chionographis-output')"/>
+      </snip>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output2.xml" out="${dir.output}/actual2.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-cache">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="cache"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}/input-${test.title}" includes="input.xml" verbose="yes">
+      <meta type="file-title"/>
+      <transform style="style1.xsl">
+        <output dest="../output-${test.title}/actual1.txt"/>
+      </transform>
+      <transform style="style2.xsl">
+        <output dest="../output-${test.title}/actual2.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+    <assertfileeq name="${test.name} - 2"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-cache-refer-content">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="cache-refer-content"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-cache"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" verbose="yes">
+      <meta type="file-title"/>
+      <output destdir="../output-${test.title}" refer="count(/*/*)">
+        <globmapper from="*" to="output*.xml"/>
+      </output>
+      <transform style="style2.xsl">
+        <output dest="../output-${test.title}/actual2.txt"/>
+      </transform>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq name="${test.name} - 0"
+      expected="${dir.input}/expected0.txt" actual="${dir.output}/actual0.txt"/>
+    <assertfileeq name="${test.name} - 2"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-parallel-sinks">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="parallel-sinks"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" srcdir="input-${test.title}"
+                   includes="*.xml" cache="no">
+      <!-- Original sources are: input1.xml and input2.xml.
+           The latter contains document element's sibling. -->
+      <all root="p">
+        <output dest="output-${test.title}/output-p.xml"/>
+      </all>
+      <output destdir="${dir.output}">
+        <globmapper from="in*.xml" to="out*.xml"/>
+      </output>
+      <all root="q">
+        <output dest="output-${test.title}/output-q.xml"/>
+      </all>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">
+      <globmapper from="output*.xml" to="actual*.txt"/>
+    </xslt>
+    <assertfileeq2 name="${test.name} - all-p"
+      expected1="${dir.input}/expected-p-a.txt" expected2="${dir.input}/expected-p-b.txt"
+      actual="${dir.output}/actual-p.txt"/>
+    <assertfileeq2 name="${test.name} - all-q"
+      expected1="${dir.input}/expected-q-a.txt" expected2="${dir.input}/expected-q-b.txt"
+      actual="${dir.output}/actual-q.txt"/>
+    <assertfileeq name="${test.name} - output1"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+    <assertfileeq name="${test.name} - output2"
+      expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-abort-sources">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="abort-sources"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}/1"/>
+    <mkdir dir="${dir.output}/3"/>
+
+    <chionographis basedir="${test.prefix}" srcdir="input-${test.title}"
+                   includes="input*.xml" cache="no">
+      <!-- Original sources are: input1.xml, input2.xml, input3.xml.
+               input2.xml's output shall fail due to absence of the parent directory.  -->
+      <transform style="../flatten.xsl">
+        <output destdir="output-${test.title}" mkdirs="no">
+          <regexpmapper from="^input([0-9])\.xml$$" to="\1/output.txt"/>
+        </output>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/1/output.txt"/>
+    <assertfileeq name="${test.name} - 3"
+      expected="${dir.input}/expected3.txt" actual="${dir.output}/3/output.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-abort-sinks-dom">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="abort-sinks-dom"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
+      <!-- a: this will fail due to "makedirs='no'" -->
+      <transform style="../flatten.xsl">
+        <output dest="output-${test.title}/a/output.txt" mkdirs="no"/>
+      </transform>
+      <!-- b, c, and d below shall be aborted in collateral of a -->
+      <!-- b: DOM-based multiple sink driver -->
+      <transform style="../flatten.xsl">
+        <output destdir="${dir.output}" refer="local-name(/*/@*)">
+          <globmapper from="*" to="*1/output.txt"/>
+        </output>
+        <output destdir="${dir.output}" refer="local-name(/*/@*)">
+          <globmapper from="*" to="*2/output.txt"/>
+        </output>
+      </transform>
+      <!-- c: SAX-based multiple sink driver -->
+      <transform style="../flatten.xsl">
+        <output dest="${dir.output}/c1/output.txt"/>
+        <output dest="${dir.output}/c2/output.txt"/>
+      </transform>
+      <!-- d: single sink driver -->
+      <transform style="../flatten.xsl">
+        <output dest="${dir.output}/d/output.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name} - b1" file="${dir.output}/b1/output.txt"/>
+    <assertfilenotexists name="${test.name} - b2" file="${dir.output}/b2/output.txt"/>
+    <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
+    <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
+    <assertfilenotexists name="${test.name} - d" file="${dir.output}/d/output.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-abort-sinks-sax">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="abort-sinks-sax"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-abort-sinks"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" srcdir="${dir.input}" includes="input.xml" cache="no">
+      <!-- a: this will fail due to "makedirs='no'" -->
+      <transform style="../flatten.xsl">
+        <output dest="${dir.output}/a/output.txt" mkdirs="no"/>
+      </transform>
+      <!-- c below shall be aborted in collateral of a -->
+      <!-- c: SAX-based multiple sink driver -->
+      <transform style="../flatten.xsl">
+        <output dest="${dir.output}/c1/output.txt"/>
+        <output dest="${dir.output}/c2/output.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name} - c1" file="${dir.output}/c1/output.txt"/>
+    <assertfilenotexists name="${test.name} - c2" file="${dir.output}/c2/output.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
 
 </project>
