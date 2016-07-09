@@ -18,9 +18,9 @@
     </sequential>
   </target>
 
-  <target name="doc">
-    <delete dir="release/doc" />
-    <mkdir dir="release/doc" />
+  <target name="api-docs">
+    <delete dir="release/doc/api" />
+    <mkdir dir="release/doc/api" />
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
       sourcepath="src" destdir="release/doc" encoding="UTF-8" docencoding="UTF-8"
       charset="UTF-8" windowtitle="Chionographis API Specification"
@@ -28,9 +28,20 @@
       classpath="${ant.home}/lib/ant.jar" use="yes" />
   </target>
 
-  <target name="doc-devel">
-    <delete dir="devel/doc" />
-    <mkdir dir="devel/doc" />
+  <target name="users-guide">
+    <mkdir dir="release/doc" />
+    <exec executable="asciidoc">
+      <arg line="-b html5" />
+      <arg line="-a toc" />
+      <arg line="-n" />
+      <arg line="-o release/doc/UsersGuide.html" />
+      <arg line="UsersGuide.asciidoc" />
+    </exec>
+  </target>
+
+  <target name="api-doc-devel">
+    <delete dir="devel/doc/api" />
+    <mkdir dir="devel/doc/api" />
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
       sourcepath="src" destdir="devel/doc" encoding="UTF-8" docencoding="UTF-8"
       charset="UTF-8" windowtitle="Chionographis API Specification"
