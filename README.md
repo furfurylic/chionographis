@@ -8,13 +8,11 @@ This transformation is done with following three primitive operations applied ar
  - joining of multiple XML documents into one,
  - and snipping fragments from XML documents.
 
-For usage, consult [User's Guide](UsersGuide.asciidoc). For requirements and the ways to build, read below.
-
 ## Requirements
 
 Running Chionographis requires JRE installed, of version 1.8 or later. And it also requires [Apache Ant](http://ant.apache.org/) installed, of version 1.8.0 or later.
 
-To build Chionographis, you need JDK instead of JRE.
+To build Chionographis, you need JDK instead of JRE. Optionally, to build User's Guide, you need [AsciiDoc](http://www.methods.co.nz/asciidoc/) installed too.
 
 ## How to Build
 
@@ -33,16 +31,9 @@ $ ant doc
 
 and you will get API documents in `release/doc` directory.
 
-## How to Run
+## Example
 
-To run Chionographis with Ant, you have to define the task:
-
-```XML
-<taskdef name="chionographis"
-         classname="net.furfurylic.chionographis.Chionographis"/>
-```
-
-Then you can write a target which uses this task:
+Here is an example of a Ant target which uses Chionographis:
 
 ```XML
 <target name="flora-genera">
@@ -60,26 +51,12 @@ Then you can write a target which uses this task:
 </target>
 ```
 
-You can run this target with `ant` command:
+This target reads all `.xml` files in `flora` directory and collects all of them into a new document `<flora>...</flora>`,
+then transforms it with XSLT stylesheet `flora/to-genera.xsl`,
+then finds all document fragemnts which matches XPath `/genera/genus`,
+and then finally writes all fragments into separated files in directory `flora-genera` as `XXX.xml`, where `XXX` is the `name` attribute of the document element of each document fragment.
 
-```
-$ ant -lib the-directory-which-contains-chionographis.jar -f sample.xml flora-genera
-```
-
-This sample does following:
-
- 1. first reads and parses all files with `.xml` extension in `flora` directory,
- 1. then collects all parsed documents into a new document whose document element is `<flora>...</flora>`,
- 1. then transforms this document with XSLT stylesheet `flora/to-genera.xsl`,
- 1. then finds all fragments from the resulted document which matches XPath criteria `/genera/genus`,
- 1. finally writes each fragment to a file whose path is `flora-genera/XXX.xml`, where `XXX` is the string value of XPath expression `/genus/@name` of each fragment document (that is, `XXX` of the document element `<genus name="XXX">...</genus>`).
-
-Additionally, it might be noteworthy that:
-
- - this target recognizes whether the output files are up to date for the input files, and, if so, cuts out the file output process,
- - and if the runtime environment has multiple available processors, this target tries to take advantage of them to parallelize the reading and writing of the files.
-
-For details, please consult the [Users Guide](UsersGuide.asciidoc).
+For details, please consult the Users Guide.
 
 ## License
 

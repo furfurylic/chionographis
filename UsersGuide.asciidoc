@@ -1,6 +1,69 @@
 = Chionographis User's Guide
 
+== Overview
+
 Chionographis is an Ant task that performs cascading XML transformation.
+This transformation is done with following three primitive operations applied arbitrary number of times in arbitrary order:
+ - XML transformation with XSLT stylesheet,
+ - joining of multiple XML documents into one,
+ - and snipping fragments from XML documents.
+
+=== Requirements
+
+Running Chionographis requires JRE installed, of version 1.8 or later. And it also requires link:http://ant.apache.org/[Apache Ant] installed, of version 1.8.0 or later.
+
+=== License
+
+These codes are licensed under link:https://creativecommons.org/publicdomain/zero/1.0/deed[CC0].
+
+== Example
+
+To use Chionographis, first you have to define the task:
+
+[source,xml]
+----
+<taskdef name="chionographis"
+         classname="net.furfurylic.chionographis.Chionographis"/>
+----
+
+Then you can use the task:
+
+[source,xml]
+----
+<target name="flora-genera">
+  <chionographis srcdir="flora" includes="*.xml">
+    <all root="flora">
+      <transform style="flora/to-genera.xsl">
+        <snip select="/genera/genus">
+          <output destdir="flora-genera" refer="/genus/@name">
+            <globmapper from="*" to="*.xml"/>
+          </output>
+        </snip>
+      </transform>
+    </all>
+  </chionographis>
+</target>
+----
+
+This target does following:
+
+ . first reads and parses all files with `.xml` extension in `flora` directory,
+ . then collects all parsed documents into a new document whose document element is `<flora>...</flora>`,
+ . then transforms this document with XSLT stylesheet `flora/to-genera.xsl`,
+ . then finds all fragments from the resulted document which matches XPath criteria `/genera/genus`,
+ . finally writes each fragment to a file whose path is `flora-genera/XXX.xml`, where `XXX` is the string value of XPath expression `/genus/@name` of each fragment document (that is, `XXX` of the document element `<genus name="XXX">...</genus>`).
+
+Additionally, it might be noteworthy that:
+
+ - this target recognizes whether the output files are up to date for the input files, and, if so, cuts out the file output process,
+ - and if the runtime environment has multiple available processors, this target tries to take advantage of them to parallelize the reading and writing of the files.
+
+To run this target you can use the usual `ant` command, but you have to make Ant able to find `chionographis.jar`:
+
+[source,sh]
+----
+ant -lib the-directory-which-contains-chionographis.jar -f sample.xml flora-genera
+----
 
 == Drivers, sinks and filters
 
