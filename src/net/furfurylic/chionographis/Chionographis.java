@@ -348,7 +348,14 @@ public final class Chionographis extends MatchingTask implements Driver {
         LongUnaryOperator mutateLastModified;
         if (depends_ != null) {
             long depends = depends_.lastModified();
-            mutateLastModified = l -> Math.max(l, depends);
+            if (depends == 0) {
+                // 0 means "unknown"
+                long[] zeroes = new long[uris.length];
+                Arrays.fill(zeroes, 0);
+                return zeroes;
+            } else {
+                mutateLastModified = l -> Math.max(l, depends);
+            }
         } else {
             mutateLastModified = l -> l;
         }
