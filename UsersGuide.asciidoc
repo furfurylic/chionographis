@@ -50,7 +50,7 @@ This target does following:
  . first reads and parses all files with `.xml` extension in `flora` directory,
  . then collects all parsed documents into a new document whose document element is `<flora>...</flora>`,
  . then transforms this document with XSLT stylesheet `flora/to-genera.xsl`,
- . then finds all fragments from the resulted document which matches XPath criteria `/genera/genus`,
+ . then finds all fragments from the resulted document which matches XPath criterion `/genera/genus`,
  . finally writes each fragment to a file whose path is `flora-genera/XXX.xml`, where `XXX` is the string value of XPath expression `/genus/@name` of each fragment document (that is, `XXX` of the document element `<genus name="XXX">...</genus>`).
 
 Additionally, it might be noteworthy that:
@@ -158,7 +158,7 @@ When `file-title`, the data shall be the substring of the file name before its l
 
 [options="header", cols="1,3,1"]
 |=================
-| Attribute / Child | Description | Required
+| Attribute / Nested element | Description | Required
 |attribute: absent|An instruction how depended resources which do not exist are treated. +
 When `fail`, the execution will terminate with an error. +
 When `new`, the absent depended resources are regarded "very new", so that the corresponding output files are regarded as not up to date. +
@@ -256,7 +256,7 @@ documents are added or removed.
 
 === Snip filter
 
-A _Snip_ filter receives XML documents, generates document fragments pointed by an XPath criteria from them,
+A _Snip_ filter receives XML documents, generates document fragments pointed by an XPath criterion from them,
 and passes the resulted document fragments as independent documents to sinks it has.
 
 ==== Attributes
@@ -332,7 +332,7 @@ The XPath expression can include names which belong some namespaces only when th
 _dest_ and file mappers can be specified exclusively. _dest_ and _refer_ can be specified exclusively. At least one of _dest_, _refer_ and a file mapper must be specified. At most one file mapper can be installed .
 
 
-== Criteria to skip processing
+== Criteria for skipping processing
 
 All drivers of Chionographis skip processing inputs which are not newer than their corresponding outputs unless they are not forced to process by _force_ attrubutes.
 
@@ -342,7 +342,7 @@ So, in the following cases, skipping processing will occur and the corresponding
 The input XML files depend on other files which are newer:: For example, newer DTD files and newer external parsed entities don't make the input files processed.
 The XSLT stylesheet files depend on other files which are newer:: For example, newer external document files referred by `document()` XSLT functions and external stylesheet files imported by `<xsl:import>` don't make the input files processed either.
 
-You can tell _Chionographis_ and _Transform_ drivers to refer the new-ness these depended files by _depends_ child elements.
+You can tell _Chionographis_ and _Transform_ drivers to refer the new-ness of these depended files by _depends_ child elements.
 
 == Parallelism
 
