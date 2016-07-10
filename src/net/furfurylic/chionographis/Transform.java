@@ -48,7 +48,13 @@ public final class Transform extends Sink implements Driver {
     private Depends depends_ = null;
 
     private URI styleURI_;
+
+    /**
+     * The maximum last modified time of the stylesheet and the specified depended resources.
+     * 0 means "unknown" or "very new".
+     */
     private long lastModified_;
+
     private Map<String, Object> paramMap_ = null;
 
     private Stylesheet stylesheet_ = new Stylesheet();
@@ -192,7 +198,7 @@ public final class Transform extends Sink implements Driver {
     boolean[] preexamineBundle(
             String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
         setUpLastModified();
-        if ((!force_) && (lastModified_ > 0)) {
+        if ((!force_) && (lastModified_ != 0)) {
             long[] lastModifiedTimes =
                 Arrays.stream(originalSrcLastModifiedTimes)
                       .map(l -> (l <= 0 ? l : Math.max(l, lastModified_)))
@@ -213,13 +219,15 @@ public final class Transform extends Sink implements Driver {
             }
             if (lastModified_ > 0) {
                 long dependsLastModified = depends_.lastModified();
-                if (dependsLastModified > 0) {
+                if (dependsLastModified != 0) {
                     lastModified_ = Math.max(lastModified_, dependsLastModified);
                     return;
+                } else {
+                    // fall through: 0 means "unknown"
                 }
             }
         }
-        lastModified_ = 0;
+        lastModified_ = 0;  // "unknown" or "very new"
     }
 
     @Override
