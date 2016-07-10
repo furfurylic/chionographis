@@ -99,7 +99,7 @@ As of now, the sources of XML documents (called _original_ sources) are files on
 This is an Ant task too, and can be configured to read documents from various sources with
 Ant framework. For example, it can have filesets and exclude patterns of Ant.
 For full set of its ability to accept the source information, consult Ant's document
-(this task extends from _MatchingTask_, which is a common base class of Ant's core tasks, e.g. Javac and Delete.)
+(this task extends from _MatchingTask_, which is a common base class of Ant's core tasks, for example, Javac and Delete.)
 
 ==== Attributes
 
@@ -136,7 +136,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 |=================
 | Attribute | Description | Required
 
-|name|The target of the processing instruction (PI).| No; defaulted to "chionographis-" and the type concatenated, e.g., "chionographis-file-name"
+|name|The target of the processing instruction (PI).| No; defaulted to "chionographis-" and the type concatenated, for example, "chionographis-file-name"
 
 |type|The type of the meta-information, which is the data of PI.  +
 When `uri`, the data shall be the absolute URI of the original source. +
@@ -266,7 +266,7 @@ and passes the resulted document fragments as independent documents to sinks it 
 | Attribute | Description | Required
 
 |select|An XPath expression which specifies the unit in which the source document is snipped. +
-It can include include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the _Chinographis_'s child _namespace_ elements.| Yes
+It can include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the _Chinographis_'s child _namespace_ elements.| Yes
 
 |force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to `no`.| No; defaults to `no`
 |=================
@@ -313,7 +313,7 @@ so the destination files are always overwritten.
 |refer|An XPath expression which points the content of the "source document" (see below) required to decide the output file path. +
 The string value of the pointee is used as an input to the installed file mapper if any, otherwise is used as if it is set to _dest_ attribute.  +
 _Transform_ drivers retrieve the pointee from the source documents of the transformation; on the other hand, the _Chionographis_, _All_, and _Snip_ drivers retrieve from their result document (the source document of this sink). +
-The XPath expression can include include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the task's child _namespace_ elements.| No; see note
+The XPath expression can include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the task's child _namespace_ elements.| No; see note
 
 |mkdirs|Whether this sink creates parent directories of the destination file if needed.| No; defaults to `Yes`
 
