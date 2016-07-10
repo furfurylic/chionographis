@@ -1,6 +1,6 @@
-<project name="chionographis" default="release">
+<project name="chionographis" default="classes">
 
-  <target name="release">
+  <target name="classes">
     <sequential>
       <delete dir="release/classes" />
       <mkdir dir="release/classes" />
@@ -37,6 +37,16 @@
       <arg line="-o release/doc/UsersGuide.html" />
       <arg line="UsersGuide.asciidoc" />
     </exec>
+  </target>
+
+  <target name="release">
+    <delete dir="release" />
+    <antcall target="classes" />
+    <antcall target="api-docs" />
+    <antcall target="users-guide" />
+    <zip destfile="release/doc/api.zip" basedir="release/doc/api" />
+    <delete dir="release/classes" />
+    <delete dir="release/doc/api" />
   </target>
 
   <target name="api-doc-devel">
