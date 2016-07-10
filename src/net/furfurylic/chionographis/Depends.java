@@ -75,6 +75,14 @@ public final class Depends {
         resources_ = resources;
     }
 
+    /**
+     * Returns the last modified time of the newest resource.
+     *
+     * @return
+     *      -1 if all of the resources are very old (or the caller can neglect its new-ness),
+     *      0 if one of the resource is very new,
+     *      positive value otherwise.
+     */
     long lastModified() {
         long l = -1;
         for (Resource r : (Iterable<Resource>) (() -> resources_.iterator())) {
@@ -87,25 +95,40 @@ public final class Depends {
                 // ignore minus
             }
         }
-        return (l == -1) ? ofAbsent() : l;
+        return (l == -1) ? ofAbsent(null) : l;
     }
 
     private long lastModifiedOne(Resource r) {
         if (r.isExists()) {
             return r.getLastModified();     // positive or 0
         } else {
-            return ofAbsent();
+            return ofAbsent(r);
         }
     }
 
-    private long ofAbsent() {
+    private long ofAbsent(Resource r) {
         switch (absent_) {
         case IGNORE:
             return -1;
         case NEW:
+            if (r != null) {
+                logger_.log(this,
+                    "Referred resource \"" + r.toString() + "\" is missing to be regarded as new",
+                    Logger.Level.INFO);
+            } else {
+                logger_.log(this,
+                    "Referred resources are missing to be regarded as new",
+                    Logger.Level.INFO);
+            }
             return 0;
         case FAIL:
-            throw new BuildException(); // TODO: logging
+            if (r != null) {
+                logger_.log(this,
+                    "Required resource \"" + r.toString() + "\" is missing", Logger.Level.ERR);
+            } else {
+                logger_.log(this, "Required resources are missing", Logger.Level.ERR);
+            }
+            throw new BuildException();
         default:
             assert false;
             return 0;
