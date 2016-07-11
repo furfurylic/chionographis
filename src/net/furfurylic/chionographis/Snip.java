@@ -147,7 +147,7 @@ public final class Snip extends Sink implements Driver {
 
         try {
             // Apply XPath expression to current document
-            sinks_.log(this, "Applying snipping criteria " + select_ +
+            sinks_.log(this, "Applying snipping criterion " + select_ +
                 "; the original source is " + r.originalSrcFileName(), Logger.Level.DEBUG);
             NodeList nodes = extractNodes(r);
 
