@@ -174,14 +174,16 @@ public final class All extends Sink implements Driver {
                 rootQ_.getNamespaceURI());
         }
         resultDocument_.appendChild(docElement);
-        lastModifiedTime_ = Long.MIN_VALUE;
+        lastModifiedTime_ = 1;
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName, long originalSrcLastModified, List<String> notUsed) {
+    Result startOne(int originalSrcIndex, String originalSrcFileName,
+            long originalSrcLastModified, List<String> notUsed) {
         assert resultDocument_ != null;
         synchronized (resultDocument_) {
-            lastModifiedTime_ = Math.max(originalSrcLastModified, lastModifiedTime_);
+            lastModifiedTime_ = ((originalSrcLastModified <= 0) || (lastModifiedTime_ <= 0)) ?
+                0 : Math.max(originalSrcLastModified, lastModifiedTime_);
         }
         synchronized (resultDocument_) {
             if (nodes_ != null) {
