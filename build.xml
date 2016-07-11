@@ -49,7 +49,7 @@
     <delete dir="release/doc/api" />
   </target>
 
-  <target name="api-doc-devel">
+  <target name="api-docs-devel">
     <delete dir="devel/doc/api" />
     <mkdir dir="devel/doc/api" />
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"

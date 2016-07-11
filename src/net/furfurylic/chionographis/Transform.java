@@ -240,6 +240,8 @@ public final class Transform extends Sink implements Driver {
             long originalSrcLastModifiedTime, List<String> notUsed) {
         try {
             List<XPathExpression> referents = sinks_.referents();
+            long lastModified = ((originalSrcLastModifiedTime <= 0) || (lastModified_ <= 0)) ?
+                0 : Math.max(originalSrcLastModifiedTime, lastModified_);
             if (!referents.isEmpty()) {
                 return new FinisherDOMResult(
                     r -> {
@@ -248,7 +250,7 @@ public final class Transform extends Sink implements Driver {
                             + String.join(", ", referredContents), Logger.Level.DEBUG);
                         Result openedResult =
                             sinks_.startOne(originalSrcIndex, originalSrcFileName,
-                                lastModified_, referredContents);
+                                lastModified, referredContents);
                         if (openedResult != null) {
                             try {
                                 stylesheet_.newTransformer()
@@ -263,7 +265,7 @@ public final class Transform extends Sink implements Driver {
             } else {
                 Result openedResult =
                     sinks_.startOne(originalSrcIndex, originalSrcFileName,
-                        lastModified_, Collections.emptyList());
+                        lastModified, Collections.emptyList());
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
                     styler.setResult(openedResult);
