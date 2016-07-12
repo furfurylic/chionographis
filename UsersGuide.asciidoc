@@ -222,6 +222,10 @@ arranges them as child elements of a newly-created XML document's document eleme
 and passes the resulted document to sinks it has.
 The number of document passed to the sinks is always one.
 
+[NOTE]
+The document order of the collected elements in the resulted document is not specified.
+If the order is significant, you should sort the elements by a descendant _Transform_ filter.
+
 ==== Attributes
 
 [options="header", cols="1,3,1"]
@@ -342,7 +346,7 @@ So, in the following cases, skipping processing will occur and the corresponding
 The input XML files depend on other files which are newer:: For example, newer DTD files and newer external parsed entities don't make the input files processed.
 The XSLT stylesheet files depend on other files which are newer:: For example, newer external document files referred by `document()` XSLT functions and external stylesheet files imported by `<xsl:import>` don't make the input files processed either.
 
-You can tell _Chionographis_ and _Transform_ drivers to refer the new-ness of these depended files by _depends_ child elements.
+You can tell _Chionographis_ and _Transform_ drivers to refer the newness of these depended files by _depends_ child elements.
 
 == Parallelism
 
