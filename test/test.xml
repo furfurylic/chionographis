@@ -19,6 +19,7 @@
     <antcall target="transform-params-ns"/>
     <antcall target="transform-refer-content"/>
     <antcall target="transform-not-up-to-date"/>
+    <antcall target="transform-not-up-to-date-at-start"/>
     <antcall target="transform-not-up-to-date-by-depends"/>
     <antcall target="transform-not-up-to-date-by-depends-new"/>
     <antcall target="transform-force"/>
@@ -601,6 +602,41 @@
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
       <transform style="output-${test.title}/flatten.xsl" cache="no">
         <output dest="output-${test.title}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name}"
+      expected="transform/input/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-not-up-to-date-at-start">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="not-up-to-date-at-start"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/actual.txt" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- input: newer -->
+    <copy file="transform/input/input.xml" todir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- style: older -->
+    <copy file="flatten.xsl" todir="${dir.output}"/>
+    <touch file="${dir.output}/flatten.xsl" datetime="01/01/2001 00:00:45 AM"/>
+
+    <!-- Shall be processed -->
+    <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
+      <transform style="output-${test.title}/flatten.xsl" cache="no">
+        <output destdir="${dir.output}">
+          <globmapper from="*.xml" to="actual.txt"/>
+        </output>
       </transform>
     </chionographis>
 
