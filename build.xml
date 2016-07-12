@@ -10,7 +10,7 @@
       <delete dir="release/lib" />
       <mkdir dir="release/lib" />
       <jar destfile="release/lib/chionographis.jar" basedir="release/classes"
-        includes="**/*" update="false" filesonly="true" index="yes">
+        includes="**/*" update="false" filesonly="true" index="yes" level="9">
         <manifest>
           <attribute name="Sealed" value="true" />
         </manifest>
@@ -44,7 +44,7 @@
     <antcall target="classes" />
     <antcall target="api-docs" />
     <antcall target="users-guide" />
-    <zip destfile="release/doc/api.zip" basedir="release/doc/api" />
+    <zip destfile="release/doc/api.zip" basedir="release/doc/api" level="9" />
     <delete dir="release/classes" />
     <delete dir="release/doc/api" />
   </target>
@@ -55,7 +55,8 @@
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
       sourcepath="src" destdir="devel/doc/api" encoding="UTF-8" docencoding="UTF-8"
       charset="UTF-8" windowtitle="Chionographis API Specification"
-      doctitle="Chionographis API Specification for developers" header="Chionographis API for developers"
+      doctitle="Chionographis API Specification for developers"
+      header="Chionographis API for developers"
       classpath="${ant.home}/lib/ant.jar" access="package" use="yes" />
   </target>
 
