@@ -293,22 +293,23 @@ public final class Output extends Sink {
         OutputStream buffer = BUFFER.get();
 
         // Configure dests.
-        Set<Path> dests;
+        Set<Path> dests = Collections.<Path>emptySet();
         if (referents_.isEmpty()) {
             assert destMapping_ != null;
             dests = destMapping_.apply(originalSrcFileName);
-        } else {
-            if (referredContents.isEmpty() || (referredContents.get(0) == null)) {
-                logger_.log(this, "Cannot decide the output file path", Logger.Level.ERR);
-                throw new BuildException();
-            } else if (destMapping_ != null) {
+        } else if (!(referredContents.isEmpty() || (referredContents.get(0) == null))) {
+            if (destMapping_ != null) {
                 dests = destMapping_.apply(referredContents.get(0));
             } else {
                 dests = Collections.singleton(destDir_.resolve(referredContents.get(0)));
             }
         }
-        if (!force_
-         && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
+        if (dests.isEmpty()) {
+            logger_.log(this, "Cannot decide the output file path", Logger.Level.ERR);
+            throw new BuildException();
+        }
+
+        if (!force_ && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
             if (dests.size() > 1) {
                 String files = dests.stream()
                     .map(Path::toString)
@@ -319,7 +320,7 @@ public final class Output extends Sink {
                     Logger.Level.DEBUG);
             }
             return null;
-       }
+        }
 
         return new OutputStreamResult(buffer, dests);
     }
