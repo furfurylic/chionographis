@@ -1,5 +1,4 @@
 = Chionographis User's Guide
-furfurylic
 :revnumber:, :revdate:
 
 == Overview
