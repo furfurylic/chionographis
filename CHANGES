@@ -1,0 +1,11 @@
+Changes for 1.0.1:
+
+ * Fixed behaviour of <depends absent="new"> for Chionographis driver, which
+   had handled it as if <depends absent="ignore">.
+ * Fixed issues of Transform and All drivers in terms of judgement of newness
+   of the original sources.
+ * Fixed typos and syntax errors in the user's guide.
+
+Changes for 1.0.0:
+
+ * Initial release of Chionographis.
