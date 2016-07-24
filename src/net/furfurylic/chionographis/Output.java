@@ -359,7 +359,7 @@ public final class Output extends Sink {
                 try {
                     try (FileChannel channel = FileChannel.open(
                             absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
-                        channel.write(ByteBuffer.wrap(out.buffer(), 0, out.count()));
+                        channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
                     }
                 } catch (IOException e) {
                     logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
@@ -419,10 +419,6 @@ public final class Output extends Sink {
 
         public byte[] buffer() {
             return buf;
-        }
-
-        public int count() {
-            return count;
         }
     }
 }
