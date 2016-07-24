@@ -1,3 +1,7 @@
+Cahnges for 1.0.2:
+
+ * Fixed a fatal bug by which Output sink writes excess contents.
+
 Changes for 1.0.1:
 
  * Fixed behaviour of <depends absent="new"> for Chionographis driver, which
