@@ -15,6 +15,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -124,8 +125,8 @@ public final class Snip extends Sink implements Driver {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
-        return sinks_.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes);
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+        return sinks_.preexamineBundle(origSrcFileNames, origSrcLastModTimes);
     }
 
     @Override
@@ -134,9 +135,9 @@ public final class Snip extends Sink implements Driver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> notUsed) {
-        return new SnipDOMResult(originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime);
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> notUsed) {
+        return new SnipDOMResult(origSrcIndex, origSrcFileName, origSrcLastModTime);
     }
 
     @Override
@@ -153,14 +154,14 @@ public final class Snip extends Sink implements Driver {
 
             int count;
             ForkJoinPool pool = ForkJoinTask.getPool();
+            Stream<Document> fragsStream =
+                IntStream.range(0, nodes.getLength())
+                         .mapToObj(i -> nodes.item(i))
+                         .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
+                         .map(n -> newFragmentDocument(n));
             if (pool != null) {
                 // We do document creation sequentially.
-                List<Document> documents =
-                    IntStream.range(0, nodes.getLength())
-                             .mapToObj(i -> nodes.item(i))
-                             .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
-                             .map(n -> newFragmentDocument(n))
-                             .collect(Collectors.toList());
+                List<Document> documents = fragsStream.collect(Collectors.toList());
                 // Created documents are passed to sink in parallel.
                 count = pool.submit(() -> documents.stream()
                                                    .parallel()
@@ -169,12 +170,8 @@ public final class Snip extends Sink implements Driver {
                             .join();
                 // It is OK if some fragments failed.
             } else {
-                count = IntStream.range(0, nodes.getLength())
-                                 .mapToObj(i -> nodes.item(i))
-                                 .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
-                                 .map(n -> newFragmentDocument(n))
-                                 .mapToInt(d -> sendFragmentDocument(d, r))
-                                 .sum();
+                count = fragsStream.mapToInt(d -> sendFragmentDocument(d, r))
+                                   .sum();
             }
             if (count > 0) {
                 sinks_.log(this, count + " snipped fragments processed", Logger.Level.DEBUG);
