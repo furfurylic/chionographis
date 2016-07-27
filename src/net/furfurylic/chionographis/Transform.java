@@ -195,17 +195,16 @@ public final class Transform extends Sink implements Driver {
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         setUpLastModified();
         if ((!force_) && (lastModified_ != 0)) {
             long[] lastModifiedTimes =
-                Arrays.stream(originalSrcLastModifiedTimes)
+                Arrays.stream(origSrcLastModTimes)
                       .map(l -> (l <= 0 ? l : Math.max(l, lastModified_)))
                       .toArray();
-            return sinks_.preexamineBundle(originalSrcFileNames, lastModifiedTimes);
+            return sinks_.preexamineBundle(origSrcFileNames, lastModifiedTimes);
         } else {
-            boolean[] includes = new boolean[originalSrcFileNames.length];
+            boolean[] includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
             return includes;
         }
@@ -236,12 +235,12 @@ public final class Transform extends Sink implements Driver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> notUsed) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> notUsed) {
         try {
             List<XPathExpression> referents = sinks_.referents();
-            long lastModified = ((originalSrcLastModifiedTime <= 0) || (lastModified_ <= 0)) ?
-                0 : Math.max(originalSrcLastModifiedTime, lastModified_);
+            long lastModified = ((origSrcLastModTime <= 0) || (lastModified_ <= 0)) ?
+                0 : Math.max(origSrcLastModTime, lastModified_);
             if (!referents.isEmpty()) {
                 return new FinisherDOMResult(
                     r -> {
@@ -249,7 +248,7 @@ public final class Transform extends Sink implements Driver {
                         sinks_.log(this, "Referred source data: "
                             + String.join(", ", referredContents), Logger.Level.DEBUG);
                         Result openedResult =
-                            sinks_.startOne(originalSrcIndex, originalSrcFileName,
+                            sinks_.startOne(origSrcIndex, origSrcFileName,
                                 lastModified, referredContents);
                         if (openedResult != null) {
                             try {
@@ -264,7 +263,7 @@ public final class Transform extends Sink implements Driver {
                     () -> {});
             } else {
                 Result openedResult =
-                    sinks_.startOne(originalSrcIndex, originalSrcFileName,
+                    sinks_.startOne(origSrcIndex, origSrcFileName,
                         lastModified, Collections.emptyList());
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
