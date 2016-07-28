@@ -267,16 +267,15 @@ public final class Output extends Sink {
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
-        boolean[] includes = new boolean[originalSrcFileNames.length];
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+        boolean[] includes = new boolean[origSrcFileNames.length];
         if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
         } else {
             assert destMapping_ != null;
-            for (int i = 0; i < originalSrcFileNames.length; ++i) {
-                includes[i] = isOriginalSrcNewer(
-                    originalSrcLastModifiedTimes[i], destMapping_.apply(originalSrcFileNames[i]));
+            for (int i = 0; i < origSrcFileNames.length; ++i) {
+                includes[i] = isOrigSrcNewer(
+                    origSrcLastModTimes[i], destMapping_.apply(origSrcFileNames[i]));
             }
         }
         return includes;
@@ -288,15 +287,15 @@ public final class Output extends Sink {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> referredContents) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> referredContents) {
         OutputStream buffer = BUFFER.get();
 
         // Configure dests.
         Set<Path> dests = Collections.<Path>emptySet();
         if (referents_.isEmpty()) {
             assert destMapping_ != null;
-            dests = destMapping_.apply(originalSrcFileName);
+            dests = destMapping_.apply(origSrcFileName);
         } else if (!(referredContents.isEmpty() || (referredContents.get(0) == null))) {
             if (destMapping_ != null) {
                 dests = destMapping_.apply(referredContents.get(0));
@@ -309,11 +308,11 @@ public final class Output extends Sink {
             throw new BuildException();
         }
 
-        if (!force_ && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
+        if (!force_ && !isOrigSrcNewer(origSrcLastModTime, dests)) {
             if (dests.size() > 1) {
                 String files = dests.stream()
-                    .map(Path::toString)
-                    .collect(Collectors.joining(", "));
+                                    .map(Path::toString)
+                                    .collect(Collectors.joining(", "));
                 logger_.log(this, "Output files are up to date: " + files, Logger.Level.DEBUG);
             } else {
                 logger_.log(this, "The output file is up to date: " + dests.iterator().next(),
@@ -325,7 +324,7 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOriginalSrcNewer(
+    private static boolean isOrigSrcNewer(
             long originalSrcLastModifiedTime, Set<Path> dests) {
         if (originalSrcLastModifiedTime <= 0) {
             return true;
@@ -369,9 +368,9 @@ public final class Output extends Sink {
             }
         } catch (IOException e) {
             throw new BuildException(e);
+        } finally {
+            placeBackBuffer(out);
         }
-
-        placeBackBuffer(out);
 
         countInBundle_.incrementAndGet();
     }

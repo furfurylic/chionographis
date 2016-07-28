@@ -45,22 +45,22 @@ final class Pool<T> {
      *      an object taken out of this pool.
      */
     public T get() {
-        T buffer = null;
+        T o = null;
         lock_.lock();
         try {
             if (pool_ != null) {
                 Queue<T> queue = pool_.get();
                 if (queue != null) {
-                    buffer = queue.poll();
+                    o = queue.poll();
                 }
             }
         } finally {
             lock_.unlock();
         }
-        if (buffer == null) {
-            buffer = create_.get();
+        if (o == null) {
+            o = create_.get();
         }
-        return buffer;
+        return o;
     }
 
     /**
