@@ -40,8 +40,6 @@ final class CachingResolver implements EntityResolver, URIResolver {
     private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
     private static final NetResourceCache<Source> TREES = new NetResourceCache<>();
 
-    private static final Pool<byte[]> BUFFER = new Pool<>(() -> new byte[4096]);
-
     private Consumer<URI> listenStored_;
     private Consumer<URI> listenHit_;
 
@@ -76,7 +74,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
                     return Files.readAllBytes(Paths.get(u));
                 } else {
                     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                    byte[] buffer = BUFFER.get();
+                    byte[] buffer = Pool.BYTES.get();
                     try {
                         try (InputStream in = u.toURL().openStream()) {
                             int length;
@@ -85,8 +83,9 @@ final class CachingResolver implements EntityResolver, URIResolver {
                             }
                         }
                     } finally {
-                        BUFFER.release(buffer);
+                        Pool.BYTES.release(buffer);
                     }
+                    // TODO: Can make more efficient (by avoiding copy)
                     return bytes.toByteArray();
                 }
 
