@@ -147,14 +147,14 @@ public final class All extends Sink implements Driver {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         boolean[] includes;
         if (force_) {
-            includes = new boolean[originalSrcFileNames.length];
+            includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
         } else {
             includes =
-                sinks_.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes);
+                sinks_.preexamineBundle(origSrcFileNames, origSrcLastModTimes);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
@@ -178,12 +178,12 @@ public final class All extends Sink implements Driver {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModified, List<String> notUsed) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> notUsed) {
         assert resultDocument_ != null;
         synchronized (resultDocument_) {
-            lastModifiedTime_ = ((originalSrcLastModified <= 0) || (lastModifiedTime_ <= 0)) ?
-                0 : Math.max(originalSrcLastModified, lastModifiedTime_);
+            lastModifiedTime_ = ((origSrcLastModTime <= 0) || (lastModifiedTime_ <= 0)) ?
+                0 : Math.max(origSrcLastModTime, lastModifiedTime_);
         }
         synchronized (resultDocument_) {
             if (nodes_ != null) {

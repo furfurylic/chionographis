@@ -138,11 +138,10 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
-            .map(s -> s.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes))
+            .map(s -> s.preexamineBundle(origSrcFileNames, origSrcLastModTimes))
             .toArray(boolean[][]::new);
 
         boolean[] results = new boolean[includes_[0].length];
@@ -171,8 +170,8 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> referredContents) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> referredContents) {
         List<Sink> activeSinks = null;
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int j = 0;
@@ -189,7 +188,7 @@ final class Sinks extends Sink implements Logger {
                     }
                 }
                 Result result = sinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
+                    origSrcIndex, origSrcFileName, origSrcLastModTime,
                     referredContentsOne);
                 if (result != null) {
                     // First, we populate activeSinks.
