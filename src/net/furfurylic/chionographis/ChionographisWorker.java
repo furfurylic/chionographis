@@ -69,7 +69,7 @@ final class ChionographisWorker {
          *      the log priority of the second and subsequent lines of the stack trace of
          *      {@code ex}, which shall not be {@code null}.
          */
-        void log(Throwable ex, String heading, Logger.Level headingLevel, Logger.Level bodyLevel);
+        void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel);
     }
 
     private int index_;
@@ -138,7 +138,7 @@ final class ChionographisWorker {
         String systemID = null;
         try {
             systemID = uri_.toString();
-            logger_.log("Processing " + systemID, Logger.Level.VERBOSE);
+            logger_.log("Processing " + systemID, Level.VERBOSE);
 
             List<XPathExpression> referents = sink_.referents();
             List<String> referredContents;
@@ -147,7 +147,7 @@ final class ChionographisWorker {
                 Document document = xfer_.parse(new StreamSource(systemID));
                 referredContents = Referral.extract(document, referents);
                 logger_.log("Referred source data: "
-                    + String.join(", ", referredContents), Logger.Level.DEBUG);
+                    + String.join(", ", referredContents), Level.DEBUG);
 
                 if (!metaFuncMap_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
@@ -184,7 +184,7 @@ final class ChionographisWorker {
             try {
                 xfer_.transfer(source, result);
             } catch (BuildException e) {
-                logger_.log("Aborting processing " + systemID, Logger.Level.WARN);
+                logger_.log("Aborting processing " + systemID, Level.WARN);
                 logCause(e);
                 try {
                     sink_.abortOne(result);
@@ -205,7 +205,7 @@ final class ChionographisWorker {
         } catch (FatalityException e) {
             throw e;
         } catch (Exception e) {
-            logger_.log("Failed to process " + systemID, Logger.Level.WARN);
+            logger_.log("Failed to process " + systemID, Level.WARN);
             logCause(e);
             return 0;
         }
@@ -214,7 +214,7 @@ final class ChionographisWorker {
     private void logCause(Exception e) {
         if (!(e instanceof ChionographisBuildException) ||
             !((ChionographisBuildException) e).isLoggedAlready()) {
-            logger_.log(e, "  Cause: " + e, Logger.Level.INFO, Logger.Level.VERBOSE);
+            logger_.log(e, "  Cause: " + e, Level.INFO, Level.VERBOSE);
         }
     }
 
@@ -225,7 +225,7 @@ final class ChionographisWorker {
             String target = metaFunc.getKey();
             String data = metaFunc.getValue().apply(sourceURI);
             logger_.log("Adding a processing instruction: target=" + target + ", data=" + data,
-                Logger.Level.DEBUG);
+                Level.DEBUG);
             consumer.accept(target, data);
         }
     }

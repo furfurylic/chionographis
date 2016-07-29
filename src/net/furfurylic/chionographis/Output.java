@@ -36,6 +36,8 @@ import javax.xml.xpath.XPathFactory;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.util.FileNameMapper;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An <i>Output</i> {@linkplain Sink sink} writes each source document into an filesystem file.
  */
@@ -188,7 +190,7 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            logger_.log(this, "File mappers added twice", Logger.Level.ERR);
+            logger_.log(this, "File mappers added twice", Level.ERR);
             throw new BuildException();
         }
         mapper_ = mapper;
@@ -208,11 +210,11 @@ public final class Output extends Sink {
             // A predefined destination path exists.
             if (referent_ != null) {
                 logger_.log(this,
-                    "\"dest\" and \"refer\" can be set exclusively", Logger.Level.ERR);
+                    "\"dest\" and \"refer\" can be set exclusively", Level.ERR);
                 throw new BuildException();
             } else if (mapper_ != null) {
                 logger_.log(this,
-                    "\"dest\" and file mappers can be set exclusively", Logger.Level.ERR);
+                    "\"dest\" and file mappers can be set exclusively", Level.ERR);
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
@@ -228,7 +230,7 @@ public final class Output extends Sink {
                 referents_ = Collections.singletonList(xpath.compile(referent_));
             } catch (XPathExpressionException e) {
                 logger_.log(this,
-                    "Failed to compile XPath expression: " + referent_, Logger.Level.ERR);
+                    "Failed to compile XPath expression: " + referent_, Level.ERR);
                 throw new BuildException(e);
             }
 
@@ -238,7 +240,7 @@ public final class Output extends Sink {
             // neither do file mappers.
             // -> No clue to decide the output path.
             logger_.log(this,
-                "Neither \"dest\", \"refer\" nor file mappers are set", Logger.Level.ERR);
+                "Neither \"dest\", \"refer\" nor file mappers are set", Level.ERR);
             throw new BuildException();
         }
 
@@ -318,7 +320,7 @@ public final class Output extends Sink {
             }
         }
         if (dests.isEmpty()) {
-            logger_.log(this, "Cannot decide the output file path", Logger.Level.ERR);
+            logger_.log(this, "Cannot decide the output file path", Level.ERR);
             throw new BuildException();
         }
 
@@ -327,10 +329,10 @@ public final class Output extends Sink {
                 String files = dests.stream()
                                     .map(Path::toString)
                                     .collect(Collectors.joining(", "));
-                logger_.log(this, "Output files are up to date: " + files, Logger.Level.DEBUG);
+                logger_.log(this, "Output files are up to date: " + files, Level.DEBUG);
             } else {
                 logger_.log(this, "The output file is up to date: " + dests.iterator().next(),
-                    Logger.Level.DEBUG);
+                    Level.DEBUG);
             }
             return null;
         }
@@ -374,12 +376,12 @@ public final class Output extends Sink {
                     if (file.exists() && (file.length() == out.size())
                      && hasIdenticalContent(file, out.buffer())) {
                         logger_.log(this, "No need to overwrite the output file: " + absolute,
-                            Logger.Level.FINE);
+                            Level.FINE);
                         continue;
                     }
                 }
 
-                logger_.log(this, "Creating " + absolute, Logger.Level.FINE);
+                logger_.log(this, "Creating " + absolute, Level.FINE);
                 // We take advantage of FileChannel for its capability to be interrupted
                 try {
                     try (FileChannel channel = FileChannel.open(
@@ -388,8 +390,8 @@ public final class Output extends Sink {
                     }
                     countInBundle_.incrementAndGet();
                 } catch (IOException e) {
-                    logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
-                    logger_.log(this, e, "  Cause: ", Logger.Level.INFO, Logger.Level.VERBOSE);
+                    logger_.log(this, "Failed to create " + absolute, Level.WARN);
+                    logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
                      throw new ChionographisBuildException(e);
                 }
             }
@@ -435,13 +437,13 @@ public final class Output extends Sink {
     void finishBundle() {
         switch (countInBundle_.get()) {
         case 0:
-            logger_.log(this, "No output files created", Logger.Level.INFO);
+            logger_.log(this, "No output files created", Level.INFO);
             break;
         case 1:
-            logger_.log(this, "1 output file created", Logger.Level.INFO);
+            logger_.log(this, "1 output file created", Level.INFO);
             break;
         default:
-            logger_.log(this, countInBundle_ + " output files created", Logger.Level.INFO);
+            logger_.log(this, countInBundle_ + " output files created", Level.INFO);
             break;
         }
     }
