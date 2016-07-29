@@ -35,6 +35,7 @@
     <antcall target="snip-ns"/>
     <antcall target="crossing-cache"/>
     <antcall target="crossing-cache-refer-content"/>
+    <antcall target="crossing-timid"/>
     <antcall target="crossing-parallel-sinks"/>
     <antcall target="crossing-abort-sources"/>
     <antcall target="crossing-abort-sinks-dom"/>
@@ -1107,6 +1108,55 @@
       expected="${dir.input}/expected0.txt" actual="${dir.output}/actual0.txt"/>
     <assertfileeq name="${test.name} - 2"
       expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="crossing-timid">
+    <property name="test.prefix" value="crossing"/>
+    <property name="test.title" value="timid"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <copy file="${dir.input}/input.xml" tofile="${dir.output}/input1.xml"/>
+    <copy file="${dir.input}/input.xml" tofile="${dir.output}/input2.xml"/>
+    <copy file="${dir.input}/input.xml" tofile="${dir.output}/input3.xml"/>
+    <copy file="${dir.input}/input.xml" tofile="${dir.output}/input4.xml"/>
+    <copy todir="${dir.output}">
+      <fileset dir="${dir.input}" includes="placeholder*.txt"/>
+      <mapper type="glob" from="placeholder*.txt" to="actual*.txt"/>
+    </copy>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>  <!-- newer -->
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:10 AM"/>  <!-- newer -->
+    <touch file="${dir.output}/input3.xml" datetime="01/01/2001 00:01:10 AM"/>  <!-- newer -->
+    <touch file="${dir.output}/actual1.txt" datetime="01/01/2001 00:01:00 AM"/> <!-- older -->
+    <touch file="${dir.output}/actual2.txt" datetime="01/01/2001 00:01:00 AM"/> <!-- older -->
+    <touch file="${dir.output}/actual3.txt" datetime="01/01/2001 00:01:00 AM"/> <!-- older -->
+
+    <chionographis srcdir="${dir.output}" includes="input*.xml" cache="no">
+      <transform style="flatten.xsl" cache="no">
+        <output destdir="${dir.output}" timid="yes">
+          <globmapper from="input*.xml" to="actual*.txt"/>
+        </output>
+      </transform>
+    </chionographis>
+
+    <!-- 1: identical: not touched -->
+    <assertfilelastmodified name="${test.name} - 1"
+      file="${dir.output}/actual1.txt" datetime="01/01/2001 00:01:00 AM"/>
+    <!-- 2: equal length and different content: touched -->
+    <assertfileeq name="${test.name} - 2"
+      expected="${dir.input}/placeholder1.txt" actual="${dir.output}/actual2.txt"/>
+    <!-- 3: different length: touched -->
+    <assertfileeq name="${test.name} - 3"
+      expected="${dir.input}/placeholder1.txt" actual="${dir.output}/actual3.txt"/>
+    <!-- 4: missing in destination: touched -->
+    <assertfileeq name="${test.name} - 4"
+      expected="${dir.input}/placeholder1.txt" actual="${dir.output}/actual4.txt"/>
 
     <delete dir="${dir.output}"/>
   </target>

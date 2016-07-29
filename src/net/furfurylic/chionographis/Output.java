@@ -40,7 +40,7 @@ import org.apache.tools.ant.util.FileNameMapper;
  * An <i>Output</i> {@linkplain Sink sink} writes each source document into an filesystem file.
  */
 public final class Output extends Sink {
-    private static final Pool<OutputStream> BUFFER =
+    private static final Pool<ExposingByteArrayOutputStream> BUFFER =
         new Pool<>(() -> new ExposingByteArrayOutputStream());
 
     private Path destDir_ = null;
@@ -48,6 +48,7 @@ public final class Output extends Sink {
     private boolean mkDirs_ = true;
     private String referent_ = null;
     private boolean force_ = false;
+    private boolean timid_ = false;
     private FileNameMapper mapper_ = null;
 
     private Logger logger_;
@@ -137,7 +138,7 @@ public final class Output extends Sink {
      * if necessary. Defaulted to "no".
      *
      * @param mkDirs
-     *      {@code true} if make parent directories; {@code false} otherwise.
+     *      {@code true} if makes parent directories; {@code false} otherwise.
      */
     public void setMkDirs(boolean mkDirs) {
         mkDirs_ = mkDirs;
@@ -152,6 +153,19 @@ public final class Output extends Sink {
      */
     public void setForce(boolean force) {
         force_ = force;
+    }
+
+    /**
+     * Sets whether this sink should compare existing destination files with the contents
+     * about to be written and avoid overwriting them if not necessary.
+     *
+     * @param timid
+     *      {@code true} if avoids unnecessary overwriting; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setTimid(boolean timid) {
+        timid_ = timid;
     }
 
     /**
@@ -352,7 +366,19 @@ public final class Output extends Sink {
                         Files.createDirectories(parent);
                     }
                 }
+
                 Path absolute = mapped.toAbsolutePath();
+
+                if (timid_) {
+                    File file = absolute.toFile();
+                    if (file.exists() && (file.length() == out.size())
+                     && hasIdenticalContent(file, out.buffer())) {
+                        logger_.log(this, "No need to overwrite the output file: " + absolute,
+                            Logger.Level.FINE);
+                        continue;
+                    }
+                }
+
                 logger_.log(this, "Creating " + absolute, Logger.Level.FINE);
                 // We take advantage of FileChannel for its capability to be interrupted
                 try {
@@ -360,6 +386,7 @@ public final class Output extends Sink {
                             absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
                     }
+                    countInBundle_.incrementAndGet();
                 } catch (IOException e) {
                     logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
                     logger_.log(this, e, "  Cause: ", Logger.Level.INFO, Logger.Level.VERBOSE);
@@ -371,16 +398,35 @@ public final class Output extends Sink {
         } finally {
             placeBackBuffer(out);
         }
+    }
 
-        countInBundle_.incrementAndGet();
+    private boolean hasIdenticalContent(File file, byte[] content) throws IOException {
+        byte[] bytes = Pool.BYTES.get();
+        try (FileChannel in = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            int length;
+            int head = 0;
+            while ((length = in.read(buffer)) > -1) {
+                buffer.limit(length);
+                buffer.rewind();
+                if (!buffer.equals(ByteBuffer.wrap(content, head, length))) {
+                    return false;
+                }
+                head += length;
+            }
+            return true;
+        } finally {
+            Pool.BYTES.release(bytes);
+        }
     }
 
     @Override
     void abortOne(Result result) {
-        placeBackBuffer((ByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
+        placeBackBuffer(
+            (ExposingByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
     }
 
-    private void placeBackBuffer(ByteArrayOutputStream buffer) {
+    private void placeBackBuffer(ExposingByteArrayOutputStream buffer) {
         buffer.reset();
         BUFFER.release(buffer);
     }
