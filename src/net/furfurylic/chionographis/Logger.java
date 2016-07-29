@@ -59,7 +59,6 @@ interface Logger {
      *      the log priority of the second and subsequent lines of the stack trace of {@code ex},
      *      which shall not be {@code null}.
      */
-    void log(Object issuer, Throwable ex, String heading,
-        Logger.Level headingLevel, Logger.Level bodyLevel);
+    void log(Object issuer, Throwable ex, String heading, Level headingLevel, Level bodyLevel);
 }
 
