@@ -23,6 +23,8 @@ import java.util.function.Supplier;
  */
 final class Pool<T> {
 
+    public static final Pool<byte[]> BYTES = new Pool<>(() -> new byte[4096]);
+
     private final ReentrantLock lock_ = new ReentrantLock();
     private Supplier<? extends T> create_;
     private SoftReference<Queue<T>> pool_;
