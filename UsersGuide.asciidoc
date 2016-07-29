@@ -181,7 +181,7 @@ generates output XML documents one per one input document and pass them to sinks
 |=================
 | Attribute | Description | Required
 
-|style|The URI of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
+|style|The URI or the file path of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
 
 |force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
 

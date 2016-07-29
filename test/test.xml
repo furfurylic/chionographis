@@ -770,7 +770,7 @@
 
     <!-- Shall be processed -->
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
-      <transform style="output-${test.title}/flatten.xsl" force="yes" cache="no">
+      <transform style="${dir.output}/flatten.xsl" force="yes" cache="no">
         <output dest="output-${test.title}/actual.txt"/>
       </transform>
     </chionographis>
