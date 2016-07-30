@@ -10,40 +10,39 @@
       debuglevel="source,lines" includeantruntime="yes"/>
   </target>
 
-  <target name="-archive" depends="rev,-archive-spec,-archive-no-spec"/>
+  <target name="-archive" depends="-make-archive,-rev,-update-archive-rev,-update-archive-spec"/>
 
-  <target name="-archive-spec" if="${rev.isbase}">
-    <delete dir="release/lib" />
-    <mkdir dir="release/lib" />
+  <target name="-make-archive">
+    <delete dir="release/lib"/>
+    <mkdir dir="release/lib"/>
     <jar destfile="release/lib/chionographis.jar" basedir="release/classes"
-      includes="**/*" update="false" filesonly="true" index="yes" level="9">
+      includes="**/*" update="no" filesonly="yes" index="yes" level="9">
       <manifest>
         <attribute name="Sealed" value="true"/>
         <attribute name="Specification-Title" value="Chionographis"/>
+        <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
+        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="-update-archive-rev" if="rev.number">
+    <jar destfile="release/lib/chionographis.jar" update="yes" filesonly="yes" level="9">
+      <manifest>
+        <attribute name="Implementation-Version" value="${rev.number}"/>
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="-update-archive-spec" if="rev.spec">
+    <jar destfile="release/lib/chionographis.jar" update="yes" filesonly="yes" level="9">
+      <manifest>
         <attribute name="Specification-Version" value="${rev.spec}"/>
-        <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
-        <attribute name="Implementation-Version" value="${rev.number}"/>
-        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
       </manifest>
     </jar>
   </target>
 
-  <target name="-archive-no-spec" unless="${rev.isbase}">
-    <delete dir="release/lib" />
-    <mkdir dir="release/lib" />
-    <jar destfile="release/lib/chionographis.jar" basedir="release/classes"
-      includes="**/*" update="false" filesonly="true" index="yes" level="9">
-      <manifest>
-        <attribute name="Sealed" value="true"/>
-        <attribute name="Specification-Title" value="Chionographis"/>
-        <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
-        <attribute name="Implementation-Version" value="${rev.number}"/>
-        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
-      </manifest>
-    </jar>
-  </target>
-
-  <target name="api-docs" depends="rev,-api-docs-spec,-api-docs-no-spec"/>
+  <target name="api-docs" depends="-rev,-api-docs-spec,-api-docs-no-spec,-api-docs-fallback"/>
 
   <target name="-api-docs-spec" if="${rev.isbase}">
     <delete dir="release/doc/api"/>
@@ -53,9 +52,10 @@
       charset="UTF-8" windowtitle="Chionographis API version ${rev.spec} (${rev.number})"
       doctitle="Chionographis API v${rev.spec}" header="Chionographis API v${rev.spec}"
       classpath="${ant.home}/lib/ant.jar" use="yes"/>
+    <property name="api-docs.made" value="true"/>
   </target>
 
-  <target name="-api-docs-no-spec" unless="${rev.isbase}">
+  <target name="-api-docs-no-spec" if="${rev.isnotbase}">
     <delete dir="release/doc/api"/>
     <mkdir dir="release/doc/api"/>
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
@@ -63,11 +63,36 @@
       charset="UTF-8" windowtitle="Chionographis API (version ${rev.number})"
       doctitle="Chionographis API" header="Chionographis API"
       classpath="${ant.home}/lib/ant.jar" use="yes"/>
+    <property name="api-docs.made" value="true"/>
   </target>
 
-  <target name="rev" depends="-rev-number,-rev-spec,-rev-date"/>
+  <target name="-api-docs-fallback" unless="${api-docs.made}">
+    <delete dir="release/doc/api"/>
+    <mkdir dir="release/doc/api"/>
+    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
+      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
+      charset="UTF-8" windowtitle="Chionographis API"
+      doctitle="Chionographis API" header="Chionographis API"
+      classpath="${ant.home}/lib/ant.jar" use="yes"/>
+    <property name="api-docs.made" value="true"/>
+  </target>
 
-  <target name="-rev-number">
+  <target name="-rev" depends="-git-check,-rev-all"/>
+
+  <target name="-git-check">
+    <exec executable="git" resultproperty="git.exitcode"
+      failonerror="false" failifexecutionfails="false">
+      <arg line="status"/>
+      <arg line="-s"/>
+    </exec>
+    <condition property="git.available" else="false">
+      <equals arg1="${git.exitcode}" arg2="0"/>
+    </condition>
+  </target>
+
+  <target name="-rev-all" depends="-rev-number,-rev-spec,-rev-date"/>
+
+  <target name="-rev-number" if="${git.available}">
     <mkdir dir="release/rev"/>
     <exec executable="git" output="release/rev/number">
       <arg line="describe" />
@@ -81,9 +106,12 @@
     <delete dir="release/rev"/>
   </target>
 
-  <target name="-rev-isbase" depends="-rev-number">
+  <target name="-rev-isbase" if="${git.available}" depends="-rev-number">
     <condition property="rev.isbase" else="false">
       <equals arg1="${rev.number}" arg2="${rev.base}"/>
+    </condition>
+    <condition property="rev.isnotbase" else="false">
+      <isset property="rev.isbase"/>
     </condition>
   </target>
 
@@ -96,7 +124,7 @@
     <delete dir="release/rev"/>
   </target>
 
-  <target name="-rev-date">
+  <target name="-rev-date" if="${git.available}">
     <mkdir dir="release/rev"/>
     <exec executable="git" output="release/rev/date">
       <arg line="log"/>
@@ -109,7 +137,9 @@
     <delete dir="release/rev"/>
   </target>
 
-  <target name="users-guide" depends="rev">
+  <target name="users-guide" depends="-rev,-users-guide-rev,-users-guide-no-rev"/>
+
+  <target name="-users-guide-rev" if="rev.number">
     <mkdir dir="release/doc"/>
     <exec executable="asciidoc" failonerror="true">
       <arg line="-b html5"/>
@@ -118,6 +148,17 @@
       <arg line="-o release/doc/UsersGuide.html"/>
       <arg line="-a revnumber=${rev.number}"/>
       <arg line="-a revdate='${rev.date}'"/>
+      <arg line="UsersGuide.asciidoc"/>
+    </exec>
+  </target>
+
+  <target name="-users-guide-no-rev" unless="rev.number">
+    <mkdir dir="release/doc"/>
+    <exec executable="asciidoc" failonerror="true">
+      <arg line="-b html5"/>
+      <arg line="-a toc"/>
+      <arg line="-n"/>
+      <arg line="-o release/doc/UsersGuide.html"/>
       <arg line="UsersGuide.asciidoc"/>
     </exec>
   </target>
