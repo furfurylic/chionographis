@@ -28,6 +28,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An <i>All</i> filter collects all source documents up into an document.
  *
@@ -164,7 +166,7 @@ public final class All extends Sink implements Driver {
 
     @Override
     void startBundle() {
-        sinks_.log(this, "Starting to collect input sources into " + rootQ_, Logger.Level.DEBUG);
+        sinks_.log(this, "Starting to collect input sources into " + rootQ_, Level.DEBUG);
         sinks_.startBundle();
         resultDocument_ = XMLTransfer.getDefault().newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
@@ -220,7 +222,7 @@ public final class All extends Sink implements Driver {
     void abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        sinks_.log(this, "One of the sources is damaged; must give up all", Logger.Level.ERR);
+        sinks_.log(this, "One of the sources is damaged; must give up all", Level.ERR);
         throw new BuildException();
     }
 
@@ -232,7 +234,7 @@ public final class All extends Sink implements Driver {
         if (!referents.isEmpty()) {
             referredContents = Referral.extract(resultDocument_, referents);
             sinks_.log(this, "Referred source data: "
-                + String.join(", ", referredContents), Logger.Level.DEBUG);
+                + String.join(", ", referredContents), Level.DEBUG);
         } else {
             referredContents = Collections.emptyList();
         }

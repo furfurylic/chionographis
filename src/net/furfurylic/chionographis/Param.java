@@ -14,6 +14,8 @@ import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An object of this class represents one stylesheet parameter applied to the transformation
  * by an <i>Transform</i> driver.
@@ -54,7 +56,7 @@ public final class Param {
     public void setName(String name) {
         if (name.isEmpty()) {
             logger_.log(this,
-                "Stylesheet parameters with empty names are not acceptable", Logger.Level.ERR);
+                "Stylesheet parameters with empty names are not acceptable", Level.ERR);
             throw new BuildException();
         }
         name_ = name;
@@ -92,12 +94,12 @@ public final class Param {
             if (value_ != null) {
                 message += ": value=" + value_;
             }
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
         if (value_ == null) {
             String message = "Incomplete stylesheet parameter found: name=" + name_;
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
 
