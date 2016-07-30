@@ -235,6 +235,13 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void execute() {
+        String implementationVersion = Main.getImplementationVersion();
+        if (implementationVersion != null) {
+            sinks_.log(this, "Starting: v" + implementationVersion, Level.DEBUG);
+        } else {
+            sinks_.log(this, "Starting", Level.DEBUG);
+        }
+
         // Arrange various directories.
         setUpDirectories();
 

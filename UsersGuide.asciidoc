@@ -366,3 +366,24 @@ Of course, if there is a _Snip_ filter in descendant of an _All_ filter, it will
 All Chionographis tasks share one common thread pool for parallelism.
 So if you run multiple Chinograhis tasks simultaneously in an Ant's _Parallel_ task, they are likely to share the resource
 (to be specific, it is not the case that each Chinonographis task tries to utilize all the available processors as if there are no other processor users).
+
+== Version information
+
+If you want to know the version of your 'chionographis.jar', execute the Main-Class of the JAR:
+
+[source,sh]
+----
+java -jar chionographis.jar
+----
+
+Instead, you can be informed of it by executing _Chionographis_ task with "debug" logging level:
+
+[source,sh]
+----
+ant -d -lib the-directory-which-contains-chionographis.jar target-name
+----
+
+[NOTE]
+If your 'chionographis.jar' has been built in an environment in which
+the version information is not available (for example, 'git' command is not
+installed), you cannot get any version information by ways above.

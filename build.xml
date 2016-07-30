@@ -23,6 +23,7 @@
         <attribute name="Specification-Version" value="${rev.spec}"/>
         <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
         <attribute name="Implementation-Version" value="${rev.number}"/>
+        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
       </manifest>
     </jar>
   </target>
@@ -37,6 +38,7 @@
         <attribute name="Specification-Title" value="Chionographis"/>
         <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
         <attribute name="Implementation-Version" value="${rev.number}"/>
+        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
       </manifest>
     </jar>
   </target>
