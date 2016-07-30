@@ -141,7 +141,7 @@
 
   <target name="-users-guide-rev" if="rev.number">
     <mkdir dir="release/doc"/>
-    <exec executable="asciidoc" failonerror="true">
+    <exec executable="asciidoc" failifexecutionfails="false">
       <arg line="-b html5"/>
       <arg line="-a toc"/>
       <arg line="-n"/>
@@ -154,7 +154,7 @@
 
   <target name="-users-guide-no-rev" unless="rev.number">
     <mkdir dir="release/doc"/>
-    <exec executable="asciidoc" failonerror="true">
+    <exec executable="asciidoc" failifexecutionfails="false">
       <arg line="-b html5"/>
       <arg line="-a toc"/>
       <arg line="-n"/>
