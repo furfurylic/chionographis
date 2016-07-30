@@ -12,6 +12,8 @@ import java.util.Map;
 
 import org.apache.tools.ant.BuildException;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * This class represents one prefix-namespace URI mapping entry.
  *
@@ -45,11 +47,11 @@ public final class Namespace {
      */
     public void setPrefix(String prefix) {
         if (prefix.isEmpty()) {
-            logger_.log(this, "Empty namespace prefixes are not acceptable", Logger.Level.ERR);
+            logger_.log(this, "Empty namespace prefixes are not acceptable", Level.ERR);
             throw new BuildException();
         }
         if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad namespace prefix: " + prefix, Logger.Level.ERR);
+            logger_.log(this, "Bad namespace prefix: " + prefix, Level.ERR);
             throw new BuildException();
         }
         prefix_ = prefix;
@@ -82,12 +84,12 @@ public final class Namespace {
             if (namespaceURI_ != null) {
                 message += ": URI=" + namespaceURI_;
             }
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
         if (namespaceURI_ == null) {
             String message = "Incomplete namespace prefix mapping found: prefix=" + prefix_;
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
 

@@ -11,6 +11,8 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * Objects of this class are used to instruct their enclosing <i>{@linkplain Chionographis}</i>
  * drivers or <i>{@linkplain Transform}</i> filters that they shall refer the last modified times
@@ -60,7 +62,7 @@ public final class Depends {
         try {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
-            logger_.log(this, "Bad \"absent\" attribute value: " + absent, Logger.Level.ERR);
+            logger_.log(this, "Bad \"absent\" attribute value: " + absent, Level.ERR);
             throw new BuildException();
         }
     }
@@ -114,19 +116,18 @@ public final class Depends {
             if (r != null) {
                 logger_.log(this,
                     "Referred resource \"" + r.toString() + "\" is missing to be regarded as new",
-                    Logger.Level.INFO);
+                    Level.INFO);
             } else {
                 logger_.log(this,
-                    "Referred resources are missing to be regarded as new",
-                    Logger.Level.INFO);
+                    "Referred resources are missing to be regarded as new", Level.INFO);
             }
             return 0;
         case FAIL:
             if (r != null) {
                 logger_.log(this,
-                    "Required resource \"" + r.toString() + "\" is missing", Logger.Level.ERR);
+                    "Required resource \"" + r.toString() + "\" is missing", Level.ERR);
             } else {
-                logger_.log(this, "Required resources are missing", Logger.Level.ERR);
+                logger_.log(this, "Required resources are missing", Level.ERR);
             }
             throw new BuildException();
         default:

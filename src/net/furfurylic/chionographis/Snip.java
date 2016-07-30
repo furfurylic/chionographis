@@ -32,6 +32,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * A <i>Snip</i> filter performs extraction of tree fragments from the source documents
  * and passes the fragments to its sinks.
@@ -149,7 +151,7 @@ public final class Snip extends Sink implements Driver {
         try {
             // Apply XPath expression to current document
             sinks_.log(this, "Applying snipping criterion " + select_ +
-                "; the original source is " + r.originalSrcFileName(), Logger.Level.DEBUG);
+                "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
             NodeList nodes = extractNodes(r);
 
             int count;
@@ -174,10 +176,10 @@ public final class Snip extends Sink implements Driver {
                                    .sum();
             }
             if (count > 0) {
-                sinks_.log(this, count + " snipped fragments processed", Logger.Level.DEBUG);
+                sinks_.log(this, count + " snipped fragments processed", Level.DEBUG);
             } else {
                 sinks_.log(this, "No snipped fragments generated; the original source is " +
-                        r.originalSrcFileName(), Logger.Level.INFO);
+                        r.originalSrcFileName(), Level.INFO);
             }
 
         } catch (XPathExpressionException e) {
@@ -214,7 +216,7 @@ public final class Snip extends Sink implements Driver {
         if (!referents.isEmpty()) {
             referredContents = Referral.extract(document, referents);
             sinks_.log(this, "Referred source data: "
-                + String.join(", ", referredContents), Logger.Level.DEBUG);
+                + String.join(", ", referredContents), Level.DEBUG);
         } else {
             referredContents = Collections.emptyList();
         }
