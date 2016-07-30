@@ -52,6 +52,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean force_ = false;
     private boolean verbose_ = false;
     private boolean parallel_ = true;
+    private boolean dryRun_ = false;
     private Depends depends_ = null;
 
     private Auxiliaries<Namespace> namespaces_ = new Auxiliaries<>();
@@ -143,6 +144,24 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     public void setParallel(boolean parallel) {
         parallel_ = parallel;
+    }
+
+    /**
+     * Sets whether "dry run" mode is enabled. The default value is {@code false}.
+     *
+     * <p>In "dry run" mode, Chionographis does not finalize outputs of the processing.
+     * To be specific, it does not write files.</p>
+     *
+     * <p>You can override this attribute by setting Ant's property
+     * {@code net.furfurylic.chionographis.dry-run} to {@code true} or {@code false}.</p>
+     *
+     * @param dryRun
+     *      {@code true} if "dry mode" is enabled; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setDryRun(boolean dryRun) {
+        dryRun_ = dryRun;
     }
 
     /**
@@ -265,7 +284,21 @@ public final class Chionographis extends MatchingTask implements Driver {
                               .toArray(URI[]::new);
         long[] srcLastModifiedTimes = getLastModifiedTimes(srcURIs);
 
-        sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_);
+        String dryRunProperty = getProject().getProperty(
+            getClass().getPackage().getName() + ".dry-run");
+        boolean dryRun;
+        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = true;
+        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = false;
+        } else {
+            dryRun = dryRun_;
+        }
+        if (dryRun) {
+            sinks_.log(this, "Executing in DRY RUN mode", Level.INFO);
+        }
+
+        sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_, dryRun);
 
         // Tell whether destinations are older.
         boolean[] includes = (force_ || (srcLastModifiedTimes == null)) ?
