@@ -44,8 +44,11 @@ public abstract class Sink {
      * @param force
      *      whether the driver wants this object to process all inputs regardless
      *      if the output files are up to date or not.
+     * @param dryRun
+     *      whether the driver wants this object not to finalize its outputs onto external devices.
      */
-    abstract void init(File baseDir, NamespaceContext namespaceContext, boolean force);
+    abstract void init(File baseDir, NamespaceContext namespaceContext,
+        boolean force, boolean dryRun);
 
     /**
      * Returns XPath expressions which point the source document contents required by this object.
@@ -54,7 +57,8 @@ public abstract class Sink {
      * the data is informed as the argument of {@link #startOne(int, String, long, List)}.</p>
      *
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,
-     * boolean)} arbitrary number of times. If the driver is not responsive to this sink's request,
+     * boolean, boolean)} arbitrary number of times.
+     * If the driver is not responsive to this sink's request,
      * this method might never be invoked.</p>
      *
      * <p>This method may be called simultaneously by multiple threads on one object.</p>

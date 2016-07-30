@@ -126,7 +126,7 @@ public final class All extends Sink implements Driver {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         rootQ_ = null;
         if (!root_.startsWith("{")) {
             int indexOfColon = root_.indexOf(':');
@@ -145,7 +145,7 @@ public final class All extends Sink implements Driver {
             }
         }
         force_ = force_ || force;
-        sinks_.init(baseDir, namespaceContext, force_);
+        sinks_.init(baseDir, namespaceContext, force_, dryRun);
     }
 
     @Override

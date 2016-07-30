@@ -120,9 +120,9 @@ public final class Snip extends Sink implements Driver {
      * {@inheritDoc}
      */
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         force_ = force_ || force;
-        sinks_.init(baseDir, namespaceContext, force_);
+        sinks_.init(baseDir, namespaceContext, force_, dryRun);
         namespaceContext_ = namespaceContext;
     }
 
