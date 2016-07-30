@@ -174,7 +174,7 @@ public final class Transform extends Sink implements Driver {
      * {@inheritDoc}
      */
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         paramMap_ = createParamMap(namespaceContext);
 
         if (style_ == null) {
@@ -193,7 +193,7 @@ public final class Transform extends Sink implements Driver {
 
         force_ = force_ || force;
 
-        sinks_.init(baseDir, namespaceContext, force_);
+        sinks_.init(baseDir, namespaceContext, force_, dryRun);
     }
 
     private Map<String, Object> createParamMap(NamespaceContext namespaceContext) {

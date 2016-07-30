@@ -51,6 +51,7 @@ public final class Output extends Sink {
     private String referent_ = null;
     private boolean force_ = false;
     private boolean timid_ = false;
+    private boolean dryRun_ = false;
     private FileNameMapper mapper_ = null;
 
     private Logger logger_;
@@ -197,7 +198,7 @@ public final class Output extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         // Configure destDir_ to be an absolute path.
         if (destDir_ == null) {
             destDir_ = baseDir.toPath();
@@ -275,6 +276,7 @@ public final class Output extends Sink {
         }
 
         force_ = force_ || force;
+        dryRun_ = dryRun;
     }
 
     @Override
@@ -362,13 +364,6 @@ public final class Output extends Sink {
         // Write the buffer contents to currentDests_.
         try {
             for (Path mapped : r.getDestinations()) {
-                if (mkDirs_) {
-                    Path parent = mapped.getParent();
-                    if ((parent != null) && !Files.exists(parent)) {
-                        Files.createDirectories(parent);
-                    }
-                }
-
                 Path absolute = mapped.toAbsolutePath();
 
                 if (timid_) {
@@ -381,18 +376,27 @@ public final class Output extends Sink {
                     }
                 }
 
-                logger_.log(this, "Creating " + absolute, Level.FINE);
-                // We take advantage of FileChannel for its capability to be interrupted
-                try {
+                if (dryRun_) {
+                    logger_.log(this, "[DRY RUN] Creating " + absolute, Level.FINE);
+
+                } else {
+                    if (mkDirs_) {
+                        Path parent = mapped.getParent();
+                        if ((parent != null) && !Files.exists(parent)) {
+                            Files.createDirectories(parent);
+                        }
+                    }
+                    logger_.log(this, "Creating " + absolute, Level.FINE);
+                    // We take advantage of FileChannel for its capability to be interrupted
                     try (FileChannel channel = FileChannel.open(
                             absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
+                    } catch (IOException e) {
+                        logger_.log(this, "Failed to create " + absolute, Level.WARN);
+                        logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
+                         throw new ChionographisBuildException(e);
                     }
                     countInBundle_.incrementAndGet();
-                } catch (IOException e) {
-                    logger_.log(this, "Failed to create " + absolute, Level.WARN);
-                    logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                     throw new ChionographisBuildException(e);
                 }
             }
         } catch (IOException e) {
