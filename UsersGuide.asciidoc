@@ -114,6 +114,11 @@ For full set of its ability to accept the source information, consult Ant's docu
 |cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +no+
 |verbose|Whether this task promotes log levels from +verbose+ to +info+ for some log entries, such as reports of document output.| No; defaults to +no+
 |parallel|Whether parallel execution is employed. The parallel execution is done with static thread pool whose maximum thread count coincides with the available processor count.| No; defaults to +yes+
+
+|dryrun|Whether "dry run" mode is enabled. In "dry run" mode, sinks avoid finalizing all of their outputs (to be specific, they do not write files). +
+You can enable this mode also by setting +net.furfurylic.chionographis.dry-run+ Ant property to +true+.
+If you set this property to +false+, "dry run" mode is disabled regardless of this driver's attribute. That is, the latter way (through the Ant property) is stronger and definitive. | No; defaults to +no+
+
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
 |=================
 

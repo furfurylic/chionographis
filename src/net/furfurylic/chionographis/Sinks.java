@@ -125,8 +125,8 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force));
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
+        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
     }
 
     @Override
