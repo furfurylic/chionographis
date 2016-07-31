@@ -1,5 +1,11 @@
 <project name="chionographis" default="classes">
 
+  <target name="release" depends="classes,api-docs,users-guide">
+    <zip destfile="release/doc/api.zip" basedir="release/doc/api" level="9"/>
+    <delete dir="release/classes"/>
+    <delete dir="release/doc/api"/>
+  </target>
+
   <target name="classes" depends="-compile,-archive"/>
 
   <target name="-compile">
@@ -10,74 +16,80 @@
       debuglevel="source,lines" includeantruntime="yes"/>
   </target>
 
-  <target name="-archive" depends="-make-archive,-rev,-update-archive-rev,-update-archive-spec"/>
-
-  <target name="-make-archive">
+  <target name="-archive" depends="-rev">
     <delete dir="release/lib"/>
     <mkdir dir="release/lib"/>
-    <jar destfile="release/lib/chionographis.jar" basedir="release/classes"
-      includes="**/*" update="no" filesonly="yes" index="yes" level="9">
-      <manifest>
-        <attribute name="Sealed" value="true"/>
-        <attribute name="Specification-Title" value="Chionographis"/>
-        <attribute name="Implementation-Title" value="net.furfurylic.chionographis"/>
-        <attribute name="Main-Class" value="net.furfurylic.chionographis.Main"/>
-      </manifest>
-    </jar>
+    <script language="javascript"><![CDATA[
+      manifest = new org.apache.tools.ant.taskdefs.Manifest();
+      manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+        "Sealed", "true"));
+      manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+        "Specification-Title", "Chionographis"));
+      manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+        "Implementation-Title", "net.furfurylic.chionographis"));
+      manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+        "Main-Class", "net.furfurylic.chionographis.Main"));
+
+      number = project.getProperty("rev.number");
+      spec = project.getProperty("rev.spec");
+      if (spec != null) {
+        manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+          "Specification-Version", spec));
+      }
+      if (number != null) {
+        manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
+          "Implementation-Version", number));
+      }
+
+      jar = project.createTask("jar");
+      jar.setDestFile(new java.io.File(project.getBaseDir(), "release/lib/chionographis.jar"));
+      jar.setBasedir(new java.io.File(project.getBaseDir(), "release/classes"));
+      jar.setIncludes("**/*");
+      jar.setUpdate(false);
+      jar.setFilesonly(true);
+      jar.setIndex(true);
+      jar.setLevel(9);
+      jar.addConfiguredManifest(manifest);
+      jar.perform();
+    ]]></script>
   </target>
 
-  <target name="-update-archive-rev" if="rev.number">
-    <jar destfile="release/lib/chionographis.jar" update="yes" filesonly="yes" level="9">
-      <manifest>
-        <attribute name="Implementation-Version" value="${rev.number}"/>
-      </manifest>
-    </jar>
-  </target>
-
-  <target name="-update-archive-spec" if="rev.spec">
-    <jar destfile="release/lib/chionographis.jar" update="yes" filesonly="yes" level="9">
-      <manifest>
-        <attribute name="Specification-Version" value="${rev.spec}"/>
-      </manifest>
-    </jar>
-  </target>
-
-  <target name="api-docs" depends="-rev,-api-docs-spec,-api-docs-no-spec,-api-docs-fallback"/>
-
-  <target name="-api-docs-spec" if="${rev.isbase}">
+  <target name="api-docs" depends="-rev">
     <delete dir="release/doc/api"/>
     <mkdir dir="release/doc/api"/>
-    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
-      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
-      charset="UTF-8" windowtitle="Chionographis API version ${rev.spec} (${rev.number})"
-      doctitle="Chionographis API v${rev.spec}" header="Chionographis API v${rev.spec}"
-      classpath="${ant.home}/lib/ant.jar" use="yes"/>
-    <property name="api-docs.made" value="true"/>
+    <script language="javascript"><![CDATA[
+      javadoc = project.createTask("javadoc");
+      javadoc.setLocale("en");
+      javadoc.setPackagenames("net.furfurylic.chionographis.*");
+      javadoc.setSourcepath(new org.apache.tools.ant.types.Path(project, "src"));
+      javadoc.setDestdir(new java.io.File(project.getBaseDir(), "release/doc/api"));
+      javadoc.setEncoding("UTF-8");
+      javadoc.setDocencoding("UTF-8");
+      javadoc.setCharset("UTF-8");
+      javadoc.setClasspath(new org.apache.tools.ant.types.Path(
+        project, project.getProperty("ant.home") + "/lib/ant.jar"));
+
+      number = project.getProperty("rev.number");
+      spec = project.getProperty("rev.spec");
+      if (spec != null) {
+        javadoc.setWindowtitle("Chionographis API version " + spec + " (" + number + ")");
+        javadoc.setDoctitle("Chionographis API v" + spec);
+        javadoc.setHeader("Chionographis API v" + spec);
+      } else {
+        if (number != null) {
+          javadoc.setWindowtitle("Chionographis API (version " + number + ")");
+        } else {
+          javadoc.setWindowtitle("Chionographis API");
+        }
+        javadoc.setDoctitle("Chionographis API");
+        javadoc.setHeader("Chionographis API");
+      }
+      javadoc.perform();
+    ]]></script>
   </target>
 
-  <target name="-api-docs-no-spec" if="${rev.isnotbase}">
-    <delete dir="release/doc/api"/>
-    <mkdir dir="release/doc/api"/>
-    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
-      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
-      charset="UTF-8" windowtitle="Chionographis API (version ${rev.number})"
-      doctitle="Chionographis API" header="Chionographis API"
-      classpath="${ant.home}/lib/ant.jar" use="yes"/>
-    <property name="api-docs.made" value="true"/>
-  </target>
-
-  <target name="-api-docs-fallback" unless="${api-docs.made}">
-    <delete dir="release/doc/api"/>
-    <mkdir dir="release/doc/api"/>
-    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
-      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
-      charset="UTF-8" windowtitle="Chionographis API"
-      doctitle="Chionographis API" header="Chionographis API"
-      classpath="${ant.home}/lib/ant.jar" use="yes"/>
-    <property name="api-docs.made" value="true"/>
-  </target>
-
-  <target name="-rev" depends="-git-check,-rev-all"/>
+  <target name="-rev" depends="-git-check,-rev-git"/>
+  <target name="rev" depends="-git-check,-rev-git"/>
 
   <target name="-git-check">
     <exec executable="git" resultproperty="git.exitcode"
@@ -90,83 +102,53 @@
     </condition>
   </target>
 
-  <target name="-rev-all" depends="-rev-number,-rev-spec,-rev-date"/>
-
-  <target name="-rev-number" if="${git.available}">
-    <mkdir dir="release/rev"/>
-    <exec executable="git" output="release/rev/number">
+  <target name="-rev-git">
+    <exec executable="git" outputproperty="git.desc.tags">
       <arg line="describe" />
       <arg line="--tags" />
     </exec>
-    <replaceregexp file="release/rev/number" match="^[\s]*v([\S]+)[\s]*$" replace="\1"/>
-    <loadfile property="rev.number" srcfile="release/rev/number"/>
-    <copy file="release/rev/number" tofile="release/rev/base"/>
-    <replaceregexp file="release/rev/base" match="^[\s]*([\d]+\.[\d]+\.[\d]+).*$" replace="\1"/>
-    <loadfile property="rev.base" srcfile="release/rev/base"/>
-    <delete dir="release/rev"/>
-  </target>
-
-  <target name="-rev-isbase" if="${git.available}" depends="-rev-number">
-    <condition property="rev.isbase" else="false">
-      <equals arg1="${rev.number}" arg2="${rev.base}"/>
-    </condition>
-    <condition property="rev.isnotbase" else="false">
-      <isset property="rev.isbase"/>
-    </condition>
-  </target>
-
-  <target name="-rev-spec" if="${rev.isbase}" depends="-rev-number,-rev-isbase">
-    <mkdir dir="release/rev"/>
-    <echo message="${rev.base}" file="release/rev/spec"/>
-    <echo>hoge</echo>
-    <replaceregexp file="release/rev/spec" match="^[\s]*([\d]+\.[\d]+).*$" replace="\1"/>
-    <loadfile property="rev.spec" srcfile="release/rev/spec"/>
-    <delete dir="release/rev"/>
-  </target>
-
-  <target name="-rev-date" if="${git.available}">
-    <mkdir dir="release/rev"/>
-    <exec executable="git" output="release/rev/date">
+    <exec executable="git" outputproperty="git.log.date">
       <arg line="log"/>
       <arg line="-1"/>
-      <arg line="--date=iso"/>
+      <arg line="--date=iso-strict"/>
       <arg line="--format='%cd'"/>
      </exec>
-    <replaceregexp file="release/rev/date" match="^[\s]*([\S]+)[\s]$" replace="\1"/>
-    <loadfile property="rev.date" srcfile="release/rev/date"/>
-    <delete dir="release/rev"/>
+    <script language="javascript"><![CDATA[
+      number = project.getProperty("git.desc.tags").replaceAll("^[\\s]*v([\\S]+)[\\s]*$", "$1");
+      base = number.replaceAll("^[\\s]*([\\d]+\\.[\\d]+\\.[\\d]+).*$", "$1");
+      project.setNewProperty("rev.number", number);
+      project.setNewProperty("rev.base", base);
+      if (number.equals(base)) {
+        spec = base.replaceAll("^[\\s]*([\\d]+\\.[\\d]+).*$", "$1");
+        project.setNewProperty("rev.spec", spec);
+      }
+      dateString = project.getProperty("git.log.date").trim();
+      date = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX").parse(dateString);
+      format = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+      format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+      dateString = format.format(date);
+      project.setNewProperty("rev.date", dateString);
+    ]]></script>
   </target>
 
-  <target name="users-guide" depends="-rev,-users-guide-rev,-users-guide-no-rev"/>
-
-  <target name="-users-guide-rev" if="rev.number">
+  <target name="users-guide" depends="-rev">
     <mkdir dir="release/doc"/>
-    <exec executable="asciidoc" failifexecutionfails="false">
-      <arg line="-b html5"/>
-      <arg line="-a toc"/>
-      <arg line="-n"/>
-      <arg line="-o release/doc/UsersGuide.html"/>
-      <arg line="-a revnumber=${rev.number}"/>
-      <arg line="-a revdate='${rev.date}'"/>
-      <arg line="UsersGuide.asciidoc"/>
-    </exec>
-  </target>
-
-  <target name="-users-guide-no-rev" unless="rev.number">
-    <mkdir dir="release/doc"/>
-    <exec executable="asciidoc" failifexecutionfails="false">
-      <arg line="-b html5"/>
-      <arg line="-a toc"/>
-      <arg line="-n"/>
-      <arg line="-o release/doc/UsersGuide.html"/>
-      <arg line="UsersGuide.asciidoc"/>
-    </exec>
-  </target>
-
-  <target name="release" depends="classes,api-docs,users-guide">
-    <zip destfile="release/doc/api.zip" basedir="release/doc/api" level="9"/>
-    <delete dir="release/classes"/>
-    <delete dir="release/doc/api"/>
+    <script language="javascript"><![CDATA[
+      exec = new org.apache.tools.ant.taskdefs.ExecTask();
+      exec.setProject(project);
+      exec.setExecutable("asciidoc");
+      exec.setFailIfExecutionFails(false);
+      exec.createArg().setLine("-b html5");
+      exec.createArg().setLine("-a toc");
+      exec.createArg().setLine("-n");
+      exec.createArg().setLine("-o release/doc/UsersGuide.html");
+      if (project.getProperty("rev.number") != null) {
+        exec.createArg().setLine("-a revnumber=" + project.getProperty("rev.number"));
+        exec.createArg().setLine("-a revdate='" + project.getProperty("rev.date") + "'");
+      }
+      exec.createArg().setLine("UsersGuide.asciidoc");
+      exec.perform();
+    ]]></script>
   </target>
 
   <target name="api-docs-devel">
