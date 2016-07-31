@@ -47,7 +47,7 @@ public final class Transform extends Sink implements Driver {
     private String style_ = null;
     private boolean usesCache_ = true;
     private boolean force_ = false;
-    private Auxiliaries<Param> params_ = new Auxiliaries<>();
+    private Assemblage<Param> params_ = new Assemblage<>();
     private Depends depends_ = null;
 
     private URI styleURI_;
@@ -87,7 +87,7 @@ public final class Transform extends Sink implements Driver {
 
     /**
      * Sets whether external resources referred through the transformation process
-     * should be cached. Defaulted to "yes".
+     * should be cached. Defaulted to {@code true}.
      *
      * <p>The external resources are:</p>
      * <ul>
