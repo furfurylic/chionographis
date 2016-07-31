@@ -17,7 +17,7 @@ public interface Driver {
 
     /**
      * Sets whether this driver should proceed processing even if the corresponding destination
-     * files are up to date.
+     * files are up to date. Defaults to {@code false}.
      *
      * @param force
      *      {@code true} if proceeds even if up to date; {@code false} otherwise.

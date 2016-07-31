@@ -55,8 +55,8 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean dryRun_ = false;
     private Depends depends_ = null;
 
-    private Auxiliaries<Namespace> namespaces_ = new Auxiliaries<>();
-    private Auxiliaries<Meta> metas_ = new Auxiliaries<>();
+    private Assemblage<Namespace> namespaces_ = new Assemblage<>();
+    private Assemblage<Meta> metas_ = new Assemblage<>();
     private Sinks sinks_ = new Sinks(new ChionographisLogger());
 
     /**
@@ -101,7 +101,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     /**
      * Sets whether the external parsed entities in the original source files are cached.
-     * Defaulted to "yes".
+     * Defaulted to {@code true}.
      *
      * @param cache
      *      {@code true} if cached; {@code false} otherwise.
@@ -120,6 +120,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     /**
      * Sets whether verbose logging should be performed.
+     * Defaulted to {@code false}.
      *
      * <p>If set to "yes", some log entries with "verbose" log level, such as reporting
      * document output, are promoted to "info" level.</p>
@@ -137,7 +138,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * <p>If set to "yes", execution is done with {@link ForkJoinPool}, which is a statically held
      * thread pool and whose maximum thread count is the available processor count.</p>
      *
-     * <p>This attribute is defaulted to "yes".</p>
+     * <p>This attribute is defaulted to {@code true}.</p>
      *
      * @param parallel
      *      {@code true} if parallel execution is employed; {@code false} otherwise.
@@ -419,8 +420,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private Map<String, Function<URI, String>> createMetaFuncMap() {
         return metas_.toMap(Meta::yield,
             e -> sinks_.log(this,
-                            "Adding a meta-information instruction: name=" + e.getKey(),
-                            Level.DEBUG),
+                    "Adding a meta-information instruction: name=" + e.getKey(), Level.DEBUG),
             k -> {
                 sinks_.log(this,
                     "Meta-information instruction named " + k + " added twice", Level.ERR);
@@ -430,11 +430,9 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private NamespaceContext createNamespaceContext() {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
-            e -> sinks_.log(this,
-                    "Adding namespace prefix mapping: " + e, Level.DEBUG),
+            e -> sinks_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
             k -> {
-                sinks_.log(this,
-                    "Namespace prefix " + k + " added twice", Level.ERR);
+                sinks_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
                 throw new ChionographisBuildException(true);
             });
         return new PrefixMap(namespaceMap);

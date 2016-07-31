@@ -9,7 +9,6 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +51,12 @@ final class Sinks extends Sink implements Logger {
      */
     private boolean[][] includes_;
 
+    /**
+     * A map which maps a TrAX Result object returned {@link #startOne(int, String, long, List)}
+     * of this object to {@link Sink} objects responsive to it.
+     *
+     * <p>This map is based on idenditity of the keys (that is, mapping by keys' identities).</p>
+     */
     private Map<Result, List<Sink>> activeSinkMap_;
 
     /**
@@ -133,7 +138,7 @@ final class Sinks extends Sink implements Logger {
     List<XPathExpression> referents() {
         return sinks_.stream()
                       .map(s -> s.referents())
-                      .flatMap(r -> r.stream())
+                      .flatMap(List::stream)
                       .collect(Collectors.toList());
     }
 
@@ -172,36 +177,29 @@ final class Sinks extends Sink implements Logger {
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
             long origSrcLastModTime, List<String> referredContents) {
-        List<Sink> activeSinks = null;
+        Assemblage<Sink> activeSinks = new Assemblage<>();
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int j = 0;
         try {
             int i = 0;
             for (; j < sinks_.size(); ++j) {
+                // Grab referred contents for this sink.
                 List<String> referredContentsOne =
                     referredContents.subList(i, i + sinks_.get(j).referents().size());
                 i += sinks_.get(j).referents().size();
+                // If the sink does not include sources at all, skip it.
                 if (includes_ != null) {
                     boolean[] includesOne = includes_[j];
                     if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
                         continue;
                     }
                 }
+                // Open the result of the sink.
                 Result result = sinks_.get(j).startOne(
-                    origSrcIndex, origSrcFileName, origSrcLastModTime,
-                    referredContentsOne);
+                    origSrcIndex, origSrcFileName, origSrcLastModTime, referredContentsOne);
                 if (result != null) {
                     // First, we populate activeSinks.
-                    if (activeSinks == null) {
-                        activeSinks = Collections.singletonList(sinks_.get(j));
-                    } else{
-                        if (activeSinks.size() == 1) {
-                            Sink s = activeSinks.get(0);
-                            activeSinks = new ArrayList<>();
-                            activeSinks.add(s);
-                        }
-                        activeSinks.add(sinks_.get(j));
-                    }
+                    activeSinks.add(sinks_.get(j));
                     // Second, we populate builder.
                     builder.add(result);    // We don't assume if any exception thrown here
                                             // it is a recoverable situation.
@@ -212,7 +210,7 @@ final class Sinks extends Sink implements Logger {
             Result r = builder.newCompositeResult();
             if (r != null) {
                 try {
-                    abort(r, activeSinks);
+                    abort(r, activeSinks.getList());
                 } catch (RuntimeException ex) {
                     // e is more essential than ex for this abortion.
                 }
@@ -221,8 +219,10 @@ final class Sinks extends Sink implements Logger {
         }
 
         Result r = builder.newCompositeResult();
-        synchronized (activeSinkMap_) {
-            activeSinkMap_.put(r, activeSinks);
+        if (r != null) {
+            synchronized (activeSinkMap_) {
+                activeSinkMap_.put(r, activeSinks.getList());
+            }
         }
         return r;
     }
@@ -301,7 +301,8 @@ final class Sinks extends Sink implements Logger {
          *      if one of {@code sinks} throws a {@link RuntimeException}.
          *      This situation should be considered as unrecoverable.
          */
-        public void abort(List<Sink> sinks) {
+        public final void abort(List<Sink> sinks) {
+            assert sinks.size() == results_.size();
             Optional<RuntimeException> ex =
                 IntStream.range(0, sinks.size())
                          .mapToObj(i -> abortSinkSilent(sinks.get(i), results_.get(i)))
@@ -312,7 +313,7 @@ final class Sinks extends Sink implements Logger {
             }
         }
 
-        protected void abortSilent(IntStream indices, List<Sink> sinks) {
+        protected final void abortSilent(IntStream indices, List<Sink> sinks) {
             indices.forEach(k -> abortSinkSilent(sinks.get(k), results_.get(k)));
         }
 
@@ -330,6 +331,7 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
+    /** An interface of holders of one {@link Results} object. */
     private static interface CompositeResult {
         Results results();
     }
@@ -343,7 +345,7 @@ final class Sinks extends Sink implements Logger {
             results_ = new Results(results) {
                 @Override
                 public void finish(List<Sink> sinks) {
-                    List<Result> rs = results_.asList();
+                    List<Result> rs = asList();
                     int i = 0;
                     try {
                         while (i < sinks.size()) {
@@ -373,7 +375,7 @@ final class Sinks extends Sink implements Logger {
             results_ = new Results(results) {
                 @Override
                 public void finish(List<Sink> sinks) {
-                    List<Result> rs = results_.asList();
+                    List<Result> rs = asList();
 
                     // Search a real DOMResult
                     // Those which getNode() == null have high priority
@@ -399,6 +401,7 @@ final class Sinks extends Sink implements Logger {
                             }
                         }
                     } catch (RuntimeException e) {
+                        // Sinks which have not been finished shall be aborted
                         abortSilent(
                             IntStream.concat(IntStream.range(i, sinks.size()), IntStream.of(j))
                                      .distinct(),
@@ -570,7 +573,7 @@ final class Sinks extends Sink implements Logger {
 
             @Override
             public void startElement(String uri, String localName, String qName, Attributes atts)
-                throws SAXException {
+                    throws SAXException {
                 for (ContentHandler handler : contentHandlers_) {
                     handler.startElement(uri, localName, qName, atts);
                 }

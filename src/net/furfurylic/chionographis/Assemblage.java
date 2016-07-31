@@ -18,19 +18,19 @@ import java.util.function.Function;
 import org.apache.tools.ant.BuildException;
 
 /**
- * A simple collections class for objects, each element of which represents a key-value pair.
+ * A simple collections class for objects.
  *
  * @param <T>
  *      the type of the objects which are stores to an object of this class.
  */
-final class Auxiliaries<T> {
+final class Assemblage<T> {
 
     private List<T> ts_ = Collections.emptyList();
 
     /**
      * Sole constructor, which creates an empty collection.
      */
-    public Auxiliaries() {
+    public Assemblage() {
     }
 
     /**
@@ -50,6 +50,10 @@ final class Auxiliaries<T> {
             }
             ts_.add(t);
         }
+    }
+
+    public List<T> getList() {
+        return ts_;
     }
 
     /**

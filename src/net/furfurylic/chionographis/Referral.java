@@ -40,7 +40,7 @@ final class Referral {
      */
     public static List<String> extract(Node node, List<XPathExpression> referents) {
         return referents.stream().map(r -> extractOne(node, r))
-                                 .collect(Collectors.toList());
+                                  .collect(Collectors.toList());
     }
 
     private static String extractOne(Node node, XPathExpression expr) {
