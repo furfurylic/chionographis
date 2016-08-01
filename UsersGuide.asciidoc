@@ -218,6 +218,8 @@ The way to configure this element is the same as that to configure one that appe
 |name|The name of the stylesheet parameter. +
 Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+. In the first form, the name doesn't belong to any namespace. In the second form, the name belongs to a namespace whose name is mapped from prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
+|expand|Whether Ant properties in this element's contents are expanded. | No; defaults to +no+
+
 |_Text_|The value of the stylesheet parameter. | Yes
 |=================
 
