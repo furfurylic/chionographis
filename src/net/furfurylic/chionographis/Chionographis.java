@@ -32,6 +32,7 @@ import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.xml.sax.EntityResolver;
@@ -57,7 +58,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
-    private Sinks sinks_ = new Sinks(new ChionographisLogger());
+    private Sinks sinks_;
 
     /**
      * Sole constructor.
@@ -70,6 +71,9 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void init() {
+        sinks_ = new Sinks(
+            new ChionographisLogger(),
+            PropertyHelper.getPropertyHelper(getProject())::replaceProperties);
     }
 
     /**

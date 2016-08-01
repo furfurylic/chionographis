@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -56,9 +57,11 @@ public final class Snip extends Sink implements Driver {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Snip(Logger logger) {
-        sinks_ = new Sinks(logger);
+    Snip(Logger logger, Function<String, String> expander) {
+        sinks_ = new Sinks(logger, expander);
     }
 
     /**

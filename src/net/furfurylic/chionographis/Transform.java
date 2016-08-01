@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -67,9 +68,11 @@ public final class Transform extends Sink implements Driver {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Transform(Logger logger) {
-        sinks_ = new Sinks(logger);
+    Transform(Logger logger, Function<String, String> expander) {
+        sinks_ = new Sinks(logger, expander);
     }
 
     /**
@@ -119,7 +122,7 @@ public final class Transform extends Sink implements Driver {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(sinks_);
+        Param param = new Param(sinks_, sinks_.expander());
         params_.add(param);
         return param;
     }

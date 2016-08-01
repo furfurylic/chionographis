@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -62,9 +63,11 @@ public final class All extends Sink implements Driver {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    All(Logger logger) {
-        sinks_ = new Sinks(logger);
+    All(Logger logger, Function<String, String> expander) {
+        sinks_ = new Sinks(logger, expander);
     }
 
     /**
