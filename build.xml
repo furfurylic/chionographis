@@ -102,7 +102,7 @@
     </condition>
   </target>
 
-  <target name="-rev-git">
+  <target name="-rev-git" if="${git.available}">
     <exec executable="git" outputproperty="git.desc.tags">
       <arg line="describe" />
       <arg line="--tags" />
@@ -134,8 +134,7 @@
   <target name="users-guide" depends="-rev">
     <mkdir dir="release/doc"/>
     <script language="javascript"><![CDATA[
-      exec = new org.apache.tools.ant.taskdefs.ExecTask();
-      exec.setProject(project);
+      exec = project.createTask("exec");
       exec.setExecutable("asciidoc");
       exec.setFailIfExecutionFails(false);
       exec.createArg().setLine("-b html5");
