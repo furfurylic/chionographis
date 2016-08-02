@@ -138,7 +138,7 @@ public final class Output extends Sink {
 
     /**
      * Sets whether this sink should make the destination files' parent directories
-     * if necessary. Defaulted to "no".
+     * if necessary. Defaulted to {@code true}.
      *
      * @param mkDirs
      *      {@code true} if makes parent directories; {@code false} otherwise.
@@ -149,7 +149,7 @@ public final class Output extends Sink {
 
     /**
      * Sets whether this sink should proceed processing even if the destination files are
-     * up to date.
+     * up to date. Defaulted to {@code false}.
      *
      * @param force
      *      {@code true} if proceeds even if up to date; {@code false} otherwise.
@@ -161,6 +161,7 @@ public final class Output extends Sink {
     /**
      * Sets whether this sink should compare existing destination files with the contents
      * about to be written and avoid overwriting them if not necessary.
+     * Defaulted to {@code false}.
      *
      * @param timid
      *      {@code true} if avoids unnecessary overwriting; {@code false} otherwise.
