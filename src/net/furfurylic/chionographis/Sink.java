@@ -126,7 +126,7 @@ public abstract class Sink {
      *      {@link #preexamineBundle(String[], long[])}.
      * @param origSrcLastModTime
      *      the last modification time of the original source file from the epoch,
-     *      which is positive if significant, or {@code 0} if unknown..
+     *      which is positive if significant, or {@code 0} if unknown.
      * @param referredContents
      *      an list whose size is the same as the return value of
      *      {@link #referents()} and contains the required input document contents
@@ -134,7 +134,8 @@ public abstract class Sink {
      *      or an empty list if the driver is not responsive to the request.
      *
      * @return
-     *      an TrAX {@code Result} object which receives the input document.
+     *      an TrAX {@code Result} object which receives the input document; is possibly
+     *      {@code null} when this sink judges that there is no need to process the input.
      */
     abstract Result startOne(int origSrcIndex, String origSrcFileName, long origSrcLastModTime,
         List<String> referredContents);
@@ -142,13 +143,20 @@ public abstract class Sink {
     /**
      * Finishes to receive one input document.
      *
+     * <p>This method is called after {@link #startOne(int, String, long, List)} with the
+     *  identical TrAX {@code Result} object which it has returned
+     *  (only if {@link #abortOne(Result)} has not been invoked).
+     *  However, if {@link #startOne(int, String, long, List)} has returned {@code null},
+     *  corresponding call of this method shall not occur.</p>
+     *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
      * called {@link #startOne(int, String, long, List)}.</p>
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
-     *      {@link #startOne(int, String, long, List)} of this object.
+     *      {@link #startOne(int, String, long, List)} of this object;
+     *      which is never {@code null}.
      */
     abstract void finishOne(Result result);
 

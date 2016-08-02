@@ -45,6 +45,17 @@
     <antcall target="crossing-abort-sinks-sax"/>
   </target>
 
+  <fail message="Run this with dry run mode not specified">
+    <condition>
+      <or>
+        <equals arg1="${net.furfurylic.chionographis.dry-run}"
+          arg2="true" casesensitive="no"/>
+        <equals arg1="${net.furfurylic.chionographis.dry-run}"
+          arg2="false" casesensitive="no"/>
+      </or>
+    </condition>
+  </fail>
+
   <macrodef name="assertfilenotexists">
     <attribute name="name"/>
     <attribute name="file"/>
@@ -134,28 +145,15 @@
     </sequential>
   </macrodef>
 
-  <target name="-require-dry-not-specified">
-    <fail message="Run this test with dry run mode not specified">
-      <condition>
-        <or>
-          <equals arg1="${net.furfurylic.chionographis.dry-run}"
-            arg2="true" casesensitive="no"/>
-          <equals arg1="${net.furfurylic.chionographis.dry-run}"
-            arg2="false" casesensitive="no"/>
-        </or>
-      </condition>
-    </fail>
-  </target>
-
-  <target name="-require-dry-by-prop" depends="-require-dry-not-specified">
+  <target name="-require-dry-by-prop">
     <property name="net.furfurylic.chionographis.dry-run" value="true"/>
   </target>
 
-  <target name="-require-not-dry-by-prop" depends="-require-dry-not-specified">
+  <target name="-require-not-dry-by-prop">
     <property name="net.furfurylic.chionographis.dry-run" value="false"/>
   </target>
 
-  <target name="basic-mapper" depends="-require-dry-not-specified">
+  <target name="basic-mapper">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="mapper"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -183,7 +181,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-mapper-dry" depends="-require-dry-not-specified">
+  <target name="basic-mapper-dry">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="mapper-dry"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -249,7 +247,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-mapper-up-to-date" depends="-require-dry-not-specified">
+  <target name="basic-mapper-up-to-date">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="mapper-up-to-date"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -280,7 +278,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-not-up-to-date-by-depends-new" depends="-require-dry-not-specified">
+  <target name="basic-not-up-to-date-by-depends-new">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="mapper-up-to-date-by-depends-new"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -309,7 +307,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-up-to-date-by-depends-ignore" depends="-require-dry-not-specified">
+  <target name="basic-up-to-date-by-depends-ignore">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="mapper-up-to-date-by-depends-ignore"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -342,7 +340,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-refer-content" depends="-require-dry-not-specified">
+  <target name="basic-refer-content">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="refer-content"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -372,7 +370,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-force-output" depends="-require-dry-not-specified">
+  <target name="basic-force-output">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="force-output"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -410,7 +408,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-force-task" depends="-require-dry-not-specified">
+  <target name="basic-force-task">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="force-task"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -449,7 +447,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-up-to-date-at-start" depends="-require-dry-not-specified">
+  <target name="basic-up-to-date-at-start">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="up-to-date-at-start"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -486,7 +484,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-not-up-to-date-at-start-by-depends" depends="-require-dry-not-specified">
+  <target name="basic-not-up-to-date-at-start-by-depends">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="not-up-to-date-at-start-by-depends"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -521,7 +519,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-force-at-start" depends="-require-dry-not-specified">
+  <target name="basic-force-at-start">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="force-at-start"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -559,7 +557,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-meta" depends="-require-dry-not-specified">
+  <target name="basic-meta">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="meta"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -582,7 +580,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-meta-refer-content" depends="-require-dry-not-specified">
+  <target name="basic-meta-refer-content">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="meta-refer-content"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -607,7 +605,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform" depends="-require-dry-not-specified">
+  <target name="transform">
     <property name="test.prefix" value="transform"/>
     <property name="test.name" value="${test.prefix}"/>
     <property name="dir.input" location="${test.prefix}/input"/>
@@ -627,7 +625,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-params" depends="-require-dry-not-specified">
+  <target name="transform-params">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="params"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -650,7 +648,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-params-ns" depends="-require-dry-not-specified">
+  <target name="transform-params-ns">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="params-ns"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -678,7 +676,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-refer-content" depends="-require-dry-not-specified">
+  <target name="transform-refer-content">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="refer-content"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -700,7 +698,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-not-up-to-date" depends="-require-dry-not-specified">
+  <target name="transform-not-up-to-date">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="not-up-to-date"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -733,7 +731,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-not-up-to-date-at-start" depends="-require-dry-not-specified">
+  <target name="transform-not-up-to-date-at-start">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="not-up-to-date-at-start"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -768,7 +766,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-not-up-to-date-by-depends" depends="-require-dry-not-specified">
+  <target name="transform-not-up-to-date-by-depends">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="not-up-to-date-by-depends"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -805,7 +803,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-not-up-to-date-by-depends-new" depends="-require-dry-not-specified">
+  <target name="transform-not-up-to-date-by-depends-new">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="not-up-to-date-by-depends-new"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -839,7 +837,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="transform-force" depends="-require-dry-not-specified">
+  <target name="transform-force">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="force"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -872,7 +870,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all" depends="-require-dry-not-specified">
+  <target name="all">
     <property name="test.prefix" value="all"/>
     <property name="test.name" value="${test.prefix}"/>
     <property name="dir.input" location="${test.prefix}/input"/>
@@ -895,7 +893,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all-up-to-date" depends="-require-dry-not-specified">
+  <target name="all-up-to-date">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="up-to-date"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -927,7 +925,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all-up-to-date-late" depends="-require-dry-not-specified">
+  <target name="all-up-to-date-late">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="up-to-date-late"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -961,7 +959,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all-not-up-to-date-late" depends="-require-dry-not-specified">
+  <target name="all-not-up-to-date-late">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="not-up-to-date-late"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1000,7 +998,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all-ns" depends="-require-dry-not-specified">
+  <target name="all-ns">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="ns"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1026,7 +1024,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="all-force" depends="-require-dry-not-specified">
+  <target name="all-force">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="force"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1062,7 +1060,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="snip-1" depends="-require-dry-not-specified">
+  <target name="snip-1">
     <property name="test.prefix" value="snip"/>
     <property name="test.title" value="1"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1090,7 +1088,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="snip-2" depends="-require-dry-not-specified">
+  <target name="snip-2">
     <property name="test.prefix" value="snip"/>
     <property name="test.title" value="2"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1120,7 +1118,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="snip-ns" depends="-require-dry-not-specified">
+  <target name="snip-ns">
     <property name="test.prefix" value="snip"/>
     <property name="test.title" value="ns"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1145,7 +1143,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-cache" depends="-require-dry-not-specified">
+  <target name="crossing-cache">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="cache"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1172,7 +1170,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-cache-refer-content" depends="-require-dry-not-specified">
+  <target name="crossing-cache-refer-content">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="cache-refer-content"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1203,7 +1201,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-timid" depends="-require-dry-not-specified">
+  <target name="crossing-timid">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="timid"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1252,7 +1250,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-parallel-sinks" depends="-require-dry-not-specified">
+  <target name="crossing-parallel-sinks">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="parallel-sinks"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1294,7 +1292,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-abort-sources" depends="-require-dry-not-specified">
+  <target name="crossing-abort-sources">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="abort-sources"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1324,7 +1322,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-abort-sinks-dom" depends="-require-dry-not-specified">
+  <target name="crossing-abort-sinks-dom">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="abort-sinks-dom"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -1368,7 +1366,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="crossing-abort-sinks-sax" depends="-require-dry-not-specified">
+  <target name="crossing-abort-sinks-sax">
     <property name="test.prefix" value="crossing"/>
     <property name="test.title" value="abort-sinks-sax"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
