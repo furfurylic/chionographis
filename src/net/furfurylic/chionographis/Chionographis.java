@@ -23,6 +23,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongUnaryOperator;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -54,6 +55,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean verbose_ = false;
     private boolean parallel_ = true;
     private boolean dryRun_ = false;
+    private boolean failOnNonfatalError_ = false;
     private Depends depends_ = null;
 
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
@@ -72,7 +74,9 @@ public final class Chionographis extends MatchingTask implements Driver {
     @Override
     public void init() {
         sinks_ = new Sinks(
-            new ChionographisLogger(),
+            // If failOnNonfatalError_, exceptions reported other than this task is redundant
+            // (those exceptions are likely to be reported by Ant after failing).
+            new ChionographisLogger(i -> !failOnNonfatalError_ || (i == this)),
             PropertyHelper.getPropertyHelper(getProject())::replaceProperties);
     }
 
@@ -161,12 +165,28 @@ public final class Chionographis extends MatchingTask implements Driver {
      * {@code net.furfurylic.chionographis.dry-run} to {@code true} or {@code false}.</p>
      *
      * @param dryRun
-     *      {@code true} if "dry mode" is enabled; {@code false} otherwise.
+     *      {@code true} if "dry run" mode is enabled; {@code false} otherwise.
      *
      * @since 1.1
      */
     public void setDryRun(boolean dryRun) {
         dryRun_ = dryRun;
+    }
+
+    /**
+     * Sets whether the build should fail if nonfatal error occurs.
+     * Defaults to {@code false}.
+     *
+     * <p>A nonfatal error is an error on one input source not likely to affect integrity of
+     * processing of other input sources.</p>
+     *
+     * @param failOnNonfatalError
+     *      {@code true} if the build should fail on nonfatal errors; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setFailOnNonfatalError(boolean failOnNonfatalError) {
+        failOnNonfatalError_ = failOnNonfatalError;
     }
 
     /**
@@ -326,7 +346,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         sinks_.startBundle();
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
-            srcURIs, srcFileNames, srcLastModifiedTimes,
+            failOnNonfatalError_, srcURIs, srcFileNames, srcLastModifiedTimes,
             sinks_, createEntityResolver(), new ChionographisBoundLogger(), createMetaFuncMap());
 
         Stream<IntSupplier> workers = IntStream.range(0, srcFileNames.length)
@@ -443,6 +463,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private static final class ChionographisWorkerFactory {
+        private boolean failOnNonfatalError_;
         private URI[] uris_;
         private String[] fileNames_;
         private long[] lastModifiedTimes_;
@@ -453,10 +474,12 @@ public final class Chionographis extends MatchingTask implements Driver {
         private volatile int isOK_;
 
         public ChionographisWorkerFactory(
+                boolean failOnNonfatalError,
                 URI[] uris, String[] fileNames, long[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver,
                 ChionographisWorker.BoundLogger logger,
                 Map<String, Function<URI, String>> metaFuncMap) {
+            failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
             lastModifiedTimes_ = lastModifiedTimes;
@@ -470,7 +493,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         public IntSupplier create(int index) {
             long lastModifiedTime = (lastModifiedTimes_ != null)
                 ? lastModifiedTimes_[index] : 0;
-            return new ChionographisWorker(index,
+            return new ChionographisWorker(failOnNonfatalError_, index,
                 uris_[index], fileNames_[index], lastModifiedTime,
                 sink_, logger_, metaFuncMap_, xfer_,
                 () -> isOK_)::run;
@@ -496,6 +519,13 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private final class ChionographisLogger implements Logger {
+
+        Predicate<Object> tellIfReportsException_;
+
+        public ChionographisLogger(Predicate<Object> tellIfReportsException) {
+            tellIfReportsException_ = tellIfReportsException;
+        }
+
         @Override
         public void log(Object issuer, String message, Level level) {
             Chionographis.this.log(head(issuer) + message, translateLevel(level));
@@ -503,6 +533,13 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         @Override
         public void log(Object issuer, Throwable ex, String heading,
+                Level headingLevel, Level bodyLevel) {
+            if (tellIfReportsException_.test(issuer)) {
+                logEx(issuer, ex, heading, headingLevel, bodyLevel);
+            }
+        }
+
+        private void logEx(Object issuer, Throwable ex, String heading,
                 Level headingLevel, Level bodyLevel) {
             String indent;
             String trimmedHead;
