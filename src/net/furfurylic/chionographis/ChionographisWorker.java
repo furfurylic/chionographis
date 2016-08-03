@@ -72,6 +72,8 @@ final class ChionographisWorker {
         void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel);
     }
 
+    private boolean failOnNonfatalError_;
+
     private int index_;
     private URI uri_;
     private String fileName_;
@@ -109,10 +111,12 @@ final class ChionographisWorker {
      *      a function which tells whether the execution is go (1) or no-go (0).
      */
     public ChionographisWorker(
-                int index, URI uri, String fileName, long lastModified,
-                Sink sink, BoundLogger logger,
-                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer,
-                IntSupplier isOK) {
+            boolean failOnNonfatalError,
+            int index, URI uri, String fileName, long lastModified,
+            Sink sink, BoundLogger logger,
+            Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer,
+            IntSupplier isOK) {
+        failOnNonfatalError_ = failOnNonfatalError;
         index_ = index;
         uri_ = uri;
         fileName_ = fileName;
@@ -185,7 +189,9 @@ final class ChionographisWorker {
                 xfer_.transfer(source, result);
             } catch (BuildException e) {
                 logger_.log("Aborting processing " + systemID, Level.WARN);
-                logCause(e);
+                if (!failOnNonfatalError_) {
+                    logCause(e);
+                }
                 try {
                     sink_.abortOne(result);
                 } catch (FatalityException ex) {
@@ -193,7 +199,11 @@ final class ChionographisWorker {
                 } catch (Exception ex) {
                     throw new FatalityException(e);
                 }
-                return 0;
+                if (failOnNonfatalError_) {
+                    throw new FatalityException(e);
+                } else {
+                    return 0;
+                }
             }
             if (isOK_.getAsInt() == 0) {
                 return 0;
@@ -206,8 +216,16 @@ final class ChionographisWorker {
             throw e;
         } catch (Exception e) {
             logger_.log("Failed to process " + systemID, Level.WARN);
-            logCause(e);
-            return 0;
+            if (failOnNonfatalError_) {
+                if (e instanceof RuntimeException) {
+                    throw e;
+                } else {
+                    throw new FatalityException(e);
+                }
+            } else {
+                logCause(e);
+                return 0;
+            }
         }
     }
 
