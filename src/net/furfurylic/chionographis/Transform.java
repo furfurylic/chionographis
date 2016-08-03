@@ -68,9 +68,13 @@ public final class Transform extends Filter {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Transform(Logger logger, Function<String, String> expander) {
-        super(logger, expander);
+    Transform(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
+        super(logger, expander, exceptionPoster);
     }
 
     /**
@@ -112,7 +116,7 @@ public final class Transform extends Filter {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(logger(), expander());
+        Param param = new Param(logger(), expander(), exceptionPoster());
         params_.add(param);
         return param;
     }

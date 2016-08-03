@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -29,6 +30,7 @@ import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
+import org.apache.tools.ant.BuildException;
 import org.w3c.dom.Node;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
@@ -43,6 +45,7 @@ final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
     private Function<String, String> expander_;
+    private Consumer<BuildException> exceptionPoster_;
 
     private List<Sink> sinks_;
 
@@ -69,10 +72,17 @@ final class Sinks extends Sink implements Logger {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
      */
-    public Sinks(Logger logger, Function<String, String> expander) {
+    public Sinks(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
         expander_ = expander;
+        exceptionPoster_ = exceptionPoster;
         sinks_ = new ArrayList<>();
     }
 
@@ -98,13 +108,24 @@ final class Sinks extends Sink implements Logger {
     }
 
     /**
+     * Returns an object which consumes exceptions occurred during preparation process.
+     *
+     * @return
+     *      an object which consumes exceptions occurred during preparation process,
+     *      which shall not be {@code null}.
+     */
+    public Consumer<BuildException> exceptionPoster() {
+        return exceptionPoster_;
+    }
+
+    /**
      * Adds a {@link Transform} filter into this composite.
      *
      * @return
      *      a {@link Transform} filter object.
      */
     public Transform createTransform() {
-        Transform sink = new Transform(logger_, expander_);
+        Transform sink = new Transform(logger_, expander_, exceptionPoster_);
         sinks_.add(sink);
         return sink;
     }
@@ -116,7 +137,7 @@ final class Sinks extends Sink implements Logger {
      *      an {@link All} filter object.
      */
     public All createAll() {
-        All sink = new All(logger_, expander_);
+        All sink = new All(logger_, expander_, exceptionPoster_);
         sinks_.add(sink);
         return sink;
     }
@@ -128,7 +149,7 @@ final class Sinks extends Sink implements Logger {
      *      a {@link Snip} filter object.
      */
     public Snip createSnip() {
-        Snip sink = new Snip(logger_, expander_);
+        Snip sink = new Snip(logger_, expander_, exceptionPoster_);
         sinks_.add(sink);
         return sink;
     }
@@ -140,7 +161,7 @@ final class Sinks extends Sink implements Logger {
      *      an {@link Output} sink object.
      */
     public Output createOutput() {
-        Output sink = new Output(logger_);
+        Output sink = new Output(logger_, exceptionPoster_);
         sinks_.add(sink);
         return sink;
     }

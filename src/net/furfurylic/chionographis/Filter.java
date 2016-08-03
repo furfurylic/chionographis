@@ -8,9 +8,12 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
+
+import org.apache.tools.ant.BuildException;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -30,9 +33,13 @@ abstract class Filter extends Sink implements Driver {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Filter(Logger logger, Function<String, String> expander) {
-        sinks_ = new Sinks(logger, expander);
+    Filter(Logger logger, Function<String, String> expander,
+                Consumer<BuildException> exceptionPoster) {
+        sinks_ = new Sinks(logger, expander, exceptionPoster);
     }
 
     /**
@@ -63,6 +70,10 @@ abstract class Filter extends Sink implements Driver {
      */
     final Function<String, String> expander() {
         return sinks_.expander();
+    }
+
+    final Consumer<BuildException> exceptionPoster() {
+        return sinks_.exceptionPoster();
     }
 
     /**

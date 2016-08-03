@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -56,9 +57,13 @@ public final class Snip extends Filter {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Snip(Logger logger, Function<String, String> expander) {
-        super(logger, expander);
+    Snip(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
+        super(logger, expander, exceptionPoster);
     }
 
     /**
