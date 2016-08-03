@@ -1164,7 +1164,7 @@
 
     <delete dir="${dir.output}"/>
 
-    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
       <snip select="/descendent-or-self::b"> <!-- Bad axis: descendant-or-self, by rights -->
         <output destdir="${dir.output}"
                 refer="//processing-instruction('chionographis-output')"/>
