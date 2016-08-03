@@ -42,12 +42,9 @@ import net.furfurylic.chionographis.Logger.Level;
  * <p>The way of extraction is specified by <i>XPath</i> expression.
  * The root nodes of the fragments are the matched elements with the XPath expression.</p>
  */
-public final class Snip extends Sink implements Driver {
+public final class Snip extends Filter {
 
-    private Sinks sinks_;
     private String select_;
-    private boolean force_;
-
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
     private final ReentrantLock lock_ = new ReentrantLock();
@@ -61,7 +58,7 @@ public final class Snip extends Sink implements Driver {
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
     Snip(Logger logger, Function<String, String> expander) {
-        sinks_ = new Sinks(logger, expander);
+        super(logger, expander);
     }
 
     /**
@@ -83,60 +80,19 @@ public final class Snip extends Sink implements Driver {
      * {@inheritDoc}
      */
     @Override
-    public void setForce(boolean force) {
-        force_ = force;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Transform createTransform() {
-        return sinks_.createTransform();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public All createAll() {
-        return sinks_.createAll();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Snip createSnip() {
-        return sinks_.createSnip();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Output createOutput() {
-        return sinks_.createOutput();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
-        force_ = force_ || force;
-        sinks_.init(baseDir, namespaceContext, force_, dryRun);
+    void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
+        sink().init(baseDir, namespaceContext, isForce(), dryRun);
         namespaceContext_ = namespaceContext;
     }
 
     @Override
     boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
-        return sinks_.preexamineBundle(origSrcFileNames, origSrcLastModTimes);
+        return sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
     }
 
     @Override
     void startBundle() {
-        sinks_.startBundle();
+        sink().startBundle();
     }
 
     @Override
@@ -153,7 +109,7 @@ public final class Snip extends Sink implements Driver {
 
         try {
             // Apply XPath expression to current document
-            sinks_.log(this, "Applying snipping criterion " + select_ +
+            logger().log(this, "Applying snipping criterion " + select_ +
                 "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
             NodeList nodes = extractNodes(r);
 
@@ -179,9 +135,9 @@ public final class Snip extends Sink implements Driver {
                                    .sum();
             }
             if (count > 0) {
-                sinks_.log(this, count + " snipped fragments processed", Level.DEBUG);
+                logger().log(this, count + " snipped fragments processed", Level.DEBUG);
             } else {
-                sinks_.log(this, "No snipped fragments generated; the original source is " +
+                logger().log(this, "No snipped fragments generated; the original source is " +
                         r.originalSrcFileName(), Level.INFO);
             }
 
@@ -214,24 +170,24 @@ public final class Snip extends Sink implements Driver {
 
     private int sendFragmentDocument(Document document, SnipDOMResult result) {
         // Search the source contents if necessary
-        List<XPathExpression> referents = sinks_.referents();
+        List<XPathExpression> referents = sink().referents();
         List<String> referredContents;
         if (!referents.isEmpty()) {
             referredContents = Referral.extract(document, referents);
-            sinks_.log(this, "Referred source data: "
+            logger().log(this, "Referred source data: "
                 + String.join(", ", referredContents), Level.DEBUG);
         } else {
             referredContents = Collections.emptyList();
         }
 
         // Open sink's result
-        Result rr = sinks_.startOne(result.originalSrcIndex(), result.originalSrcFileName(),
+        Result rr = sink().startOne(result.originalSrcIndex(), result.originalSrcFileName(),
             result.originalSrcLastModifiedTime(), referredContents);
         if (rr != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
             // Finish sink
-            sinks_.finishOne(rr);
+            sink().finishOne(rr);
         }
 
         return 1;
@@ -245,7 +201,7 @@ public final class Snip extends Sink implements Driver {
 
     @Override
     void finishBundle() {
-        sinks_.finishBundle();
+        sink().finishBundle();
     }
 
     private static class SnipDOMResult extends DOMResult {
