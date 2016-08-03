@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -41,6 +42,8 @@ import org.xml.sax.ext.LexicalHandler;
 final class Sinks extends Sink implements Logger {
 
     private Logger logger_;
+    private Function<String, String> expander_;
+
     private List<Sink> sinks_;
 
     /**
@@ -64,9 +67,12 @@ final class Sinks extends Sink implements Logger {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    public Sinks(Logger logger) {
+    public Sinks(Logger logger, Function<String, String> expander) {
         logger_ = logger;
+        expander_ = expander;
         sinks_ = new ArrayList<>();
     }
 
@@ -82,13 +88,23 @@ final class Sinks extends Sink implements Logger {
     }
 
     /**
+     * Returns an object which perform property expansion.
+     *
+     * @return
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     */
+    public Function<String, String> expander() {
+        return expander_;
+    }
+
+    /**
      * Adds a {@link Transform} filter into this composite.
      *
      * @return
      *      a {@link Transform} filter object.
      */
     public Transform createTransform() {
-        Transform sink = new Transform(logger_);
+        Transform sink = new Transform(logger_, expander_);
         sinks_.add(sink);
         return sink;
     }
@@ -100,7 +116,7 @@ final class Sinks extends Sink implements Logger {
      *      an {@link All} filter object.
      */
     public All createAll() {
-        All sink = new All(logger_);
+        All sink = new All(logger_, expander_);
         sinks_.add(sink);
         return sink;
     }
@@ -112,7 +128,7 @@ final class Sinks extends Sink implements Logger {
      *      a {@link Snip} filter object.
      */
     public Snip createSnip() {
-        Snip sink = new Snip(logger_);
+        Snip sink = new Snip(logger_, expander_);
         sinks_.add(sink);
         return sink;
     }

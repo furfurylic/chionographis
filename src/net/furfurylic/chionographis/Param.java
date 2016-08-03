@@ -9,6 +9,7 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
 
@@ -25,8 +26,10 @@ import net.furfurylic.chionographis.Logger.Level;
 public final class Param {
 
     private Logger logger_;
+    private Function<String, String> expander_;
 
     private String name_ = null;
+    private boolean expand_ = false;
     private Object value_ = null;
 
     /**
@@ -34,9 +37,12 @@ public final class Param {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Param(Logger logger) {
+    Param(Logger logger, Function<String, String> expander) {
         logger_ = logger;
+        expander_ = expander;
     }
 
     /**
@@ -63,14 +69,39 @@ public final class Param {
     }
 
     /**
+     * Sets whether Ant properties in this element's contents are expanded.
+     * Defaults to {@code false}.
+     *
+     * @param expand
+     *      {@code true} if properties are expanded; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setExpand(boolean expand) {
+        expand_ = expand;
+    }
+
+    /**
      * Sets the value of this parameter.
      * As of now, the value must be a string.
      *
      * @param value
      *      the value of this parameter.
+     *
+     * @throws BuildException
+     *      if property expansion fails.
      */
     public void addText(String value) {
-        value_ = value;
+        if (expand_) {
+            try {
+                value_ = expander_.apply(value);
+            } catch (BuildException e) {
+                logger_.log(this, "Property expansion failed: " + value, Level.ERR);
+                throw e;
+            }
+        } else {
+            value_ = value;
+        }
     }
 
     /**
