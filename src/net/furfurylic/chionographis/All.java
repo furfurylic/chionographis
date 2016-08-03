@@ -38,7 +38,7 @@ import net.furfurylic.chionographis.Logger.Level;
  * supplied to this object by the driver as the direct child nodes of the document element of the
  * resulted document.</p>
  */
-public final class All extends Sink implements Driver {
+public final class All extends Filter {
     /**
      * The qualified name of the root element.
      *
@@ -47,9 +47,6 @@ public final class All extends Sink implements Driver {
      * After the invocation, this field is the string value of {@link #rootQ_}.
      */
     private String root_ = null;
-
-    private boolean force_ = false;
-    private Sinks sinks_;
 
     private QName rootQ_;
 
@@ -67,7 +64,7 @@ public final class All extends Sink implements Driver {
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
     All(Logger logger, Function<String, String> expander) {
-        sinks_ = new Sinks(logger, expander);
+        super(logger, expander);
     }
 
     /**
@@ -88,48 +85,8 @@ public final class All extends Sink implements Driver {
         root_ = root;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void setForce(boolean force) {
-        force_ = force;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Transform createTransform() {
-        return sinks_.createTransform();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public All createAll() {
-        return sinks_.createAll();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Snip createSnip() {
-        return sinks_.createSnip();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Output createOutput() {
-        return sinks_.createOutput();
-    }
-
-    @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
+    void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
         rootQ_ = null;
         if (!root_.startsWith("{")) {
             int indexOfColon = root_.indexOf(':');
@@ -147,19 +104,18 @@ public final class All extends Sink implements Driver {
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
-        force_ = force_ || force;
-        sinks_.init(baseDir, namespaceContext, force_, dryRun);
+        sink().init(baseDir, namespaceContext, isForce(), dryRun);
     }
 
     @Override
     boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         boolean[] includes;
-        if (force_) {
+        if (isForce()) {
             includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
         } else {
             includes =
-                sinks_.preexamineBundle(origSrcFileNames, origSrcLastModTimes);
+                sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
@@ -169,8 +125,8 @@ public final class All extends Sink implements Driver {
 
     @Override
     void startBundle() {
-        sinks_.log(this, "Starting to collect input sources into " + rootQ_, Level.DEBUG);
-        sinks_.startBundle();
+        logger().log(this, "Starting to collect input sources into " + rootQ_, Level.DEBUG);
+        sink().startBundle();
         resultDocument_ = XMLTransfer.getDefault().newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
@@ -225,30 +181,30 @@ public final class All extends Sink implements Driver {
     void abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        sinks_.log(this, "One of the sources is damaged; must give up all", Level.ERR);
+        logger().log(this, "One of the sources is damaged; must give up all", Level.ERR);
         throw new BuildException();
     }
 
     @Override
     void finishBundle() {
         assert resultDocument_ != null;
-        List<XPathExpression> referents = sinks_.referents();
+        List<XPathExpression> referents = sink().referents();
         List<String> referredContents;
         if (!referents.isEmpty()) {
             referredContents = Referral.extract(resultDocument_, referents);
-            sinks_.log(this, "Referred source data: "
+            logger().log(this, "Referred source data: "
                 + String.join(", ", referredContents), Level.DEBUG);
         } else {
             referredContents = Collections.emptyList();
         }
-        Result result = sinks_.startOne(-1, null, lastModifiedTime_, referredContents);
+        Result result = sink().startOne(-1, null, lastModifiedTime_, referredContents);
         if (result != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(resultDocument_), result);
             resultDocument_ = null;
             // Finish sink
-            sinks_.finishOne(result);
+            sink().finishOne(result);
         }
-        sinks_.finishBundle();
+        sink().finishBundle();
     }
 }
