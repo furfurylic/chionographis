@@ -507,7 +507,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             String indent;
             String trimmedHead;
             {
-                Pattern lineHeadSpace = Pattern.compile("^([\\s]+)(.*)");
+                Pattern lineHeadSpace = Pattern.compile("^([\\s]*)([\\S].*)$");
                 Matcher matcher = lineHeadSpace.matcher(heading);
                 if (matcher.find()) {
                     indent = matcher.group(1);
@@ -520,14 +520,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
             List<String> lines;
             {
-                String all;
-                StringWriter writer = new StringWriter();
-                try (PrintWriter out = new PrintWriter(writer)) {
-                    out.print(trimmedHead);
-                    ex.printStackTrace(out);
-                }
-                all = writer.toString();
-                // StringWriter.close() has no effect so we don't close
+                String all = trimmedHead + getPrintedStackTrace(ex);
                 all = all.replaceAll("\t", "    ");   // Maybe controversial
 
                 String[] linesArray = all.split("\\r\\n|\\r|\\n");
@@ -548,6 +541,21 @@ public final class Chionographis extends MatchingTask implements Driver {
                     }
                 }
             }
+        }
+
+        private String getPrintedStackTrace(Throwable ex) {
+            StringWriter writer = new StringWriter();
+            try (PrintWriter out = new PrintWriter(writer)) {
+                ex.printStackTrace(out);
+            }
+            String result = writer.toString();
+            // Some exception classes (for example, Ant's BuildException)
+            // don't write the class name first, so we supplement it
+            if (!result.startsWith(ex.getClass().getName())) {
+                result = ex.getClass().getName() + ": " + result;
+            }
+            // StringWriter.close() has no effect so we don't close
+            return result;
         }
 
         private String head(Object issuer) {
