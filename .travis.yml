@@ -3,6 +3,9 @@ notifications:
   email: false
 jdk:
   - oraclejdk8
+env:
+  - ANT_ARGS="-logger org.apache.tools.ant.listener.AnsiColorLogger"
 script:
   - ant
-  - ant -lib release/lib -f test/test.xml full
+  - ant -lib release/lib -f test/test.xml
+
