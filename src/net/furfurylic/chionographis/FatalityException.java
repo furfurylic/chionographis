@@ -23,6 +23,6 @@ class FatalityException extends BuildException {
      *      the causal exception object.
      */
     public FatalityException(Throwable cause) {
-        super(cause);
+        super("Fatal situation of the build", cause);
     }
 }
