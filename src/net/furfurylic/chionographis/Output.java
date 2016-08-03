@@ -233,7 +233,6 @@ public final class Output extends Sink {
             // No predefined destination path exists
             // and specified to refer the source document contents.
             try {
-
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext);
                 referents_ = Collections.singletonList(xpath.compile(referent_));

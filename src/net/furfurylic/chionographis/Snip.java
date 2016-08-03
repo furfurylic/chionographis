@@ -25,6 +25,7 @@ import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathException;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
@@ -112,55 +113,63 @@ public final class Snip extends Filter {
         assert result instanceof SnipDOMResult;
         SnipDOMResult r = (SnipDOMResult) result;
 
-        try {
-            // Apply XPath expression to current document
-            logger().log(this, "Applying snipping criterion " + select_ +
-                "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
-            NodeList nodes = extractNodes(r);
+        // Apply XPath expression to current document
+        logger().log(this, "Applying snipping criterion " + select_ +
+            "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
+        NodeList nodes = extractNodes(r);
 
-            int count;
-            ForkJoinPool pool = ForkJoinTask.getPool();
-            Stream<Document> fragsStream =
-                IntStream.range(0, nodes.getLength())
-                         .mapToObj(i -> nodes.item(i))
-                         .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
-                         .map(n -> newFragmentDocument(n));
-            if (pool != null) {
-                // We do document creation sequentially.
-                List<Document> documents = fragsStream.collect(Collectors.toList());
-                // Created documents are passed to sink in parallel.
-                count = pool.submit(() -> documents.stream()
-                                                   .parallel()
-                                                   .mapToInt(d -> sendFragmentDocument(d, r))
-                                                   .sum())
-                            .join();
-                // It is OK if some fragments failed.
-            } else {
-                count = fragsStream.mapToInt(d -> sendFragmentDocument(d, r))
-                                   .sum();
-            }
-            if (count > 0) {
-                logger().log(this, count + " snipped fragments processed", Level.DEBUG);
-            } else {
-                logger().log(this, "No snipped fragments generated; the original source is " +
-                        r.originalSrcFileName(), Level.INFO);
-            }
-
-        } catch (XPathExpressionException e) {
-            throw new BuildException(e);
+        int count;
+        ForkJoinPool pool = ForkJoinTask.getPool();
+        Stream<Document> fragsStream =
+            IntStream.range(0, nodes.getLength())
+                     .mapToObj(i -> nodes.item(i))
+                     .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
+                     .map(n -> newFragmentDocument(n));
+        if (pool != null) {
+            // We do document creation sequentially.
+            List<Document> documents = fragsStream.collect(Collectors.toList());
+            // Created documents are passed to sink in parallel.
+            count = pool.submit(() -> documents.stream()
+                                               .parallel()
+                                               .mapToInt(d -> sendFragmentDocument(d, r))
+                                               .sum())
+                        .join();
+            // It is OK if some fragments failed.
+        } else {
+            count = fragsStream.mapToInt(d -> sendFragmentDocument(d, r))
+                               .sum();
+        }
+        if (count > 0) {
+            logger().log(this, count + " snipped fragments processed", Level.DEBUG);
+        } else {
+            logger().log(this, "No snipped fragments generated; the original source is " +
+                    r.originalSrcFileName(), Level.INFO);
         }
     }
 
-    private NodeList extractNodes(DOMResult result) throws XPathExpressionException {
+    private NodeList extractNodes(DOMResult result) {
         lock_.lock();
         try {
             NodeList nodes;
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext_);
-                expr_ = xpath.compile(select_);
+                try {
+                    expr_ = xpath.compile(select_);
+                } catch (XPathException e) {
+                    logger().log(this,
+                        "Failed to compile the XPath expression: " + select_, Level.ERR);
+                    throw new FatalityException(e);
+                }
             }
-            nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
+            try {
+                nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
+            } catch (XPathExpressionException e) {
+                logger().log(this,
+                    "Failed to apply the XPath expression: " + select_, Level.ERR);
+                logger().log(this, e, "  Cause: ", Level.ERR, Level.VERBOSE);
+                throw new ChionographisBuildException(e, true);
+            }
             return nodes;
         } finally {
             lock_.unlock();
@@ -200,8 +209,8 @@ public final class Snip extends Filter {
 
     @Override
     void abortOne(Result result) {
-        // sink_.startOne(int, String) is not invoked yet,
-        // so we can evade call sink_.abortOne().
+        // sink().startOne(int, String) is not invoked yet,
+        // so we can evade call sink().abortOne().
     }
 
     @Override
@@ -210,29 +219,27 @@ public final class Snip extends Filter {
     }
 
     private static class SnipDOMResult extends DOMResult {
-        private int originalSrcIndex_;
-        private String originalSrcFileName_;
-        private long originalSrcLastModifiedTime_;
+        private int origSrcIndex_;
+        private String origSrcFileName_;
+        private long origSrcLastModTime_;
 
-        public SnipDOMResult(
-                int originalSrcIndex, String originalSrcFileName,
-                long originalSrcLastModifiedTime) {
+        public SnipDOMResult(int origSrcIndex, String origSrcFileName, long origSrcLastModTime) {
             super();
-            originalSrcIndex_ = originalSrcIndex;
-            originalSrcFileName_ = originalSrcFileName;
-            originalSrcLastModifiedTime_ = originalSrcLastModifiedTime;
+            origSrcIndex_ = origSrcIndex;
+            origSrcFileName_ = origSrcFileName;
+            origSrcLastModTime_ = origSrcLastModTime;
         }
 
         public int originalSrcIndex() {
-            return originalSrcIndex_;
+            return origSrcIndex_;
         }
 
         public String originalSrcFileName() {
-            return originalSrcFileName_;
+            return origSrcFileName_;
         }
 
         public long originalSrcLastModifiedTime() {
-            return originalSrcLastModifiedTime_;
+            return origSrcLastModTime_;
         }
     }
 }
