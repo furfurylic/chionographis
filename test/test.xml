@@ -10,6 +10,7 @@
     <antcall target="basic-mapper-up-to-date"/>
     <antcall target="basic-not-up-to-date-by-depends-new"/>
     <antcall target="basic-up-to-date-by-depends-ignore"/>
+    <antcall target="basic-error-depends-fail"/>
     <antcall target="basic-error-depends"/>
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
@@ -18,17 +19,41 @@
     <antcall target="basic-not-up-to-date-at-start-by-depends"/>
     <antcall target="basic-force-at-start"/>
     <antcall target="basic-meta"/>
+    <antcall target="basic-meta-uri"/>
+    <antcall target="basic-meta-title-no-extension"/>
+    <antcall target="basic-error-meta-no-name-no-type"/>
+    <antcall target="basic-error-meta-no-type"/>
     <antcall target="basic-error-meta-bad-type"/>
     <antcall target="basic-error-meta-empty-type"/>
     <antcall target="basic-error-meta-bad-name"/>
     <antcall target="basic-error-meta-empty-name"/>
+    <antcall target="basic-error-meta-added-twice"/>
     <antcall target="basic-meta-refer-content"/>
-    <antcall target="basic-error-namespace-empty-prefix"/>
+    <antcall target="basic-error-namespace-no-prefix-no-uri"/>
+    <antcall target="basic-error-namespace-no-prefix"/>
+    <antcall target="basic-error-namespace-no-uri"/>
     <antcall target="basic-error-namespace-bad-prefix"/>
+    <antcall target="basic-error-namespace-empty-prefix"/>
+    <antcall target="basic-error-namespace-added-twice"/>
+    <antcall target="basic-error-no-sinks"/>
+    <antcall target="basic-error-output-mapper-added-twice"/>
+    <antcall target="basic-error-output-dest-and-mapper"/>
+    <antcall target="basic-error-output-dest-and-refer"/>
+    <antcall target="basic-error-output-no-clue"/>
+    <antcall target="basic-error-output-bad-refer"/>
+    <antcall target="basic-no-matching-input"/>
+    <antcall target="basic-output-no-mapped"/>
     <antcall target="transform"/>
+    <antcall target="transform-error-no-stylesheet-configured"/>
+    <antcall target="transform-error-stylesheet"/>
     <antcall target="transform-params"/>
     <antcall target="transform-params-ns"/>
     <antcall target="transform-error-params-bad-prefix"/>
+    <antcall target="transform-error-params-no-name-no-value"/>
+    <antcall target="transform-error-params-no-name"/>
+    <antcall target="transform-error-params-empty-name"/>
+    <antcall target="transform-error-params-added-twice"/>
+    <antcall target="transform-error-params-value-format"/>
     <antcall target="transform-refer-content"/>
     <antcall target="transform-not-up-to-date"/>
     <antcall target="transform-not-up-to-date-at-start"/>
@@ -358,6 +383,23 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="basic-error-depends-fail">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-fail"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <depends absent="fail"><fileset file="${dir.input}/ghost"/></depends>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
   <target name="basic-error-depends">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-depends"/>
@@ -368,7 +410,7 @@
     <delete dir="${dir.output}"/>
 
     <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
-      <depends absent="fal"><fileset file="${dir.output}/ghost"/></depends>
+      <depends absent="fal"><fileset file="${dir.input}/ghost"/></depends>
       <output dest="${dir.output}/output1.xml"/>
     </chionographis>
 
@@ -615,11 +657,102 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="basic-meta-uri">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="meta-uri"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
+      <meta type="uri"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+
+    <script language="javascript"><![CDATA[
+      Paths = Java.type("java.nio.file.Paths");
+      o = new java.io.FileWriter(
+        new java.io.File(project.getProperty("dir.output"), "expected.txt"));
+      o.write("[input:<chionographis-uri=");
+      o.write(Paths.get(project.getProperty("dir.input"), "input.xml").toUri().toString());
+      o.write(">[child:]]");
+      o.close();
+    ]]></script>
+
+    <assertfileeq name="${test.name}"
+      expected="${dir.output}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-meta-title-no-extension">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="meta-title-no-extension"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <copy file="${dir.input}/input.xml" tofile="${dir.output}/input"/>
+
+    <chionographis srcdir="${dir.output}" includes="input" cache="no">
+      <meta type="file-name"/>
+      <meta type="file-title"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected-no-extension.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-meta-no-name-no-type">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-no-name-no-type"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
+  <target name="basic-error-meta-no-type">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-no-type"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="xyz"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
   <target name="basic-error-meta-bad-type">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-meta-bad-type"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
-    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
     <delete dir="${dir.output}"/>
@@ -636,7 +769,7 @@
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-meta-empty-type"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
-    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
     <delete dir="${dir.output}"/>
@@ -653,7 +786,7 @@
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-meta-bad-name"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
-    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
     <delete dir="${dir.output}"/>
@@ -670,13 +803,31 @@
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-meta-empty-name"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
-    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
     <delete dir="${dir.output}"/>
 
     <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
       <meta name="" type="file-name"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
+  <target name="basic-error-meta-added-twice">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-added-twice"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-meta"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="meta" type="file-name"/>
+      <meta name="meta" type="file-title"/>
       <output dest="${dir.output}/output.xml"/>
     </chionographis>
 
@@ -708,7 +859,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-error-namespace-empty-prefix">
+  <target name="basic-error-namespace-no-prefix-no-uri">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-namespace-empty-prefix"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -718,7 +869,41 @@
     <delete dir="${dir.output}"/>
 
     <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
-      <namespace prefix="" uri="http://furfurylic.net/ns"/>
+      <namespace/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
+  <target name="basic-error-namespace-no-prefix">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-empty-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace uri="http://furfurylic.net/ns"/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
+  <target name="basic-error-namespace-no-uri">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-empty-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace prefix="xyz"/>
       <output dest="${dir.output}/output1.xml"/>
     </chionographis>
 
@@ -742,6 +927,179 @@
     <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
   </target>
 
+  <target name="basic-error-namespace-empty-prefix">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-empty-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace prefix="" uri="http://furfurylic.net/ns"/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
+  <target name="basic-error-namespace-added-twice">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-added-twice"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace prefix="a" uri="http://furfurylic.net/ns"/>
+      <namespace prefix="b" uri="http://furfurylic.net/ns"/>
+      <namespace prefix="a" uri="http://furfurylic.net/ns"/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
+  <target name="basic-error-no-sinks">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-no-sinks"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no"/>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-output-mapper-added-twice">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-mapper-added-twice"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <output destdir="${dir.output}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+        <globmapper from="input*.xml" to="output*_2.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-output-dest-and-mapper">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-dest-and-mapper"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <output destdir="${dir.output}" dest="output1.xml">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-output-dest-and-refer">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-dest-and-refer"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <output destdir="${dir.output}" dest="output1.xml" refer="local-name(/*)"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-output-no-clue">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-no-clue"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <output destdir="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-output-bad-refer">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-bad-refer"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input*.xml" cache="no" failonerror="no">
+      <output destdir="${dir.output}" refer="loca-name(/*)">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-no-matching-input">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="no-matching-input"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input*.txt" cache="no">
+      <output destdir="${dir.output}" refer="local-name(/*/*)">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-output-no-mapped">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-output-no-mapped"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input*.xml" cache="no">
+      <output destdir="${dir.output}" refer="local-name(/*/*)">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
   <target name="transform">
     <property name="test.prefix" value="transform"/>
     <property name="test.name" value="${test.prefix}"/>
@@ -760,6 +1118,42 @@
       expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-no-stylesheet-configured">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-no-stylesheet-configured"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform cache="no">
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+  </target>
+
+  <target name="transform-error-stylesheet">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-stylesheet"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="${dir.input}/not-exist.xsl" cache="no">
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
   </target>
 
   <target name="transform-params">
@@ -795,9 +1189,7 @@
     <property name="dir.input" location="${test.prefix}/input"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
-    <property name="param.p0" value="v0"/>
     <property name="param.p1" value="v1"/>
-    <property name="param.p2" value="v2"/>
 
     <delete dir="${dir.output}"/>
 
@@ -814,6 +1206,7 @@
         <!-- $$ becomes $ not to be expanded -->
         <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p"
           expand="yes">$${param.p2}</param>
+        <param name="q"/>
         <output dest="output-${test.title}/actual.txt"/>
       </transform>
     </chionographis>
@@ -847,6 +1240,122 @@
     </chionographis>
 
     <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+  </target>
+
+  <target name="transform-error-params-no-name-no-value">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-no-name-no-value"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="flatten-nons.xsl" cache="no">
+        <param/>
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-params-no-name">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-no-name"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <property name="param.p1" value="v1"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="flatten-nons.xsl" cache="no">
+        <param expand="yes">${param.p1}</param>
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-params-empty-name">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-no-name"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <property name="param.p1" value="v1"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="flatten-nons.xsl" cache="no">
+        <param name="" expand="yes">${param.p1}</param>
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-params-added-twice">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-added-twice"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <property name="param.p1" value="v1"/>
+    <property name="param.p2" value="v2"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="flatten-nons.xsl" cache="no">
+        <param name="p1" expand="yes">${param.p1}</param>
+        <param name="p2">${param.p2}</param>
+        <param name="p1">v11</param>
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-params-value-format">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-no-value"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <property name="param.p1" value="v1"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <transform style="flatten-nons.xsl" cache="no">
+        <param name="p1" expand="yes">${param.p1</param> <!-- lacking the last "}" -->
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
   </target>
 
   <target name="transform-refer-content">

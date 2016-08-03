@@ -3,5 +3,6 @@
 <xsl:param name="p"/>
 <xsl:param name="x1:p"/>
 <xsl:param name="x2:p"/>
+<xsl:param name="q"/>
 <xsl:template match="/">/<xsl:value-of select="$p"/>/<xsl:value-of select="$x1:p"/><xsl:apply-imports/><xsl:value-of select="$x2:p"/></xsl:template>
 </xsl:stylesheet>
