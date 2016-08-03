@@ -244,7 +244,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * {@inheritDoc}
      */
     @Override
-    public Transform createTransform() {
+    public Filter createTransform() {
         return sinks_.createTransform();
     }
 
@@ -279,11 +279,32 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void execute() {
+        // Display version info.
         String implementationVersion = Main.getImplementationVersion();
         if (implementationVersion != null) {
             sinks_.log(this, "Starting: v" + implementationVersion, Level.DEBUG);
         } else {
             sinks_.log(this, "Starting", Level.DEBUG);
+        }
+
+        // Dry run mode?
+        String dryRunProperty = getProject().getProperty(
+            getClass().getPackage().getName() + ".dry-run");
+        boolean dryRun;
+        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = true;
+        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = false;
+        } else {
+            dryRun = dryRun_;
+        }
+        if (dryRun) {
+            sinks_.log(this, "Executing in DRY RUN mode", Level.INFO);
+        }
+
+        if (sinks_.isEmpty()) {
+            sinks_.log(this, "No sinks configured", Level.ERR);
+            throw new FatalityException();
         }
 
         // Arrange various directories.
@@ -308,20 +329,6 @@ public final class Chionographis extends MatchingTask implements Driver {
                               .map(Path::toUri)
                               .toArray(URI[]::new);
         long[] srcLastModifiedTimes = getLastModifiedTimes(srcURIs);
-
-        String dryRunProperty = getProject().getProperty(
-            getClass().getPackage().getName() + ".dry-run");
-        boolean dryRun;
-        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = true;
-        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = false;
-        } else {
-            dryRun = dryRun_;
-        }
-        if (dryRun) {
-            sinks_.log(this, "Executing in DRY RUN mode", Level.INFO);
-        }
 
         sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_, dryRun);
 
