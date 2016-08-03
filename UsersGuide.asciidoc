@@ -222,7 +222,7 @@ Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName
 
 |expand|Whether Ant properties in this element's contents are expanded. | No; defaults to +no+
 
-|_Text_|The value of the stylesheet parameter. | Yes
+|_Text_|The value of the stylesheet parameter. | No
 |=================
 
 
