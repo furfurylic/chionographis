@@ -36,6 +36,7 @@
     <antcall target="snip-1"/>
     <antcall target="snip-2"/>
     <antcall target="snip-ns"/>
+    <antcall target="snip-error-bad-xpath"/>
     <antcall target="crossing-cache"/>
     <antcall target="crossing-cache-refer-content"/>
     <antcall target="crossing-timid"/>
@@ -1152,6 +1153,25 @@
       expected="${dir.input}/expected2.txt" actual="${dir.output}/actual2.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="snip-error-bad-xpath">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="error-bad-xpath"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input1"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
+      <snip select="/descendent-or-self::b"> <!-- Bad axis: descendant-or-self, by rights -->
+        <output destdir="${dir.output}"
+                refer="//processing-instruction('chionographis-output')"/>
+      </snip>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}"/>
   </target>
 
   <target name="crossing-cache">
