@@ -89,6 +89,9 @@ final class ChionographisWorker {
     /**
      * Sole constructor.
      *
+     * @param failOnNonfatalError
+     *      whether the execution should result an exception thrown
+     *      if nonfatal error occurs.
      * @param index
      *      an opaque index of the original source.
      * @param uri
