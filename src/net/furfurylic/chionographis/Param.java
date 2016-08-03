@@ -116,23 +116,15 @@ public final class Param {
      *      form, and the value is the parameter value.
      *
      * @throws BuildException
-     *      if either the {@linkplain #setName(String) name} or the {@linkplain #addText(String)
-     *      value} is not set.
+     *      if the {@linkplain #setName(String) name} is not set.
      */
     Map.Entry<String, Object> yield(NamespaceContext namespaceContext) {
         if (name_ == null) {
-            String message = "Incomplete stylesheet parameter found";
-            if (value_ != null) {
-                message += ": value=" + value_;
-            }
+            String message = "Incomplete stylesheet parameter found: value=" + value_;
             logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
-        if (value_ == null) {
-            String message = "Incomplete stylesheet parameter found: name=" + name_;
-            logger_.log(this, message, Level.ERR);
-            throw new BuildException();
-        }
+        Object value = (value_ == null) ? "" : value_;
 
         String name = name_;
         if (!name.startsWith("{")) {
@@ -145,6 +137,6 @@ public final class Param {
             }
         }
 
-        return new AbstractMap.SimpleEntry<>(name, value_);
+        return new AbstractMap.SimpleEntry<>(name, value);
     }
 }
