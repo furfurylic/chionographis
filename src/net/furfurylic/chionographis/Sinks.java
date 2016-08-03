@@ -145,6 +145,10 @@ final class Sinks extends Sink implements Logger {
         return sink;
     }
 
+    public boolean isEmpty() {
+        return sinks_.isEmpty();
+    }
+
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
@@ -634,4 +638,3 @@ final class Sinks extends Sink implements Logger {
         }
     }
 }
-
