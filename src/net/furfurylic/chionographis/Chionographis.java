@@ -32,6 +32,7 @@ import java.util.stream.Stream;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
+import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
@@ -55,9 +56,11 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean verbose_ = false;
     private boolean parallel_ = true;
     private boolean dryRun_ = false;
+    private boolean failOnError_ = true;
     private boolean failOnNonfatalError_ = false;
     private Depends depends_ = null;
 
+    private BuildException exsInPreparation_ = null;
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
     private Sinks sinks_;
@@ -77,7 +80,16 @@ public final class Chionographis extends MatchingTask implements Driver {
             // If failOnNonfatalError_, exceptions reported other than this task is redundant
             // (those exceptions are likely to be reported by Ant after failing).
             new ChionographisLogger(i -> !failOnNonfatalError_ || (i == this)),
-            PropertyHelper.getPropertyHelper(getProject())::replaceProperties);
+            PropertyHelper.getPropertyHelper(getProject())::replaceProperties,
+            this::postExceptionInPreparation);
+    }
+
+    private void postExceptionInPreparation(BuildException e) {
+        if (failOnError_) {
+            throw e;
+        } else if (exsInPreparation_ == null) {
+            exsInPreparation_ = e;
+        }
     }
 
     /**
@@ -174,11 +186,25 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
-     * Sets whether the build should fail if nonfatal error occurs.
-     * Defaults to {@code false}.
+     * Sets whether the build should fail if a fatal error occurs. Defaults to {@code true}.
+     *
+     * @param failOnError
+     *      {@code true} if the build should fail on fatal errors; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setFailOnError(boolean failOnError) {
+        failOnError_ = failOnError;
+    }
+
+    /**
+     * Sets whether the build should fail if a nonfatal error occurs. Defaults to {@code false}.
      *
      * <p>A nonfatal error is an error on one input source not likely to affect integrity of
      * processing of other input sources.</p>
+     *
+     * <p>This attribute has no effect when {@link #setFailOnError(boolean)} is set {@code false}.
+     * In fact, setting this attribute to {@code true} escalates nonfatal errors to fatal ones.</p>
      *
      * @param failOnNonfatalError
      *      {@code true} if the build should fail on nonfatal errors; {@code false} otherwise.
@@ -244,7 +270,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * {@inheritDoc}
      */
     @Override
-    public Filter createTransform() {
+    public Transform createTransform() {
         return sinks_.createTransform();
     }
 
@@ -279,6 +305,30 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void execute() {
+        failOnNonfatalError_ = failOnError_ && failOnNonfatalError_;
+        if (failOnError_) {
+            doExecute();
+        } else {
+            if (exsInPreparation_ != null) {
+                sinks_.log(this,
+                    exsInPreparation_, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
+            } else {
+                try {
+                    doExecute();
+                } catch (ChionographisBuildException e) {
+                    if (e.isLoggedAlready()) {
+                        sinks_.log(this, "Exiting with an error", Level.ERR);
+                    } else {
+                        sinks_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
+                    }
+                } catch (RuntimeException e) {
+                    sinks_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
+                }
+            }
+        }
+    }
+
+    private void doExecute() {
         // Display version info.
         String implementationVersion = Main.getImplementationVersion();
         if (implementationVersion != null) {

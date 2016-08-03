@@ -9,6 +9,7 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
@@ -27,6 +28,7 @@ public final class Param {
 
     private Logger logger_;
     private Function<String, String> expander_;
+    private Consumer<BuildException> exceptionPoster_;
 
     private String name_ = null;
     private boolean expand_ = false;
@@ -39,10 +41,15 @@ public final class Param {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Param(Logger logger, Function<String, String> expander) {
+    Param(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
         expander_ = expander;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -63,7 +70,7 @@ public final class Param {
         if (name.isEmpty()) {
             logger_.log(this,
                 "Stylesheet parameters with empty names are not acceptable", Level.ERR);
-            throw new BuildException();
+            exceptionPoster_.accept(new BuildException());
         }
         name_ = name;
     }
@@ -97,7 +104,7 @@ public final class Param {
                 value_ = expander_.apply(value);
             } catch (BuildException e) {
                 logger_.log(this, "Property expansion failed: " + value, Level.ERR);
-                throw e;
+                exceptionPoster_.accept(e);
             }
         } else {
             value_ = value;

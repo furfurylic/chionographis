@@ -119,7 +119,8 @@ For full set of its ability to accept the source information, consult Ant's docu
 You can enable this mode also by setting +net.furfurylic.chionographis.dry-run+ Ant property to +true+.
 If you set this property to +false+, "dry run" mode is disabled regardless of this driver's attribute. That is, the latter way (through the Ant property) is stronger and definitive. | No; defaults to +no+
 
-|failOnNonfatalError|Whether nonfatal errors should make the build fail. A nonfatal error is an error attributed to one input source and not likely to affect processing of other input sources. | No; defaults to +no+
+|failOnError|Whether fatal errors should make the build fail. | No; defaults to +yes+
+|failOnNonfatalError|Whether nonfatal errors should make the build fail. A nonfatal error is an error attributed to one input source and not likely to affect processing of other input sources. Note that this attribute has no effect if _failOnError_ is set to +no+. | No; defaults to +no+
 
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
 |=================
