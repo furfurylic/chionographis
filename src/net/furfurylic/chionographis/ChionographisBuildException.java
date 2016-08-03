@@ -56,6 +56,20 @@ class ChionographisBuildException extends BuildException {
         isLoggedAlready_ = isLoggedAlready;
     }
 
+    @Override
+    public String toString() {
+        String sup = super.toString();
+        if (sup.isEmpty()) {
+            return getClass().getName();
+        } else {
+            if (!sup.startsWith(getClass().getName())) {
+                return getClass().getName() + ": " + sup;
+            } else {
+                return sup;
+            }
+        }
+    }
+
     public boolean isLoggedAlready() {
         return isLoggedAlready_;
     }
