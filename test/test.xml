@@ -632,12 +632,15 @@
     <property name="dir.input" location="${test.prefix}/input"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
+    <property name="param.p1" value="v1"/>
+    <property name="param.p2" value="v2"/>
+
     <delete dir="${dir.output}"/>
 
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
       <transform style="input/flatten-nons.xsl" cache="no">
-        <param name="p1">v1</param>
-        <param name="p2">v2</param>
+        <param name="p1" expand="yes">${param.p1}</param>
+        <param name="p2">${param.p2}</param>
         <output dest="output-${test.title}/actual.txt"/>
       </transform>
     </chionographis>
@@ -655,7 +658,11 @@
     <property name="dir.input" location="${test.prefix}/input"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
-    <delete dir="${dir.output}"/>
+    <property name="param.p0" value="v0"/>
+    <property name="param.p1" value="v1"/>
+    <property name="param.p2" value="v2"/>
+
+      <delete dir="${dir.output}"/>
 
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
       <namespace prefix="p1"
@@ -663,9 +670,13 @@
       <namespace prefix="p2"
                  uri="http://www.furfurylic.net/chionographis/test/transform/ns/2"/>
       <transform style="input/flatten-ns.xsl" cache="no">
-        <param name="p">v0</param>
-        <param name="p1:p">v1</param>
-        <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p">v2</param>
+        <!-- becomes v0 -->
+        <param name="p">v<![CDATA[0]]></param>
+        <!-- expanded as ${param.p1} -->
+        <param name="p1:p" expand="yes">${param.<![CDATA[p1}]]></param>
+        <!-- $$ becomes $ not to be expanded -->
+        <param name="{http://www.furfurylic.net/chionographis/test/transform/ns/2}p"
+          expand="yes">$${param.p2}</param>
         <output dest="output-${test.title}/actual.txt"/>
       </transform>
     </chionographis>

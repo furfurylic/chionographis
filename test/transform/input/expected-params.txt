@@ -1,1 +1,1 @@
-/v0/v1[input1:]v2
+/v0/v1[input1:]${param.p2}
