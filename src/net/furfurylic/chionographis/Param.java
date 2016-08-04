@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
@@ -122,14 +123,15 @@ public final class Param {
      *      The key is the parameter name in {@code localName} or {@code {namespaceURI}localName}
      *      form, and the value is the parameter value.
      *
-     * @throws BuildException
-     *      if the {@linkplain #setName(String) name} is not set.
+     * @throws FatalityException
+     *      if the {@linkplain #setName(String) name} is not set
+     *      or has an unbound namespace prefix.
      */
     Map.Entry<String, Object> yield(NamespaceContext namespaceContext) {
         if (name_ == null) {
             String message = "Incomplete stylesheet parameter found: value=" + value_;
             logger_.log(this, message, Level.ERR);
-            throw new BuildException();
+            throw new FatalityException();
         }
         Object value = (value_ == null) ? "" : value_;
 
@@ -138,8 +140,12 @@ public final class Param {
             int indexOfColon = name.indexOf(':');
             if (indexOfColon != -1) {
                 String prefix = name.substring(0, indexOfColon);
-                String localName = name.substring(indexOfColon + 1);
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
+                if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
+                    logger_.log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
+                    throw new FatalityException();
+                }
+                String localName = name.substring(indexOfColon + 1);
                 name = '{' + namespaceURI + '}' + localName;
             }
         }

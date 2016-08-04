@@ -21,6 +21,7 @@
     <antcall target="transform"/>
     <antcall target="transform-params"/>
     <antcall target="transform-params-ns"/>
+    <antcall target="transform-error-params-bad-prefix"/>
     <antcall target="transform-refer-content"/>
     <antcall target="transform-not-up-to-date"/>
     <antcall target="transform-not-up-to-date-at-start"/>
@@ -663,7 +664,7 @@
     <property name="param.p1" value="v1"/>
     <property name="param.p2" value="v2"/>
 
-      <delete dir="${dir.output}"/>
+    <delete dir="${dir.output}"/>
 
     <chionographis basedir="${test.prefix}" includes="input/input.xml" cache="no">
       <namespace prefix="p1"
@@ -686,6 +687,31 @@
       expected="${dir.input}/expected-params.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-params-bad-prefix">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-params-bad-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input.xml" cache="no" failonerror="no">
+      <namespace prefix="p1"
+                 uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
+      <namespace prefix="p2"
+                 uri="http://www.furfurylic.net/chionographis/test/transform/ns/1"/>
+      <transform style="input/flatten-ns.xsl" cache="no">
+        <param name="p">v0</param>
+        <param name="p1:p">v1</param>
+        <param name="P2:p">${param.p2}</param> <!-- unbound prefix -->
+        <output dest="${dir.output}/actual.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
   </target>
 
   <target name="transform-refer-content">
