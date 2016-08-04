@@ -93,22 +93,32 @@ public final class All extends Filter {
     @Override
     void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
         rootQ_ = null;
+
+        // First take care of "prefix:localName" cases only
         if (!root_.startsWith("{")) {
             int indexOfColon = root_.indexOf(':');
             if (indexOfColon != -1) {
                 String prefix = root_.substring(0, indexOfColon);
-                String localName = root_.substring(indexOfColon + 1);
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
+                if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
+                    logger().log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
+                    throw new FatalityException();
+                }
+                String localName = root_.substring(indexOfColon + 1);
                 rootQ_ = new QName(namespaceURI, localName, prefix);
             }
         }
+
+        // Other cases
         if (rootQ_ == null) {
             rootQ_ = QName.valueOf(root_);
             if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+                // If rootQ_ is in a certain namespace, make its prefix "all"
                 rootQ_ = new QName(rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), "all");
                 root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
             }
         }
+
         sink().init(baseDir, namespaceContext, isForce(), dryRun);
     }
 
@@ -119,8 +129,7 @@ public final class All extends Filter {
             includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
         } else {
-            includes =
-                sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
+            includes = sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
@@ -135,6 +144,7 @@ public final class All extends Filter {
         resultDocument_ = XMLTransfer.getDefault().newDocument();
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
+            // If rootQ_ is in a certain namespace, add the namespace decl
             docElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI,
                 XMLConstants.XMLNS_ATTRIBUTE + ':' + rootQ_.getPrefix(),
                 rootQ_.getNamespaceURI());
