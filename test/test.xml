@@ -33,6 +33,7 @@
     <antcall target="all-up-to-date-late"/>
     <antcall target="all-not-up-to-date-late"/>
     <antcall target="all-ns"/>
+    <antcall target="all-error-bad-prefix"/>
     <antcall target="all-force"/>
     <antcall target="snip-1"/>
     <antcall target="snip-2"/>
@@ -1060,6 +1061,25 @@
       expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="all-error-bad-prefix">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="error-bad-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-ns"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <namespace prefix="all" uri="http://www.furfurylic.net/chionographis/test/all/ns/task1"/>
+      <all root="ALL:p"> <!-- unbound prefix -->
+        <output dest="${dir.output}/output.xml"/>
+      </all>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.txt"/>
   </target>
 
   <target name="all-force">
