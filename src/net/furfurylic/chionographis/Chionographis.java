@@ -714,7 +714,16 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         @Override
         public String getNamespaceURI(String prefix) {
-            return prefixMap_.get(prefix);
+            if (prefix == null) {
+                throw new IllegalArgumentException("Prefix is null");
+            } else if (prefix.equals(XMLConstants.XML_NS_PREFIX)) {
+                return XMLConstants.XML_NS_URI;
+            } else if (prefix.equals(XMLConstants.XMLNS_ATTRIBUTE)) {
+                return XMLConstants.XMLNS_ATTRIBUTE_NS_URI;
+            } else {
+                String uri = prefixMap_.get(prefix);
+                return (uri == null) ? XMLConstants.NULL_NS_URI : uri;
+            }
         }
 
         @Override
