@@ -18,6 +18,10 @@
     <antcall target="basic-not-up-to-date-at-start-by-depends"/>
     <antcall target="basic-force-at-start"/>
     <antcall target="basic-meta"/>
+    <antcall target="basic-error-meta-bad-type"/>
+    <antcall target="basic-error-meta-empty-type"/>
+    <antcall target="basic-error-meta-bad-name"/>
+    <antcall target="basic-error-meta-empty-name"/>
     <antcall target="basic-meta-refer-content"/>
     <antcall target="transform"/>
     <antcall target="transform-params"/>
@@ -599,6 +603,74 @@
       expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-meta-bad-type">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-bad-type"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="xyz" type="url"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
+  <target name="basic-error-meta-empty-type">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-empty-type"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="xyz" type=""/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
+  <target name="basic-error-meta-bad-name">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-bad-name"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="xMl" type="file-name"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+  </target>
+
+  <target name="basic-error-meta-empty-name">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-meta-empty-name"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+      <meta name="" type="file-name"/>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
   </target>
 
   <target name="basic-meta-refer-content">

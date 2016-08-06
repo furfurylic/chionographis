@@ -225,7 +225,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty instruction of meta-information processing instruction.
      */
     public Meta createMeta() {
-        Meta meta = new Meta(sinks_);
+        Meta meta = new Meta(sinks_, sinks_.exceptionPoster());
         metas_.add(meta);
         return meta;
     }
