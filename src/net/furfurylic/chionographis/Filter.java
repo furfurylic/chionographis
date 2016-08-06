@@ -38,7 +38,7 @@ abstract class Filter extends Sink implements Driver {
      *      which shall not be {@code null}.
      */
     Filter(Logger logger, Function<String, String> expander,
-                Consumer<BuildException> exceptionPoster) {
+            Consumer<BuildException> exceptionPoster) {
         sinks_ = new Sinks(logger, expander, exceptionPoster);
     }
 
