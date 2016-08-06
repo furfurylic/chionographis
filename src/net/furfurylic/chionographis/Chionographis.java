@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -81,10 +80,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     @Override
     public void init() {
         sinks_ = new Sinks();
-
-        // If failOnNonfatalError_, exceptions reported other than this task is redundant
-        // (those exceptions are likely to be reported by Ant after failing).
-        logger_ = new ChionographisLogger(i -> !failOnNonfatalError_ || (i == this));
+        logger_ = new ChionographisLogger();
     }
 
     private Function<String, String> expander() {
@@ -349,16 +345,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         // Dry run mode?
-        String dryRunProperty = getProject().getProperty(
-            getClass().getPackage().getName() + ".dry-run");
-        boolean dryRun;
-        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = true;
-        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = false;
-        } else {
-            dryRun = dryRun_;
-        }
+        boolean dryRun = isDryRun();
         if (dryRun) {
             logger_.log(this, "Executing in DRY RUN mode", Level.INFO);
         }
@@ -373,15 +360,16 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         // Find files to process.
         String[] srcFileNames = getIncludedFileNames();
+        LogOnce logSrcFound = null;
         switch (srcFileNames.length) {
         case 0:
             logger_.log(this, "No input sources found", Level.INFO);
             return;
         case 1:
-            logger_.log(this, "1 input source found", Level.INFO);
+            logSrcFound = new LogOnce("1 input source found", Level.INFO);
             break;
         default:
-            logger_.log(this, srcFileNames.length + " input sources found", Level.INFO);
+            logSrcFound = new LogOnce(srcFileNames.length + " input sources found", Level.INFO);
             break;
         }
 
@@ -402,20 +390,25 @@ public final class Chionographis extends MatchingTask implements Driver {
                 if (includes[i]) {
                     ++includedCount;
                 } else {
+                    logSrcFound.run();
                     logger_.log(this, "Skipping " + srcURIs[i], Level.DEBUG);
                 }
             }
             if (includedCount == 0) {
+                logSrcFound.run();
                 logger_.log(this, "No input sources processed", Level.INFO);
                 return;
             }
         }
 
-        sinks_.startBundle();
-
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
             failOnNonfatalError_, srcURIs, srcFileNames, srcLastModifiedTimes,
-            sinks_, createEntityResolver(), new ChionographisBoundLogger(), createMetaFuncMap());
+            sinks_, createEntityResolver(), logger_, createMetaFuncs());
+
+        // This report is placed here in order to appear after all preparation passed in peace.
+        logSrcFound.run();
+
+        sinks_.startBundle();
 
         Stream<IntSupplier> workers = IntStream.range(0, srcFileNames.length)
                                                .filter(i -> (includes == null) || includes[i])
@@ -451,6 +444,20 @@ public final class Chionographis extends MatchingTask implements Driver {
         } else {
             sinks_.finishBundle();
         }
+    }
+
+    private boolean isDryRun() {
+        boolean dryRun;
+        String dryRunProperty = getProject().getProperty(
+            getClass().getPackage().getName() + ".dry-run");
+        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = true;
+        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
+            dryRun = false;
+        } else {
+            dryRun = dryRun_;
+        }
+        return dryRun;
     }
 
     private void setUpDirectories() {
@@ -509,7 +516,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
-    private List<Map.Entry<String, Function<URI, String>>> createMetaFuncMap() {
+    private List<Map.Entry<String, Function<URI, String>>> createMetaFuncs() {
         List<Map.Entry<String, Function<URI, String>>> metaFuncs =
             metas_.getList().stream().map(Meta::yield).collect(Collectors.toList());
         metaFuncs.forEach(e -> logger_.log(this,
@@ -527,6 +534,25 @@ public final class Chionographis extends MatchingTask implements Driver {
         return new PrefixMap(namespaceMap);
     }
 
+    private final class LogOnce implements Runnable {
+
+        private String log_;
+        private Level level_;
+
+        public LogOnce(String log, Level level) {
+            log_ = log;
+            level_ = level;
+        }
+
+        @Override
+        public void run() {
+            if (log_ != null) {
+                logger_.log(Chionographis.this, log_, level_);
+                log_ = null;
+            }
+        }
+    }
+
     private static final class ChionographisWorkerFactory {
         private boolean failOnNonfatalError_;
         private URI[] uris_;
@@ -534,15 +560,14 @@ public final class Chionographis extends MatchingTask implements Driver {
         private long[] lastModifiedTimes_;
         private XMLTransfer xfer_;
         private Sink sink_;
-        private ChionographisWorker.BoundLogger logger_;
+        private Logger logger_;
         private List<Map.Entry<String, Function<URI, String>>> metaFuncs_;
         private volatile int isOK_;
 
         public ChionographisWorkerFactory(
                 boolean failOnNonfatalError,
                 URI[] uris, String[] fileNames, long[] lastModifiedTimes,
-                Sink sink, EntityResolver resolver,
-                ChionographisWorker.BoundLogger logger,
+                Sink sink, EntityResolver resolver, Logger logger,
                 List<Map.Entry<String, Function<URI, String>>> metaFuncs) {
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
@@ -584,13 +609,6 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private final class ChionographisLogger implements Logger {
-
-        Predicate<Object> tellIfReportsException_;
-
-        public ChionographisLogger(Predicate<Object> tellIfReportsException) {
-            tellIfReportsException_ = tellIfReportsException;
-        }
-
         @Override
         public void log(Object issuer, String message, Level level) {
             Chionographis.this.log(head(issuer) + message, translateLevel(level));
@@ -599,7 +617,9 @@ public final class Chionographis extends MatchingTask implements Driver {
         @Override
         public void log(Object issuer, Throwable ex, String heading,
                 Level headingLevel, Level bodyLevel) {
-            if (tellIfReportsException_.test(issuer)) {
+            // If failOnNonfatalError_, exceptions reported other than this task is redundant
+            // (those exceptions are likely to be reported by Ant after failing).
+            if (!failOnNonfatalError_ || (issuer == null) || (issuer == Chionographis.this)) {
                 logEx(issuer, ex, heading, headingLevel, bodyLevel);
             }
         }
@@ -661,6 +681,9 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         private String head(Object issuer) {
+            if (issuer == null) {
+                issuer = Chionographis.this;
+            }
             try (Formatter formatter = new Formatter()) {
                 String className = issuer.getClass().getSimpleName();
                 formatter.format("%13s@%08x(%02x): ",
@@ -697,18 +720,6 @@ public final class Chionographis extends MatchingTask implements Driver {
                 break;
             }
             return mutated.getLevel();
-        }
-    }
-
-    private final class ChionographisBoundLogger implements ChionographisWorker.BoundLogger {
-        @Override
-        public void log(String message, Level level) {
-            logger_.log(Chionographis.this, message, level);
-        }
-
-        @Override
-        public void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel) {
-            logger_.log(Chionographis.this, ex, heading, headingLevel, bodyLevel);
         }
     }
 
