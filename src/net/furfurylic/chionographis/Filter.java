@@ -24,6 +24,10 @@ import net.furfurylic.chionographis.Logger.Level;
 abstract class Filter extends Sink implements Driver {
 
     private Sinks sinks_;
+    private Logger logger_;
+    private Function<String, String> expander_;
+    private Consumer<BuildException> exceptionPoster_;
+
     private boolean force_ = false;
 
     /**
@@ -39,7 +43,10 @@ abstract class Filter extends Sink implements Driver {
      */
     Filter(Logger logger, Function<String, String> expander,
             Consumer<BuildException> exceptionPoster) {
-        sinks_ = new Sinks(logger, expander, exceptionPoster);
+        sinks_ = new Sinks();
+        logger_ = logger;
+        expander_ = expander;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -59,7 +66,7 @@ abstract class Filter extends Sink implements Driver {
      *      a logger, which shall not be {@code null}.
      */
     final Logger logger() {
-        return sinks_;
+        return logger_;
     }
 
     /**
@@ -69,11 +76,11 @@ abstract class Filter extends Sink implements Driver {
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
     final Function<String, String> expander() {
-        return sinks_.expander();
+        return expander_;
     }
 
     final Consumer<BuildException> exceptionPoster() {
-        return sinks_.exceptionPoster();
+        return exceptionPoster_;
     }
 
     /**
@@ -81,7 +88,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform();
+        return sinks_.createTransform(logger_, expander_, exceptionPoster_);
     }
 
     /**
@@ -89,7 +96,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll();
+        return sinks_.createAll(logger_, expander_, exceptionPoster_);
     }
 
     /**
@@ -97,7 +104,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip();
+        return sinks_.createSnip(logger_, expander_, exceptionPoster_);
     }
 
     /**
@@ -105,7 +112,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput();
+        return sinks_.createOutput(logger_, exceptionPoster_);
     }
 
     /**
@@ -124,7 +131,7 @@ abstract class Filter extends Sink implements Driver {
     final void init(File baseDir, NamespaceContext namespaceContext,
             boolean force, boolean dryRun) {
         if (sinks_.isEmpty()) {
-            sinks_.log(this, "No sinks configured", Level.ERR);
+            logger_.log(this, "No sinks configured", Level.ERR);
             throw new FatalityException();
         }
         force_ = force_ || force;
