@@ -262,7 +262,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(sinks_);
+        depends_ = new Depends(sinks_, sinks_.exceptionPoster());
         return depends_;
     }
 
