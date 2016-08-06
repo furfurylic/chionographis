@@ -4,8 +4,7 @@ notifications:
 jdk:
   - oraclejdk8
 env:
-  - ANT_ARGS="-logger org.apache.tools.ant.listener.AnsiColorLogger"
+  - ANT_ARGS="-logger org.apache.tools.ant.listener.AnsiColorLogger -Dnet.furfurylic.chionographis.squelch=true"
 script:
   - ant
   - ant -lib release/lib -f test/test.xml
-
