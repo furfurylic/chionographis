@@ -41,11 +41,7 @@ import org.xml.sax.ext.LexicalHandler;
 /**
  * Represents a composite of {@code Sink} objects.
  */
-final class Sinks extends Sink implements Logger {
-
-    private Logger logger_;
-    private Function<String, String> expander_;
-    private Consumer<BuildException> exceptionPoster_;
+final class Sinks extends Sink/* implements Logger*/ {
 
     private List<Sink> sinks_;
 
@@ -67,6 +63,13 @@ final class Sinks extends Sink implements Logger {
 
     /**
      * Sole constructor.
+     */
+    public Sinks() {
+        sinks_ = new ArrayList<>();
+    }
+
+    /**
+     * Adds a {@link Transform} filter into this composite.
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
@@ -77,55 +80,13 @@ final class Sinks extends Sink implements Logger {
      *      (in other words, in prior to the task execution); which shall not be {@code null}.
      *      Invocation of this results an immediate build failure or a postponed build error
      *      (not a failure).
-     */
-    public Sinks(Logger logger, Function<String, String> expander,
-            Consumer<BuildException> exceptionPoster) {
-        logger_ = logger;
-        expander_ = expander;
-        exceptionPoster_ = exceptionPoster;
-        sinks_ = new ArrayList<>();
-    }
-
-    @Override
-    public void log(Object issuer, String message, Level level) {
-        logger_.log(issuer, message, level);
-    }
-
-    @Override
-    public void log(Object issuer, Throwable ex, String heading,
-            Level headingLevel, Level bodyLevel) {
-        logger_.log(issuer, ex, heading, headingLevel, bodyLevel);
-    }
-
-    /**
-     * Returns an object which perform property expansion.
-     *
-     * @return
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     */
-    public Function<String, String> expander() {
-        return expander_;
-    }
-
-    /**
-     * Returns an object which consumes exceptions occurred during preparation process.
-     *
-     * @return
-     *      an object which consumes exceptions occurred during preparation process,
-     *      which shall not be {@code null}.
-     */
-    public Consumer<BuildException> exceptionPoster() {
-        return exceptionPoster_;
-    }
-
-    /**
-     * Adds a {@link Transform} filter into this composite.
      *
      * @return
      *      a {@link Transform} filter object.
      */
-    public Transform createTransform() {
-        Transform sink = new Transform(logger_, expander_, exceptionPoster_);
+    public Transform createTransform(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        Transform sink = new Transform(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -133,11 +94,22 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds an {@link All} filter into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      an {@link All} filter object.
      */
-    public All createAll() {
-        All sink = new All(logger_, expander_, exceptionPoster_);
+    public All createAll(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        All sink = new All(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -145,11 +117,22 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds a {@link Snip} filter into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      a {@link Snip} filter object.
      */
-    public Snip createSnip() {
-        Snip sink = new Snip(logger_, expander_, exceptionPoster_);
+    public Snip createSnip(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        Snip sink = new Snip(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -157,11 +140,19 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds an {@link Output} sink into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      an {@link Output} sink object.
      */
-    public Output createOutput() {
-        Output sink = new Output(logger_, exceptionPoster_);
+    public Output createOutput(Logger logger, Consumer<BuildException> exceptionPoster) {
+        Output sink = new Output(logger, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
