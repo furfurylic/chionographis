@@ -40,38 +40,6 @@ import net.furfurylic.chionographis.Logger.Level;
  * A class for worker objects which reads an original source and send it to a sink.
  */
 final class ChionographisWorker {
-    /**
-     * A logger type which resembles {@link Logger},
-     * but for which the issuer object is already bound externally.
-     */
-    public static interface BoundLogger {
-        /**
-         * Logs a message with the given priority.
-         *
-         * @param message
-         *      the message to be logged, which shall not be {@code null}.
-         * @param level
-         *      the priority of the log entry, which shall not be {@code null}.
-         */
-        void log(String message, Level level);
-
-        /**
-         * Logs a exception with the given priority.
-         *
-         * @param ex
-         *      the exception object to be logged, which shall not be {@code null}.
-         * @param heading
-         *      the heading added to the stack trace of {@code ex}.
-         *      This can be an empty string, but shall not be {@code null}.
-         * @param headingLevel
-         *      the log priority of the first line of the stack trace of {@code ex},
-         *      which shall not be {@code null}.
-         * @param bodyLevel
-         *      the log priority of the second and subsequent lines of the stack trace of
-         *      {@code ex}, which shall not be {@code null}.
-         */
-        void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel);
-    }
 
     private boolean failOnNonfatalError_;
 
@@ -83,7 +51,7 @@ final class ChionographisWorker {
     private IntSupplier isOK_;
 
     private Sink sink_;
-    private BoundLogger logger_;
+    private Logger logger_;
     private List<Map.Entry<String, Function<URI, String>>> metaFuncs_;
     private XMLTransfer xfer_;
 
@@ -117,7 +85,7 @@ final class ChionographisWorker {
     public ChionographisWorker(
             boolean failOnNonfatalError,
             int index, URI uri, String fileName, long lastModified,
-            Sink sink, BoundLogger logger,
+            Sink sink, Logger logger,
             List<Map.Entry<String, Function<URI, String>>> metaFuncs, XMLTransfer xfer,
             IntSupplier isOK) {
         failOnNonfatalError_ = failOnNonfatalError;
@@ -146,7 +114,7 @@ final class ChionographisWorker {
         String systemID = null;
         try {
             systemID = uri_.toString();
-            logger_.log("Processing " + systemID, Level.VERBOSE);
+            logger_.log(null, "Processing " + systemID, Level.VERBOSE);
 
             List<XPathExpression> referents = sink_.referents();
             List<String> referredContents;
@@ -164,7 +132,7 @@ final class ChionographisWorker {
                 }
 
                 referredContents = Referral.extract(document, referents);
-                logger_.log("Referred source data: "
+                logger_.log(null, "Referred source data: "
                     + String.join(", ", referredContents), Level.DEBUG);
 
                 if (isOK_.getAsInt() == 0) {
@@ -193,7 +161,7 @@ final class ChionographisWorker {
             try {
                 xfer_.transfer(source, result);
             } catch (BuildException e) {
-                logger_.log("Aborting processing " + systemID, Level.WARN);
+                logger_.log(null, "Aborting processing " + systemID, Level.WARN);
                 if (!failOnNonfatalError_) {
                     logCause(e);
                 }
@@ -220,7 +188,7 @@ final class ChionographisWorker {
         } catch (FatalityException e) {
             throw e;
         } catch (Exception e) {
-            logger_.log("Failed to process " + systemID, Level.WARN);
+            logger_.log(null, "Failed to process " + systemID, Level.WARN);
             if (failOnNonfatalError_) {
                 if (e instanceof RuntimeException) {
                     throw e;
@@ -237,7 +205,7 @@ final class ChionographisWorker {
     private void logCause(Exception e) {
         if (!(e instanceof ChionographisBuildException) ||
             !((ChionographisBuildException) e).isLoggedAlready()) {
-            logger_.log(e, "  Cause: " + e, Level.INFO, Level.VERBOSE);
+            logger_.log(null, e, "  Cause: " + e, Level.INFO, Level.VERBOSE);
         }
     }
 
@@ -247,7 +215,7 @@ final class ChionographisWorker {
         for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs) {
             String target = metaFunc.getKey();
             String data = metaFunc.getValue().apply(sourceURI);
-            logger_.log("Adding a processing instruction: target=" + target + ", data=" + data,
+            logger_.log(null, "Adding a processing instruction: target=" + target + ", data=" + data,
                 Level.DEBUG);
             consumer.accept(target, data);
         }
