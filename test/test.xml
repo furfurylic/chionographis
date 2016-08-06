@@ -611,9 +611,9 @@
     <delete dir="${dir.output}"/>
 
     <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
-      <meta type="file-name"/>
-      <meta type="file-title"/>
-      <output destdir="${dir.output}" refer="local-name(/*)">
+      <meta name="n" type="file-name"/>
+      <meta name="t" type="file-title"/>
+      <output destdir="${dir.output}" refer="/*/processing-instruction('t')">
         <globmapper from="in*" to="out*.xml"/>
       </output>
     </chionographis>
@@ -621,7 +621,7 @@
     <xslt style="${basedir}/flatten.xsl"
           in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
     <assertfileeq name="${test.name}"
-      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+      expected="${dir.input}/expected-short.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
   </target>
