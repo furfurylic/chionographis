@@ -26,6 +26,7 @@ import java.util.function.LongUnaryOperator;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -498,15 +499,12 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
-    private Map<String, Function<URI, String>> createMetaFuncMap() {
-        return metas_.toMap(Meta::yield,
-            e -> sinks_.log(this,
-                    "Adding a meta-information instruction: name=" + e.getKey(), Level.DEBUG),
-            k -> {
-                sinks_.log(this,
-                    "Meta-information instruction named " + k + " added twice", Level.ERR);
-                throw new ChionographisBuildException(true);
-            });
+    private List<Map.Entry<String, Function<URI, String>>> createMetaFuncMap() {
+        List<Map.Entry<String, Function<URI, String>>> metaFuncs =
+            metas_.getList().stream().map(Meta::yield).collect(Collectors.toList());
+        metaFuncs.forEach(e -> sinks_.log(this,
+                    "Adding a meta-information instruction: name=" + e.getKey(), Level.DEBUG));
+        return metaFuncs;
     }
 
     private NamespaceContext createNamespaceContext() {
@@ -527,7 +525,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         private XMLTransfer xfer_;
         private Sink sink_;
         private ChionographisWorker.BoundLogger logger_;
-        private Map<String, Function<URI, String>> metaFuncMap_;
+        private List<Map.Entry<String, Function<URI, String>>> metaFuncs_;
         private volatile int isOK_;
 
         public ChionographisWorkerFactory(
@@ -535,7 +533,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 URI[] uris, String[] fileNames, long[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver,
                 ChionographisWorker.BoundLogger logger,
-                Map<String, Function<URI, String>> metaFuncMap) {
+                List<Map.Entry<String, Function<URI, String>>> metaFuncs) {
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
@@ -543,7 +541,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             sink_ = sink;
             xfer_ = new XMLTransfer(resolver);
             logger_ = logger;
-            metaFuncMap_ = metaFuncMap;
+            metaFuncs_ = metaFuncs;
             isOK_ = 1;
         }
 
@@ -552,7 +550,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 ? lastModifiedTimes_[index] : 0;
             return new ChionographisWorker(failOnNonfatalError_, index,
                 uris_[index], fileNames_[index], lastModifiedTime,
-                sink_, logger_, metaFuncMap_, xfer_,
+                sink_, logger_, metaFuncs_, xfer_,
                 () -> isOK_)::run;
         }
 

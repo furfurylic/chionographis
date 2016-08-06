@@ -27,7 +27,7 @@
     <antcall target="basic-error-meta-empty-type"/>
     <antcall target="basic-error-meta-bad-name"/>
     <antcall target="basic-error-meta-empty-name"/>
-    <antcall target="basic-error-meta-added-twice"/>
+    <antcall target="basic-meta-added-twice"/>
     <antcall target="basic-meta-refer-content"/>
     <antcall target="basic-error-namespace-no-prefix-no-uri"/>
     <antcall target="basic-error-namespace-no-prefix"/>
@@ -816,22 +816,27 @@
     <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
   </target>
 
-  <target name="basic-error-meta-added-twice">
+  <target name="basic-meta-added-twice">
     <property name="test.prefix" value="basic"/>
-    <property name="test.title" value="error-meta-added-twice"/>
+    <property name="test.title" value="meta-added-twice"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
     <property name="dir.input" location="${test.prefix}/input-meta"/>
     <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
 
     <delete dir="${dir.output}"/>
 
-    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no" failonerror="no">
+    <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
       <meta name="meta" type="file-name"/>
       <meta name="meta" type="file-title"/>
       <output dest="${dir.output}/output.xml"/>
     </chionographis>
 
-    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected-twice.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
   </target>
 
   <target name="basic-meta-refer-content">
