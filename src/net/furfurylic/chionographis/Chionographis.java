@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongUnaryOperator;
@@ -64,7 +65,9 @@ public final class Chionographis extends MatchingTask implements Driver {
     private BuildException exsInPreparation_ = null;
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
-    private Sinks sinks_;
+
+    private Sinks sinks_ = null;
+    private Logger logger_ = null;
 
     /**
      * Sole constructor.
@@ -77,12 +80,19 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void init() {
-        sinks_ = new Sinks(
-            // If failOnNonfatalError_, exceptions reported other than this task is redundant
-            // (those exceptions are likely to be reported by Ant after failing).
-            new ChionographisLogger(i -> !failOnNonfatalError_ || (i == this)),
-            PropertyHelper.getPropertyHelper(getProject())::replaceProperties,
-            this::postExceptionInPreparation);
+        sinks_ = new Sinks();
+
+        // If failOnNonfatalError_, exceptions reported other than this task is redundant
+        // (those exceptions are likely to be reported by Ant after failing).
+        logger_ = new ChionographisLogger(i -> !failOnNonfatalError_ || (i == this));
+    }
+
+    private Function<String, String> expander() {
+        return PropertyHelper.getPropertyHelper(getProject())::replaceProperties;
+    }
+
+    private Consumer<BuildException> exceptionPoster() {
+        return this::postExceptionInPreparation;
     }
 
     private void postExceptionInPreparation(BuildException e) {
@@ -226,7 +236,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty instruction of meta-information processing instruction.
      */
     public Meta createMeta() {
-        Meta meta = new Meta(sinks_, sinks_.exceptionPoster());
+        Meta meta = new Meta(logger_, exceptionPoster());
         metas_.add(meta);
         return meta;
     }
@@ -248,7 +258,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        Namespace namespace = new Namespace(sinks_, sinks_.exceptionPoster());
+        Namespace namespace = new Namespace(logger_, exceptionPoster());
         namespaces_.add(namespace);
         return namespace;
     }
@@ -263,7 +273,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(sinks_, sinks_.exceptionPoster());
+        depends_ = new Depends(logger_, exceptionPoster());
         return depends_;
     }
 
@@ -272,7 +282,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform();
+        return sinks_.createTransform(logger_, expander(), exceptionPoster());
     }
 
     /**
@@ -280,7 +290,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll();
+        return sinks_.createAll(logger_, expander(), exceptionPoster());
     }
 
     /**
@@ -288,7 +298,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip();
+        return sinks_.createSnip(logger_, expander(), exceptionPoster());
     }
 
     /**
@@ -296,7 +306,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput();
+        return sinks_.createOutput(logger_, exceptionPoster());
     }
 
     // TODO: Make this task able to accept soures other than files
@@ -311,19 +321,19 @@ public final class Chionographis extends MatchingTask implements Driver {
             doExecute();
         } else {
             if (exsInPreparation_ != null) {
-                sinks_.log(this,
+                logger_.log(this,
                     exsInPreparation_, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
             } else {
                 try {
                     doExecute();
                 } catch (ChionographisBuildException e) {
                     if (e.isLoggedAlready()) {
-                        sinks_.log(this, "Exiting with an error", Level.ERR);
+                        logger_.log(this, "Exiting with an error", Level.ERR);
                     } else {
-                        sinks_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
+                        logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
                     }
                 } catch (RuntimeException e) {
-                    sinks_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
+                    logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
                 }
             }
         }
@@ -333,9 +343,9 @@ public final class Chionographis extends MatchingTask implements Driver {
         // Display version info.
         String implementationVersion = Main.getImplementationVersion();
         if (implementationVersion != null) {
-            sinks_.log(this, "Starting: v" + implementationVersion, Level.DEBUG);
+            logger_.log(this, "Starting: v" + implementationVersion, Level.DEBUG);
         } else {
-            sinks_.log(this, "Starting", Level.DEBUG);
+            logger_.log(this, "Starting", Level.DEBUG);
         }
 
         // Dry run mode?
@@ -350,11 +360,11 @@ public final class Chionographis extends MatchingTask implements Driver {
             dryRun = dryRun_;
         }
         if (dryRun) {
-            sinks_.log(this, "Executing in DRY RUN mode", Level.INFO);
+            logger_.log(this, "Executing in DRY RUN mode", Level.INFO);
         }
 
         if (sinks_.isEmpty()) {
-            sinks_.log(this, "No sinks configured", Level.ERR);
+            logger_.log(this, "No sinks configured", Level.ERR);
             throw new FatalityException();
         }
 
@@ -365,13 +375,13 @@ public final class Chionographis extends MatchingTask implements Driver {
         String[] srcFileNames = getIncludedFileNames();
         switch (srcFileNames.length) {
         case 0:
-            sinks_.log(this, "No input sources found", Level.INFO);
+            logger_.log(this, "No input sources found", Level.INFO);
             return;
         case 1:
-            sinks_.log(this, "1 input source found", Level.INFO);
+            logger_.log(this, "1 input source found", Level.INFO);
             break;
         default:
-            sinks_.log(this, srcFileNames.length + " input sources found", Level.INFO);
+            logger_.log(this, srcFileNames.length + " input sources found", Level.INFO);
             break;
         }
 
@@ -392,11 +402,11 @@ public final class Chionographis extends MatchingTask implements Driver {
                 if (includes[i]) {
                     ++includedCount;
                 } else {
-                    sinks_.log(this, "Skipping " + srcURIs[i], Level.DEBUG);
+                    logger_.log(this, "Skipping " + srcURIs[i], Level.DEBUG);
                 }
             }
             if (includedCount == 0) {
-                sinks_.log(this, "No input sources processed", Level.INFO);
+                logger_.log(this, "No input sources processed", Level.INFO);
                 return;
             }
         }
@@ -425,13 +435,13 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         switch (count) {
         case 0:
-            sinks_.log(this, "No input sources processed", Level.INFO);
+            logger_.log(this, "No input sources processed", Level.INFO);
             break;
         case 1:
-            sinks_.log(this, "Finishing the result of 1 input source", Level.DEBUG);
+            logger_.log(this, "Finishing the result of 1 input source", Level.DEBUG);
             break;
         default:
-            sinks_.log(this,
+            logger_.log(this,
                 "Finishing results of " + count +" input sources", Level.DEBUG);
             break;
         }
@@ -492,8 +502,8 @@ public final class Chionographis extends MatchingTask implements Driver {
     private EntityResolver createEntityResolver() {
         if (usesCache_) {
             return new CachingResolver(
-                u -> sinks_.log(this, "Caching " + u, Level.DEBUG),
-                u -> sinks_.log(this, "Reusing " + u, Level.DEBUG));
+                u -> logger_.log(this, "Caching " + u, Level.DEBUG),
+                u -> logger_.log(this, "Reusing " + u, Level.DEBUG));
         } else {
             return null;
         }
@@ -502,16 +512,16 @@ public final class Chionographis extends MatchingTask implements Driver {
     private List<Map.Entry<String, Function<URI, String>>> createMetaFuncMap() {
         List<Map.Entry<String, Function<URI, String>>> metaFuncs =
             metas_.getList().stream().map(Meta::yield).collect(Collectors.toList());
-        metaFuncs.forEach(e -> sinks_.log(this,
+        metaFuncs.forEach(e -> logger_.log(this,
                     "Adding a meta-information instruction: name=" + e.getKey(), Level.DEBUG));
         return metaFuncs;
     }
 
     private NamespaceContext createNamespaceContext() {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
-            e -> sinks_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
+            e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
             k -> {
-                sinks_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
+                logger_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
                 throw new ChionographisBuildException(true);
             });
         return new PrefixMap(namespaceMap);
@@ -693,12 +703,12 @@ public final class Chionographis extends MatchingTask implements Driver {
     private final class ChionographisBoundLogger implements ChionographisWorker.BoundLogger {
         @Override
         public void log(String message, Level level) {
-            sinks_.log(Chionographis.this, message, level);
+            logger_.log(Chionographis.this, message, level);
         }
 
         @Override
         public void log(Throwable ex, String heading, Level headingLevel, Level bodyLevel) {
-            sinks_.log(Chionographis.this, ex, heading, headingLevel, bodyLevel);
+            logger_.log(Chionographis.this, ex, heading, headingLevel, bodyLevel);
         }
     }
 
