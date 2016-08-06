@@ -152,9 +152,6 @@ final class ChionographisWorker {
             Source source;
             if (!referents.isEmpty()) {
                 Document document = xfer_.parse(new StreamSource(systemID));
-                referredContents = Referral.extract(document, referents);
-                logger_.log("Referred source data: "
-                    + String.join(", ", referredContents), Level.DEBUG);
 
                 if (!metaFuncMap_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
@@ -164,6 +161,10 @@ final class ChionographisWorker {
                     Element docElem = document.getDocumentElement();
                     docElem.insertBefore(metas, docElem.getFirstChild());
                 }
+
+                referredContents = Referral.extract(document, referents);
+                logger_.log("Referred source data: "
+                    + String.join(", ", referredContents), Level.DEBUG);
 
                 if (isOK_.getAsInt() == 0) {
                     return 0;
