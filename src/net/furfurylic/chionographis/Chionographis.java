@@ -247,7 +247,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        Namespace namespace = new Namespace(sinks_);
+        Namespace namespace = new Namespace(sinks_, sinks_.exceptionPoster());
         namespaces_.add(namespace);
         return namespace;
     }
