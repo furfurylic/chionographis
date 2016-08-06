@@ -55,6 +55,14 @@
     <antcall target="crossing-abort-sinks-sax"/>
   </target>
 
+  <script language="javascript"><![CDATA[
+    if ("true".equalsIgnoreCase(
+          project.getProperty("net.furfurylic.chionographis.squelch"))) {
+      System = Java.type("java.lang.System");
+      System.setErr(new java.io.PrintStream(new java.io.ByteArrayOutputStream()));
+    }
+  ]]></script>
+
   <fail message="Run this with dry run mode not specified">
     <condition>
       <or>
