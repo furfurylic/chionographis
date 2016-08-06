@@ -330,7 +330,7 @@
     <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
 
     <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input*.xml" cache="no">
-      <depends absent="ignore"><fileset file="${dir.output}/ghost"/></depends>
+      <depends absent="ignore"><fileset file="${dir.output}/ghost/ghost"/></depends>
       <output destdir="${test.prefix}/output-${test.title}">
         <globmapper from="input*.xml" to="output*.xml"/>
       </output>
