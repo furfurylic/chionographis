@@ -131,7 +131,7 @@ public final class Transform extends Filter {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(logger());
+        depends_ = new Depends(logger(), exceptionPoster());
         return depends_;
     }
 
