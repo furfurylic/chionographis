@@ -10,6 +10,7 @@
     <antcall target="basic-mapper-up-to-date"/>
     <antcall target="basic-not-up-to-date-by-depends-new"/>
     <antcall target="basic-up-to-date-by-depends-ignore"/>
+    <antcall target="basic-error-depends"/>
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
     <antcall target="basic-force-task"/>
@@ -341,6 +342,23 @@
       file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:15 AM"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-depends">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <depends absent="fal"><fileset file="${dir.output}/ghost"/></depends>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
   </target>
 
   <target name="basic-refer-content">

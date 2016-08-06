@@ -7,6 +7,8 @@
 
 package net.furfurylic.chionographis;
 
+import java.util.function.Consumer;
+
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
@@ -26,6 +28,7 @@ import net.furfurylic.chionographis.Logger.Level;
 public final class Depends {
 
     private Logger logger_;
+    private Consumer<BuildException> exceptionPoster_;
 
     /** Instructions for the case of the pointed resources do not exist. */
     public enum Absent {
@@ -45,8 +48,9 @@ public final class Depends {
     private ResourceCollection resources_ = null;
     private Absent absent_ = Absent.FAIL;
 
-    Depends(Logger logger) {
+    Depends(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -63,7 +67,7 @@ public final class Depends {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
             logger_.log(this, "Bad \"absent\" attribute value: " + absent, Level.ERR);
-            throw new BuildException();
+            exceptionPoster_.accept(new BuildException());
         }
     }
 
