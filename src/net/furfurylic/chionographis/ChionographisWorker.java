@@ -8,6 +8,7 @@
 package net.furfurylic.chionographis;
 
 import java.net.URI;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,7 @@ final class ChionographisWorker {
 
     private Sink sink_;
     private BoundLogger logger_;
-    private Map<String, Function<URI, String>> metaFuncMap_;
+    private List<Map.Entry<String, Function<URI, String>>> metaFuncs_;
     private XMLTransfer xfer_;
 
     /**
@@ -105,7 +106,7 @@ final class ChionographisWorker {
      *      a sink which receives the document.
      * @param logger
      *      a logger.
-     * @param metaFuncMap
+     * @param metaFuncs
      *      a key-value pairs of the meta-information name and the function which deduces
      *      the meta-information value from the URI of the original source URI.
      * @param xfer
@@ -117,7 +118,7 @@ final class ChionographisWorker {
             boolean failOnNonfatalError,
             int index, URI uri, String fileName, long lastModified,
             Sink sink, BoundLogger logger,
-            Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer,
+            List<Map.Entry<String, Function<URI, String>>> metaFuncs, XMLTransfer xfer,
             IntSupplier isOK) {
         failOnNonfatalError_ = failOnNonfatalError;
         index_ = index;
@@ -126,7 +127,7 @@ final class ChionographisWorker {
         lastModified_ = lastModified;
         sink_ = sink;
         logger_ = logger;
-        metaFuncMap_ = metaFuncMap;
+        metaFuncs_ = metaFuncs;
         xfer_ = xfer;
         isOK_ = isOK;
     }
@@ -153,9 +154,9 @@ final class ChionographisWorker {
             if (!referents.isEmpty()) {
                 Document document = xfer_.parse(new StreamSource(systemID));
 
-                if (!metaFuncMap_.isEmpty()) {
+                if (!metaFuncs_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
-                    addMetaInformation(metaFuncMap_, uri_, (target, data) ->
+                    addMetaInformation(metaFuncs_, uri_, (target, data) ->
                         metas.appendChild(
                             document.createProcessingInstruction(target, data)));
                     Element docElem = document.getDocumentElement();
@@ -174,10 +175,10 @@ final class ChionographisWorker {
 
             } else {
                 referredContents = Collections.emptyList();
-                if (!metaFuncMap_.isEmpty()) {
+                if (!metaFuncs_.isEmpty()) {
                     source = new SAXSource(
                         new MetaFilter(null,
-                            c -> addMetaInformation(metaFuncMap_, uri_, c)),
+                            c -> addMetaInformation(metaFuncs_, uri_, c)),
                         new InputSource(systemID));
                 } else {
                     source = new StreamSource(systemID);
@@ -241,9 +242,9 @@ final class ChionographisWorker {
     }
 
     private void addMetaInformation(
-            Map<String, Function<URI, String>> metaFuncMap,
+            Collection<Map.Entry<String, Function<URI, String>>> metaFuncs,
             URI sourceURI, BiConsumer<String, String> consumer) {
-        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncMap.entrySet()) {
+        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs) {
             String target = metaFunc.getKey();
             String data = metaFunc.getValue().apply(sourceURI);
             logger_.log("Adding a processing instruction: target=" + target + ", data=" + data,
