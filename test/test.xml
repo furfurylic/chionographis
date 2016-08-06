@@ -23,6 +23,8 @@
     <antcall target="basic-error-meta-bad-name"/>
     <antcall target="basic-error-meta-empty-name"/>
     <antcall target="basic-meta-refer-content"/>
+    <antcall target="basic-error-namespace-empty-prefix"/>
+    <antcall target="basic-error-namespace-bad-prefix"/>
     <antcall target="transform"/>
     <antcall target="transform-params"/>
     <antcall target="transform-params-ns"/>
@@ -696,6 +698,40 @@
       expected="${dir.input}/expected-short.txt" actual="${dir.output}/actual.txt"/>
 
     <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-namespace-empty-prefix">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-empty-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace prefix="" uri="http://furfurylic.net/ns"/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+  </target>
+
+  <target name="basic-error-namespace-bad-prefix">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-namespace-bad-prefix"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+      <namespace prefix="XMLN" uri="http://furfurylic.net/ns"/>
+      <output dest="${dir.output}/output1.xml"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
   </target>
 
   <target name="transform">
