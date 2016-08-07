@@ -8,12 +8,9 @@
 package net.furfurylic.chionographis;
 
 import java.net.URI;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
@@ -124,9 +121,8 @@ final class ChionographisWorker {
 
                 if (!metaFuncs_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
-                    addMetaInformation(metaFuncs_, uri_, (target, data) ->
-                        metas.appendChild(
-                            document.createProcessingInstruction(target, data)));
+                    addMetaInformation((target, data) ->
+                        metas.appendChild(document.createProcessingInstruction(target, data)));
                     Element docElem = document.getDocumentElement();
                     docElem.insertBefore(metas, docElem.getFirstChild());
                 }
@@ -145,8 +141,7 @@ final class ChionographisWorker {
                 referredContents = Collections.emptyList();
                 if (!metaFuncs_.isEmpty()) {
                     source = new SAXSource(
-                        new MetaFilter(null,
-                            c -> addMetaInformation(metaFuncs_, uri_, c)),
+                        new MetaFilter(null, this::addMetaInformation),
                         new InputSource(systemID));
                 } else {
                     source = new StreamSource(systemID);
@@ -191,7 +186,7 @@ final class ChionographisWorker {
             logger_.log(null, "Failed to process " + systemID, Level.WARN);
             if (failOnNonfatalError_) {
                 if (e instanceof RuntimeException) {
-                    throw e;
+                    throw (RuntimeException) e;
                 } else {
                     throw new FatalityException(e);
                 }
@@ -209,37 +204,32 @@ final class ChionographisWorker {
         }
     }
 
-    private void addMetaInformation(
-            Collection<Map.Entry<String, Function<URI, String>>> metaFuncs,
-            URI sourceURI, BiConsumer<String, String> consumer) {
-        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs) {
+    private void addMetaInformation(ProcessingInstructionPost consumer) throws SAXException {
+        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs_) {
             String target = metaFunc.getKey();
-            String data = metaFunc.getValue().apply(sourceURI);
-            logger_.log(null, "Adding a processing instruction: target=" + target + ", data=" + data,
+            String data = metaFunc.getValue().apply(uri_);
+            logger_.log(null,
+                "Adding a processing instruction: target=" + target + ", data=" + data,
                 Level.DEBUG);
-            consumer.accept(target, data);
+            consumer.processingInstrcution(target, data);
         }
+    }
+
+    @FunctionalInterface
+    interface ProcessingInstructionPost {
+        void processingInstrcution(String target, String data) throws SAXException;
+    }
+
+    @FunctionalInterface
+    interface ProcessingInstructionAdder {
+        void add(ProcessingInstructionPost post) throws SAXException;
     }
 
     private static final class MetaFilter extends XMLFilterImpl {
 
-        private static final class HackedSAXException extends RuntimeException {
+        private ProcessingInstructionAdder adder_;
 
-            private static final long serialVersionUID = 1L;
-
-            public HackedSAXException(SAXException cause) {
-                super(cause);
-            }
-
-            @Override
-            public SAXException getCause() {
-                return (SAXException) super.getCause();
-            }
-        }
-
-        private Consumer<BiConsumer<String, String>> adder_;
-
-        public MetaFilter(XMLReader parent, Consumer<BiConsumer<String, String>> adder) {
+        public MetaFilter(XMLReader parent, ProcessingInstructionAdder adder) {
             super(parent);
             adder_ = adder;
         }
@@ -249,20 +239,8 @@ final class ChionographisWorker {
                 throws SAXException {
             super.startElement(uri, localName, qName, atts);
             if (adder_ != null) {
-                try {
-                    adder_.accept(this::processingInstructionHacked);
-                } catch (HackedSAXException e) {
-                    throw e.getCause();
-                }
+                adder_.add(this::processingInstruction);
                 adder_ = null;
-            }
-        }
-
-        private void processingInstructionHacked(String target, String data) {
-            try {
-                processingInstruction(target, data);
-            } catch (SAXException e) {
-                throw new HackedSAXException(e);
             }
         }
     }
