@@ -159,7 +159,7 @@ public final class Snip extends Filter {
                 } catch (XPathException e) {
                     logger().log(this,
                         "Failed to compile the XPath expression: " + select_, Level.ERR);
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             }
             try {
@@ -168,7 +168,7 @@ public final class Snip extends Filter {
                 logger().log(this,
                     "Failed to apply the XPath expression: " + select_, Level.ERR);
                 logger().log(this, e, "  Cause: ", Level.ERR, Level.VERBOSE);
-                throw new ChionographisBuildException(e, true);
+                throw new NonfatalBuildException(e).setLogged();
             }
             return nodes;
         } finally {

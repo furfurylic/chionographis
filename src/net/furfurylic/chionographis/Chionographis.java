@@ -322,8 +322,8 @@ public final class Chionographis extends MatchingTask implements Driver {
             } else {
                 try {
                     doExecute();
-                } catch (ChionographisBuildException e) {
-                    if (e.isLoggedAlready()) {
+                } catch (NonfatalBuildException e) {
+                    if (e.isLogged()) {
                         logger_.log(this, "Exiting with an error", Level.ERR);
                     } else {
                         logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
@@ -352,7 +352,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         if (sinks_.isEmpty()) {
             logger_.log(this, "No sinks configured", Level.ERR);
-            throw new FatalityException();
+            throw new BuildException();
         }
 
         // Arrange various directories.
@@ -529,7 +529,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
             k -> {
                 logger_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
-                throw new ChionographisBuildException(true);
+                throw new BuildException();
             });
         return new PrefixMap(namespaceMap);
     }
@@ -643,7 +643,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             List<String> lines;
             {
                 String all = trimmedHead + getPrintedStackTrace(ex);
-                all = all.replaceAll("\t", "    ");   // Maybe controversial
+                all = all.replaceAll("\t", "    ");   // May be controversial
 
                 String[] linesArray = all.split("\\r\\n|\\r|\\n");
                 for (int i = 0; i < linesArray.length; ++i) {

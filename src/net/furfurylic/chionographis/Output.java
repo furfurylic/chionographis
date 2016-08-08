@@ -330,7 +330,7 @@ public final class Output extends Sink {
         }
         if (dests.isEmpty()) {
             logger_.log(this, "Cannot decide the output file path", Level.ERR);
-            throw new BuildException();
+            throw new NonfatalBuildException();
         }
 
         if (!force_ && !isOrigSrcNewer(origSrcLastModTime, dests)) {
@@ -390,7 +390,14 @@ public final class Output extends Sink {
                     if (mkDirs_) {
                         Path parent = mapped.getParent();
                         if ((parent != null) && !Files.exists(parent)) {
-                            Files.createDirectories(parent);
+                            try {
+                                Files.createDirectories(parent);
+                            } catch (IOException e) {
+                                logger_.log(this,
+                                    "Failed to create directory " + parent, Level.WARN);
+                                logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
+                                throw new NonfatalBuildException(e).setLogged();
+                            }
                         }
                     }
                     logger_.log(this, "Creating " + absolute, Level.FINE);
@@ -402,19 +409,17 @@ public final class Output extends Sink {
                     } catch (IOException e) {
                         logger_.log(this, "Failed to create " + absolute, Level.WARN);
                         logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                         throw new ChionographisBuildException(e);
+                        throw new NonfatalBuildException(e).setLogged();
                     }
                     countInBundle_.incrementAndGet();
                 }
             }
-        } catch (IOException e) {
-            throw new BuildException(e);
         } finally {
             placeBackBuffer(out);
         }
     }
 
-    private boolean hasIdenticalContent(File file, byte[] content) throws IOException {
+    private boolean hasIdenticalContent(File file, byte[] content) {
         byte[] bytes = Pool.BYTES.get();
         try (FileChannel in = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
@@ -429,6 +434,10 @@ public final class Output extends Sink {
                 head += length;
             }
             return true;
+        } catch (IOException e) {
+            logger_.log(this, "Failed to read " + file, Level.WARN);
+            logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
+            throw new NonfatalBuildException(e).setLogged();
         } finally {
             Pool.BYTES.release(bytes);
         }
