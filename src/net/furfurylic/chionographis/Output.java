@@ -395,8 +395,9 @@ public final class Output extends Sink {
                     }
                     logger_.log(this, "Creating " + absolute, Level.FINE);
                     // We take advantage of FileChannel for its capability to be interrupted
-                    try (FileChannel channel = FileChannel.open(
-                            absolute, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
+                    try (FileChannel channel = FileChannel.open(absolute,
+                            StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                            StandardOpenOption.TRUNCATE_EXISTING)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
                     } catch (IOException e) {
                         logger_.log(this, "Failed to create " + absolute, Level.WARN);
