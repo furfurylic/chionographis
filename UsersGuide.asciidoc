@@ -108,12 +108,20 @@ For full set of its ability to accept the source information, consult Ant's docu
 [options="header", cols="1,3,1"]
 |=================
 | Attribute | Description | Required
-|basedir|The base directory of this task.| No; defaults to the project's base directory
-|srcdir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
+|baseDir|The base directory of this task.| No; defaults to the project's base directory
+|srcDir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
 |force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
 |cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +no+
 |verbose|Whether this task promotes log levels from +verbose+ to +info+ for some log entries, such as reports of document output.| No; defaults to +no+
 |parallel|Whether parallel execution is employed. The parallel execution is done with static thread pool whose maximum thread count coincides with the available processor count.| No; defaults to +yes+
+
+|dryRun|Whether "dry run" mode is enabled. In "dry run" mode, sinks avoid finalizing all of their outputs (to be specific, they do not write files). +
+You can enable this mode also by setting +net.furfurylic.chionographis.dry-run+ Ant property to +true+.
+If you set this property to +false+, "dry run" mode is disabled regardless of this driver's attribute. That is, the latter way (through the Ant property) is stronger and definitive. | No; defaults to +no+
+
+|failOnError|Whether fatal errors should make the build fail. | No; defaults to +yes+
+|failOnNonfatalError|Whether nonfatal errors should make the build fail. A nonfatal error is an error attributed to one input source and not likely to affect processing of other input sources. Note that this attribute has no effect if _failOnError_ is set to +no+. | No; defaults to +no+
+
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
 |=================
 
@@ -122,7 +130,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
-|meta|An instruction that the driver shall put a processing instruction (PI) which includes the meta-information of the original source document. The PIs shall be put as the first children of the document element.| No; can be appear arbitrary number of times
+|meta|An instruction that the driver shall put a processing instruction (PI) which includes the meta-information of the original source document. The PIs shall be put as the first children of the document element. If there are multiple PIs to be put, their document order shall be the same as the order of these elements. | No; can be appear arbitrary number of times
 |namespace|A pair of a namespace prefix and a namespace name which is mapped from the prefix. This mapping is used by descentant _Transform_, _All_ and _Snip_ drivers.| No
 |depends|Resources depended by this task additionally. The resources are used only to decide whether the corresponding output files are up to date.| No
 |transform|A _Transform_ sink. .4+| No; at least one sink required
@@ -161,11 +169,11 @@ When +file-title+, the data shall be the substring of the file name before its l
 [options="header", cols="1,3,1"]
 |=================
 | Attribute / Nested element | Description | Required
-|attribute: absent|An instruction how depended resources which do not exist are treated. +
+|Attribute: absent|An instruction how depended resources which do not exist are treated. +
 When +fail+, the execution will terminate with an error. +
 When +new+, the absent depended resources are regarded ``very new'', so that the corresponding output files are regarded as not up to date. +
 When +ignore+, the absent depended resources are silently ignored.| No; defaults to +fail+
-|element: _resource collection_|The depended resources represented by an Ant resource collection such as a _fileset_. | Yes
+|Element: _resource collection_|The depended resources represented by an Ant resource collection such as a _fileset_. | Yes
 
 |=================
 
@@ -181,7 +189,7 @@ generates output XML documents one per one input document and pass them to sinks
 |=================
 | Attribute | Description | Required
 
-|style|The URI of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
+|style|The URI or the file path of the XSLT stylesheet. If not absolute, will be resolved by the base directory of the task.| Yes
 
 |force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
 
@@ -208,12 +216,14 @@ The way to configure this element is the same as that to configure one that appe
 
 [options="header", cols="1,3,1"]
 |=================
-| Attribute | Description | Required
+| Attribute / Element contents | Description | Required
 
 |name|The name of the stylesheet parameter. +
 Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+. In the first form, the name doesn't belong to any namespace. In the second form, the name belongs to a namespace whose name is mapped from prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
-|(text)|The value of the stylesheet parameter. | Yes
+|expand|Whether Ant properties in this element's contents are expanded. | No; defaults to +no+
+
+|_Text_|The value of the stylesheet parameter. | No
 |=================
 
 
@@ -312,7 +322,7 @@ so the destination files are always overwritten.
 |=================
 | Attribute | Description | Required
 
-|destdir|The destination directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
+|destDir|The destination directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
 
 |dest|The destination file path. If not absolute, will be resolved by the destination directory.| No; see note
 
@@ -321,9 +331,11 @@ The string value of the pointee is used as an input to the installed file mapper
 _Transform_ drivers retrieve the pointee from the source documents of the transformation; on the other hand, the _Chionographis_, _All_, and _Snip_ drivers retrieve from their result document (the source document of this sink). +
 The XPath expression can include names which belong some namespaces only when the namespaces are denoted by prefixes defined in the task's child _namespace_ elements.| No; see note
 
-|mkdirs|Whether this sink creates parent directories of the destination file if needed.| No; defaults to +yes+
+|mkDirs|Whether this sink creates parent directories of the destination file if needed.| No; defaults to +yes+
 
 |force|Whether this sink creates output files even if existing files seem new enough.| No; defaults to +no+
+
+|timid|Whether this sink avoids overwriting existing files which already have identical contents to be written. In cases where overwriting files triggers other downstream processes, setting to +yes+ might cut down the total cost dramatically. | No; defaults to +no+
 |=================
 
 ==== Nested elements
@@ -331,7 +343,7 @@ The XPath expression can include names which belong some namespaces only when th
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
-|file mappers|A mapper which makes the output file names from the original source file names if _refer_ attribute not specified, otherwise from the extracted source document content pointed by _refer_ attribute.| No; see note
+|_File mappers_|A mapper which makes the output file names from the original source file names if _refer_ attribute not specified, otherwise from the extracted source document content pointed by _refer_ attribute.| No; see note
 |=================
 
 [NOTE]
@@ -364,3 +376,24 @@ Of course, if there is a _Snip_ filter in descendant of an _All_ filter, it will
 All Chionographis tasks share one common thread pool for parallelism.
 So if you run multiple Chinograhis tasks simultaneously in an Ant's _Parallel_ task, they are likely to share the resource
 (to be specific, it is not the case that each Chinonographis task tries to utilize all the available processors as if there are no other processor users).
+
+== Version information
+
+If you want to know the version of your 'chionographis.jar', execute the Main-Class of the JAR:
+
+[source,sh]
+----
+java -jar chionographis.jar
+----
+
+Instead, you can be informed of it by executing _Chionographis_ task with "debug" logging level:
+
+[source,sh]
+----
+ant -d -lib the-directory-which-contains-chionographis.jar target-name
+----
+
+[NOTE]
+If your 'chionographis.jar' has been built in an environment in which
+the version information is not available (for example, 'git' command is not
+installed), you cannot get any version information by ways above.

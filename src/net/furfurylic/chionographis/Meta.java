@@ -10,11 +10,14 @@ package net.furfurylic.chionographis;
 import java.net.URI;
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.tools.ant.BuildException;
+
+import net.furfurylic.chionographis.Logger.Level;
 
 /**
  * A class to instruct the <i>{@linkplain Chionographis}</i> driver to add
@@ -90,6 +93,7 @@ public final class Meta {
     }
 
     private Logger logger_;
+    private Consumer<BuildException> exceptionPoster_;
 
     private Type type_ = null;
     private String name_ = null;
@@ -99,9 +103,13 @@ public final class Meta {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Meta(Logger logger) {
+    Meta(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -115,15 +123,15 @@ public final class Meta {
      */
     public void setType(String type) {
         if (type.isEmpty()) {
-            logger_.log(this, "Empty meta-information type is not acceptable", Logger.Level.ERR);
-            throw new BuildException();
-        }
-
-        try {
-            type_ = Type.valueOf(type.toUpperCase().replace('-', '_'));
-        } catch (IllegalArgumentException e) {
-            logger_.log(this, "Bad meta-information type: " + type, Logger.Level.ERR);
-            throw new BuildException();
+            logger_.log(this, "Empty meta-information type is not acceptable", Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else {
+            try {
+                type_ = Type.valueOf(type.toUpperCase().replace('-', '_'));
+            } catch (IllegalArgumentException e) {
+                logger_.log(this, "Bad meta-information type: " + type, Level.ERR);
+                exceptionPoster_.accept(new BuildException());
+            }
         }
     }
 
@@ -138,14 +146,14 @@ public final class Meta {
      */
     public void setName(String name) {
         if (name.isEmpty()) {
-            logger_.log(this, "Empty meta-information name is not acceptable", Logger.Level.ERR);
-            throw new BuildException();
+            logger_.log(this, "Empty meta-information name is not acceptable", Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else if (name.equalsIgnoreCase("xml")) {
+            logger_.log(this, "Bad meta-information name: " + name, Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else {
+            name_ = name;
         }
-        if (name.equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad meta-information name: " + name, Logger.Level.ERR);
-            throw new BuildException();
-        }
-        name_ = name;
     }
 
     /**
@@ -165,7 +173,7 @@ public final class Meta {
             if (name_ != null) {
                 message += ": name=" + name_;
             }
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
 

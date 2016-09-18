@@ -23,6 +23,8 @@ import java.util.function.Supplier;
  */
 final class Pool<T> {
 
+    public static final Pool<byte[]> BYTES = new Pool<>(() -> new byte[4096]);
+
     private final ReentrantLock lock_ = new ReentrantLock();
     private Supplier<? extends T> create_;
     private SoftReference<Queue<T>> pool_;
@@ -45,22 +47,22 @@ final class Pool<T> {
      *      an object taken out of this pool.
      */
     public T get() {
-        T buffer = null;
+        T o = null;
         lock_.lock();
         try {
             if (pool_ != null) {
                 Queue<T> queue = pool_.get();
                 if (queue != null) {
-                    buffer = queue.poll();
+                    o = queue.poll();
                 }
             }
         } finally {
             lock_.unlock();
         }
-        if (buffer == null) {
-            buffer = create_.get();
+        if (o == null) {
+            o = create_.get();
         }
-        return buffer;
+        return o;
     }
 
     /**

@@ -11,8 +11,6 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
@@ -39,38 +37,8 @@ import net.furfurylic.chionographis.Logger.Level;
  * A class for worker objects which reads an original source and send it to a sink.
  */
 final class ChionographisWorker {
-    /**
-     * A logger type which resembles {@link Logger},
-     * but for which the issuer object is already bound externally.
-     */
-    public static interface BoundLogger {
-        /**
-         * Logs a message with the given priority.
-         *
-         * @param message
-         *      the message to be logged, which shall not be {@code null}.
-         * @param level
-         *      the priority of the log entry, which shall not be {@code null}.
-         */
-        void log(String message, Level level);
 
-        /**
-         * Logs a exception with the given priority.
-         *
-         * @param ex
-         *      the exception object to be logged, which shall not be {@code null}.
-         * @param heading
-         *      the heading added to the stack trace of {@code ex}.
-         *      This can be an empty string, but shall not be {@code null}.
-         * @param headingLevel
-         *      the log priority of the first line of the stack trace of {@code ex},
-         *      which shall not be {@code null}.
-         * @param bodyLevel
-         *      the log priority of the second and subsequent lines of the stack trace of
-         *      {@code ex}, which shall not be {@code null}.
-         */
-        void log(Throwable ex, String heading, Logger.Level headingLevel, Logger.Level bodyLevel);
-    }
+    private boolean failOnNonfatalError_;
 
     private int index_;
     private URI uri_;
@@ -80,13 +48,16 @@ final class ChionographisWorker {
     private IntSupplier isOK_;
 
     private Sink sink_;
-    private BoundLogger logger_;
-    private Map<String, Function<URI, String>> metaFuncMap_;
+    private Logger logger_;
+    private List<Map.Entry<String, Function<URI, String>>> metaFuncs_;
     private XMLTransfer xfer_;
 
     /**
      * Sole constructor.
      *
+     * @param failOnNonfatalError
+     *      whether the execution should result an exception thrown
+     *      if nonfatal error occurs.
      * @param index
      *      an opaque index of the original source.
      * @param uri
@@ -100,7 +71,7 @@ final class ChionographisWorker {
      *      a sink which receives the document.
      * @param logger
      *      a logger.
-     * @param metaFuncMap
+     * @param metaFuncs
      *      a key-value pairs of the meta-information name and the function which deduces
      *      the meta-information value from the URI of the original source URI.
      * @param xfer
@@ -109,17 +80,19 @@ final class ChionographisWorker {
      *      a function which tells whether the execution is go (1) or no-go (0).
      */
     public ChionographisWorker(
-                int index, URI uri, String fileName, long lastModified,
-                Sink sink, BoundLogger logger,
-                Map<String, Function<URI, String>> metaFuncMap, XMLTransfer xfer,
-                IntSupplier isOK) {
+            boolean failOnNonfatalError,
+            int index, URI uri, String fileName, long lastModified,
+            Sink sink, Logger logger,
+            List<Map.Entry<String, Function<URI, String>>> metaFuncs, XMLTransfer xfer,
+            IntSupplier isOK) {
+        failOnNonfatalError_ = failOnNonfatalError;
         index_ = index;
         uri_ = uri;
         fileName_ = fileName;
         lastModified_ = lastModified;
         sink_ = sink;
         logger_ = logger;
-        metaFuncMap_ = metaFuncMap;
+        metaFuncs_ = metaFuncs;
         xfer_ = xfer;
         isOK_ = isOK;
     }
@@ -138,25 +111,25 @@ final class ChionographisWorker {
         String systemID = null;
         try {
             systemID = uri_.toString();
-            logger_.log("Processing " + systemID, Logger.Level.VERBOSE);
+            logger_.log(null, "Processing " + systemID, Level.VERBOSE);
 
             List<XPathExpression> referents = sink_.referents();
             List<String> referredContents;
             Source source;
             if (!referents.isEmpty()) {
                 Document document = xfer_.parse(new StreamSource(systemID));
-                referredContents = Referral.extract(document, referents);
-                logger_.log("Referred source data: "
-                    + String.join(", ", referredContents), Logger.Level.DEBUG);
 
-                if (!metaFuncMap_.isEmpty()) {
+                if (!metaFuncs_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
-                    addMetaInformation(metaFuncMap_, uri_, (target, data) ->
-                        metas.appendChild(
-                            document.createProcessingInstruction(target, data)));
+                    addMetaInformation((target, data) ->
+                        metas.appendChild(document.createProcessingInstruction(target, data)));
                     Element docElem = document.getDocumentElement();
                     docElem.insertBefore(metas, docElem.getFirstChild());
                 }
+
+                referredContents = Referral.extract(document, referents);
+                logger_.log(null, "Referred source data: "
+                    + String.join(", ", referredContents), Level.DEBUG);
 
                 if (isOK_.getAsInt() == 0) {
                     return 0;
@@ -166,10 +139,9 @@ final class ChionographisWorker {
 
             } else {
                 referredContents = Collections.emptyList();
-                if (!metaFuncMap_.isEmpty()) {
+                if (!metaFuncs_.isEmpty()) {
                     source = new SAXSource(
-                        new MetaFilter(null,
-                            c -> addMetaInformation(metaFuncMap_, uri_, c)),
+                        new MetaFilter(null, this::addMetaInformation),
                         new InputSource(systemID));
                 } else {
                     source = new StreamSource(systemID);
@@ -184,8 +156,10 @@ final class ChionographisWorker {
             try {
                 xfer_.transfer(source, result);
             } catch (BuildException e) {
-                logger_.log("Aborting processing " + systemID, Logger.Level.WARN);
-                logCause(e);
+                logger_.log(null, "Aborting processing " + systemID, Level.WARN);
+                if (!failOnNonfatalError_) {
+                    logCause(e);
+                }
                 try {
                     sink_.abortOne(result);
                 } catch (FatalityException ex) {
@@ -193,7 +167,11 @@ final class ChionographisWorker {
                 } catch (Exception ex) {
                     throw new FatalityException(e);
                 }
-                return 0;
+                if (failOnNonfatalError_) {
+                    throw new FatalityException(e);
+                } else {
+                    return 0;
+                }
             }
             if (isOK_.getAsInt() == 0) {
                 return 0;
@@ -205,50 +183,53 @@ final class ChionographisWorker {
         } catch (FatalityException e) {
             throw e;
         } catch (Exception e) {
-            logger_.log("Failed to process " + systemID, Logger.Level.WARN);
-            logCause(e);
-            return 0;
+            logger_.log(null, "Failed to process " + systemID, Level.WARN);
+            if (failOnNonfatalError_) {
+                if (e instanceof RuntimeException) {
+                    throw (RuntimeException) e;
+                } else {
+                    throw new FatalityException(e);
+                }
+            } else {
+                logCause(e);
+                return 0;
+            }
         }
     }
 
     private void logCause(Exception e) {
         if (!(e instanceof ChionographisBuildException) ||
             !((ChionographisBuildException) e).isLoggedAlready()) {
-            logger_.log(e, "  Cause: " + e, Logger.Level.INFO, Logger.Level.VERBOSE);
+            logger_.log(null, e, "  Cause: " + e, Level.INFO, Level.VERBOSE);
         }
     }
 
-    private void addMetaInformation(
-            Map<String, Function<URI, String>> metaFuncMap,
-            URI sourceURI, BiConsumer<String, String> consumer) {
-        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncMap.entrySet()) {
+    private void addMetaInformation(ProcessingInstructionPost consumer) throws SAXException {
+        for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs_) {
             String target = metaFunc.getKey();
-            String data = metaFunc.getValue().apply(sourceURI);
-            logger_.log("Adding a processing instruction: target=" + target + ", data=" + data,
-                Logger.Level.DEBUG);
-            consumer.accept(target, data);
+            String data = metaFunc.getValue().apply(uri_);
+            logger_.log(null,
+                "Adding a processing instruction: target=" + target + ", data=" + data,
+                Level.DEBUG);
+            consumer.processingInstrcution(target, data);
         }
+    }
+
+    @FunctionalInterface
+    interface ProcessingInstructionPost {
+        void processingInstrcution(String target, String data) throws SAXException;
+    }
+
+    @FunctionalInterface
+    interface ProcessingInstructionAdder {
+        void add(ProcessingInstructionPost post) throws SAXException;
     }
 
     private static final class MetaFilter extends XMLFilterImpl {
 
-        private static final class HackedSAXException extends RuntimeException {
+        private ProcessingInstructionAdder adder_;
 
-            private static final long serialVersionUID = 1L;
-
-            public HackedSAXException(SAXException cause) {
-                super(cause);
-            }
-
-            @Override
-            public SAXException getCause() {
-                return (SAXException) super.getCause();
-            }
-        }
-
-        private Consumer<BiConsumer<String, String>> adder_;
-
-        public MetaFilter(XMLReader parent, Consumer<BiConsumer<String, String>> adder) {
+        public MetaFilter(XMLReader parent, ProcessingInstructionAdder adder) {
             super(parent);
             adder_ = adder;
         }
@@ -258,20 +239,8 @@ final class ChionographisWorker {
                 throws SAXException {
             super.startElement(uri, localName, qName, atts);
             if (adder_ != null) {
-                try {
-                    adder_.accept(this::processingInstructionHacked);
-                } catch (HackedSAXException e) {
-                    throw e.getCause();
-                }
+                adder_.add(this::processingInstruction);
                 adder_ = null;
-            }
-        }
-
-        private void processingInstructionHacked(String target, String data) {
-            try {
-                processingInstruction(target, data);
-            } catch (SAXException e) {
-                throw new HackedSAXException(e);
             }
         }
     }

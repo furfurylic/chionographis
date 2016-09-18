@@ -9,8 +9,11 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.apache.tools.ant.BuildException;
+
+import net.furfurylic.chionographis.Logger.Level;
 
 /**
  * This class represents one prefix-namespace URI mapping entry.
@@ -20,6 +23,7 @@ import org.apache.tools.ant.BuildException;
 public final class Namespace {
 
     private Logger logger_;
+    private Consumer<BuildException> exceptionPoster_;
 
     private String prefix_ = null;
     private String namespaceURI_ = null;
@@ -29,9 +33,13 @@ public final class Namespace {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Namespace(Logger logger) {
+    Namespace(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -45,14 +53,14 @@ public final class Namespace {
      */
     public void setPrefix(String prefix) {
         if (prefix.isEmpty()) {
-            logger_.log(this, "Empty namespace prefixes are not acceptable", Logger.Level.ERR);
-            throw new BuildException();
+            logger_.log(this, "Empty namespace prefixes are not acceptable", Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
+            logger_.log(this, "Bad namespace prefix: " + prefix, Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else {
+            prefix_ = prefix;
         }
-        if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad namespace prefix: " + prefix, Logger.Level.ERR);
-            throw new BuildException();
-        }
-        prefix_ = prefix;
     }
 
     /**
@@ -82,12 +90,12 @@ public final class Namespace {
             if (namespaceURI_ != null) {
                 message += ": URI=" + namespaceURI_;
             }
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
         if (namespaceURI_ == null) {
             String message = "Incomplete namespace prefix mapping found: prefix=" + prefix_;
-            logger_.log(this, message, Logger.Level.ERR);
+            logger_.log(this, message, Level.ERR);
             throw new BuildException();
         }
 
