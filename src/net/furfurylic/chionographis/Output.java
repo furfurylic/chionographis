@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,11 +37,13 @@ import javax.xml.xpath.XPathFactory;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.util.FileNameMapper;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An <i>Output</i> {@linkplain Sink sink} writes each source document into an filesystem file.
  */
 public final class Output extends Sink {
-    private static final Pool<OutputStream> BUFFER =
+    private static final Pool<ExposingByteArrayOutputStream> BUFFER =
         new Pool<>(() -> new ExposingByteArrayOutputStream());
 
     private Path destDir_ = null;
@@ -48,9 +51,12 @@ public final class Output extends Sink {
     private boolean mkDirs_ = true;
     private String referent_ = null;
     private boolean force_ = false;
+    private boolean timid_ = false;
+    private boolean dryRun_ = false;
     private FileNameMapper mapper_ = null;
 
     private Logger logger_;
+    private Consumer<BuildException> exceptionPoster_;
     private Function<String, Set<Path>> destMapping_ = null;
     private List<XPathExpression> referents_;
 
@@ -61,9 +67,13 @@ public final class Output extends Sink {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Output(Logger logger) {
+    Output(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -134,10 +144,10 @@ public final class Output extends Sink {
 
     /**
      * Sets whether this sink should make the destination files' parent directories
-     * if necessary. Defaulted to "no".
+     * if necessary. Defaulted to {@code true}.
      *
      * @param mkDirs
-     *      {@code true} if make parent directories; {@code false} otherwise.
+     *      {@code true} if makes parent directories; {@code false} otherwise.
      */
     public void setMkDirs(boolean mkDirs) {
         mkDirs_ = mkDirs;
@@ -145,13 +155,27 @@ public final class Output extends Sink {
 
     /**
      * Sets whether this sink should proceed processing even if the destination files are
-     * up to date.
+     * up to date. Defaulted to {@code false}.
      *
      * @param force
      *      {@code true} if proceeds even if up to date; {@code false} otherwise.
      */
     public void setForce(boolean force) {
         force_ = force;
+    }
+
+    /**
+     * Sets whether this sink should compare existing destination files with the contents
+     * about to be written and avoid overwriting them if not necessary.
+     * Defaulted to {@code false}.
+     *
+     * @param timid
+     *      {@code true} if avoids unnecessary overwriting; {@code false} otherwise.
+     *
+     * @since 1.1
+     */
+    public void setTimid(boolean timid) {
+        timid_ = timid;
     }
 
     /**
@@ -174,14 +198,15 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            logger_.log(this, "File mappers added twice", Logger.Level.ERR);
-            throw new BuildException();
+            logger_.log(this, "File mappers added twice", Level.ERR);
+            exceptionPoster_.accept(new BuildException());
+        } else {
+            mapper_ = mapper;
         }
-        mapper_ = mapper;
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
         // Configure destDir_ to be an absolute path.
         if (destDir_ == null) {
             destDir_ = baseDir.toPath();
@@ -194,11 +219,11 @@ public final class Output extends Sink {
             // A predefined destination path exists.
             if (referent_ != null) {
                 logger_.log(this,
-                    "\"dest\" and \"refer\" can be set exclusively", Logger.Level.ERR);
+                    "\"dest\" and \"refer\" can be set exclusively", Level.ERR);
                 throw new BuildException();
             } else if (mapper_ != null) {
                 logger_.log(this,
-                    "\"dest\" and file mappers can be set exclusively", Logger.Level.ERR);
+                    "\"dest\" and file mappers can be set exclusively", Level.ERR);
                 throw new BuildException();
             }
             dest_ = destDir_.resolve(dest_);
@@ -208,13 +233,12 @@ public final class Output extends Sink {
             // No predefined destination path exists
             // and specified to refer the source document contents.
             try {
-
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext);
                 referents_ = Collections.singletonList(xpath.compile(referent_));
             } catch (XPathExpressionException e) {
                 logger_.log(this,
-                    "Failed to compile XPath expression: " + referent_, Logger.Level.ERR);
+                    "Failed to compile XPath expression: " + referent_, Level.ERR);
                 throw new BuildException(e);
             }
 
@@ -224,7 +248,7 @@ public final class Output extends Sink {
             // neither do file mappers.
             // -> No clue to decide the output path.
             logger_.log(this,
-                "Neither \"dest\", \"refer\" nor file mappers are set", Logger.Level.ERR);
+                "Neither \"dest\", \"refer\" nor file mappers are set", Level.ERR);
             throw new BuildException();
         }
 
@@ -259,6 +283,7 @@ public final class Output extends Sink {
         }
 
         force_ = force_ || force;
+        dryRun_ = dryRun;
     }
 
     @Override
@@ -267,16 +292,15 @@ public final class Output extends Sink {
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
-        boolean[] includes = new boolean[originalSrcFileNames.length];
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+        boolean[] includes = new boolean[origSrcFileNames.length];
         if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
         } else {
             assert destMapping_ != null;
-            for (int i = 0; i < originalSrcFileNames.length; ++i) {
-                includes[i] = isOriginalSrcNewer(
-                    originalSrcLastModifiedTimes[i], destMapping_.apply(originalSrcFileNames[i]));
+            for (int i = 0; i < origSrcFileNames.length; ++i) {
+                includes[i] = isOrigSrcNewer(
+                    origSrcLastModTimes[i], destMapping_.apply(origSrcFileNames[i]));
             }
         }
         return includes;
@@ -288,15 +312,15 @@ public final class Output extends Sink {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> referredContents) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> referredContents) {
         OutputStream buffer = BUFFER.get();
 
         // Configure dests.
         Set<Path> dests = Collections.<Path>emptySet();
         if (referents_.isEmpty()) {
             assert destMapping_ != null;
-            dests = destMapping_.apply(originalSrcFileName);
+            dests = destMapping_.apply(origSrcFileName);
         } else if (!(referredContents.isEmpty() || (referredContents.get(0) == null))) {
             if (destMapping_ != null) {
                 dests = destMapping_.apply(referredContents.get(0));
@@ -305,19 +329,19 @@ public final class Output extends Sink {
             }
         }
         if (dests.isEmpty()) {
-            logger_.log(this, "Cannot decide the output file path", Logger.Level.ERR);
+            logger_.log(this, "Cannot decide the output file path", Level.ERR);
             throw new BuildException();
         }
 
-        if (!force_ && !isOriginalSrcNewer(originalSrcLastModifiedTime, dests)) {
+        if (!force_ && !isOrigSrcNewer(origSrcLastModTime, dests)) {
             if (dests.size() > 1) {
                 String files = dests.stream()
-                    .map(Path::toString)
-                    .collect(Collectors.joining(", "));
-                logger_.log(this, "Output files are up to date: " + files, Logger.Level.DEBUG);
+                                    .map(Path::toString)
+                                    .collect(Collectors.joining(", "));
+                logger_.log(this, "Output files are up to date: " + files, Level.DEBUG);
             } else {
                 logger_.log(this, "The output file is up to date: " + dests.iterator().next(),
-                    Logger.Level.DEBUG);
+                    Level.DEBUG);
             }
             return null;
         }
@@ -325,7 +349,7 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOriginalSrcNewer(
+    private static boolean isOrigSrcNewer(
             long originalSrcLastModifiedTime, Set<Path> dests) {
         if (originalSrcLastModifiedTime <= 0) {
             return true;
@@ -347,42 +371,76 @@ public final class Output extends Sink {
         // Write the buffer contents to currentDests_.
         try {
             for (Path mapped : r.getDestinations()) {
-                if (mkDirs_) {
-                    Path parent = mapped.getParent();
-                    if ((parent != null) && !Files.exists(parent)) {
-                        Files.createDirectories(parent);
+                Path absolute = mapped.toAbsolutePath();
+
+                if (timid_) {
+                    File file = absolute.toFile();
+                    if (file.exists() && (file.length() == out.size())
+                     && hasIdenticalContent(file, out.buffer())) {
+                        logger_.log(this, "No need to overwrite the output file: " + absolute,
+                            Level.FINE);
+                        continue;
                     }
                 }
-                Path absolute = mapped.toAbsolutePath();
-                logger_.log(this, "Creating " + absolute, Logger.Level.FINE);
-                // We take advantage of FileChannel for its capability to be interrupted
-                try {
+
+                if (dryRun_) {
+                    logger_.log(this, "[DRY RUN] Creating " + absolute, Level.FINE);
+
+                } else {
+                    if (mkDirs_) {
+                        Path parent = mapped.getParent();
+                        if ((parent != null) && !Files.exists(parent)) {
+                            Files.createDirectories(parent);
+                        }
+                    }
+                    logger_.log(this, "Creating " + absolute, Level.FINE);
+                    // We take advantage of FileChannel for its capability to be interrupted
                     try (FileChannel channel = FileChannel.open(absolute,
                             StandardOpenOption.WRITE, StandardOpenOption.CREATE,
                             StandardOpenOption.TRUNCATE_EXISTING)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
+                    } catch (IOException e) {
+                        logger_.log(this, "Failed to create " + absolute, Level.WARN);
+                        logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
+                         throw new ChionographisBuildException(e);
                     }
-                } catch (IOException e) {
-                    logger_.log(this, "Failed to create " + absolute, Logger.Level.WARN);
-                    logger_.log(this, e, "  Cause: ", Logger.Level.INFO, Logger.Level.VERBOSE);
-                     throw new ChionographisBuildException(e);
+                    countInBundle_.incrementAndGet();
                 }
             }
         } catch (IOException e) {
             throw new BuildException(e);
+        } finally {
+            placeBackBuffer(out);
         }
+    }
 
-        placeBackBuffer(out);
-
-        countInBundle_.incrementAndGet();
+    private boolean hasIdenticalContent(File file, byte[] content) throws IOException {
+        byte[] bytes = Pool.BYTES.get();
+        try (FileChannel in = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            int length;
+            int head = 0;
+            while ((length = in.read(buffer)) > -1) {
+                buffer.limit(length);
+                buffer.rewind();
+                if (!buffer.equals(ByteBuffer.wrap(content, head, length))) {
+                    return false;
+                }
+                head += length;
+            }
+            return true;
+        } finally {
+            Pool.BYTES.release(bytes);
+        }
     }
 
     @Override
     void abortOne(Result result) {
-        placeBackBuffer((ByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
+        placeBackBuffer(
+            (ExposingByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
     }
 
-    private void placeBackBuffer(ByteArrayOutputStream buffer) {
+    private void placeBackBuffer(ExposingByteArrayOutputStream buffer) {
         buffer.reset();
         BUFFER.release(buffer);
     }
@@ -391,13 +449,13 @@ public final class Output extends Sink {
     void finishBundle() {
         switch (countInBundle_.get()) {
         case 0:
-            logger_.log(this, "No output files created", Logger.Level.INFO);
+            logger_.log(this, "No output files created", Level.INFO);
             break;
         case 1:
-            logger_.log(this, "1 output file created", Logger.Level.INFO);
+            logger_.log(this, "1 output file created", Level.INFO);
             break;
         default:
-            logger_.log(this, countInBundle_ + " output files created", Logger.Level.INFO);
+            logger_.log(this, countInBundle_ + " output files created", Level.INFO);
             break;
         }
     }

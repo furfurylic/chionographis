@@ -9,11 +9,13 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -33,18 +35,18 @@ import javax.xml.xpath.XPathExpression;
 import org.apache.tools.ant.BuildException;
 import org.xml.sax.ContentHandler;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * An <i>Transform</i> filter transforms each source document into an document
  * styled by an XSLT stylesheet.
  */
-public final class Transform extends Sink implements Driver {
+public final class Transform extends Filter {
     private static final NetResourceCache<Templates> STYLESHEETS = new NetResourceCache<>();
 
-    private Sinks sinks_;
     private String style_ = null;
     private boolean usesCache_ = true;
-    private boolean force_ = false;
-    private Auxiliaries<Param> params_ = new Auxiliaries<>();
+    private Assemblage<Param> params_ = new Assemblage<>();
     private Depends depends_ = null;
 
     private URI styleURI_;
@@ -64,18 +66,25 @@ public final class Transform extends Sink implements Driver {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Transform(Logger logger) {
-        sinks_ = new Sinks(logger);
+    Transform(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
+        super(logger, expander, exceptionPoster);
     }
 
     /**
-     * Sets the URI of the XSLT stylesheet. If the given string represents a relative URI,
-     * it is resolved by {@linkplain Chionographis#setBaseDir(String)
-     * the base directory of the task} to a file path.
+     * Sets the URI or the file path of the XSLT stylesheet.
+     * If the given string represents relative, it is resolved by
+     * {@linkplain Chionographis#setBaseDir(String) the base directory of the task}
+     * to a file path.
      *
      * @param style
-     *      the URI of the XSLT stylesheet.
+     *      the URI or the file path of the XSLT stylesheet.
      */
     public void setStyle(String style) {
         style_ = style;
@@ -83,7 +92,7 @@ public final class Transform extends Sink implements Driver {
 
     /**
      * Sets whether external resources referred through the transformation process
-     * should be cached. Defaulted to "yes".
+     * should be cached. Defaulted to {@code true}.
      *
      * <p>The external resources are:</p>
      * <ul>
@@ -101,21 +110,13 @@ public final class Transform extends Sink implements Driver {
     }
 
     /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void setForce(boolean force) {
-        force_ = force;
-    }
-
-    /**
      * Adds a stylesheet parameter.
      *
      * @return
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(sinks_);
+        Param param = new Param(logger(), expander(), exceptionPoster());
         params_.add(param);
         return param;
     }
@@ -130,7 +131,7 @@ public final class Transform extends Sink implements Driver {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(sinks_);
+        depends_ = new Depends(logger(), exceptionPoster());
         return depends_;
     }
 
@@ -138,74 +139,48 @@ public final class Transform extends Sink implements Driver {
      * {@inheritDoc}
      */
     @Override
-    public Transform createTransform() {
-        return sinks_.createTransform();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public All createAll() {
-        return sinks_.createAll();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Snip createSnip() {
-        return sinks_.createSnip();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Output createOutput() {
-        return sinks_.createOutput();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
+    void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
         paramMap_ = createParamMap(namespaceContext);
 
-        styleURI_ = URI.create(style_);
-        if (!styleURI_.isAbsolute()) {
+        if (style_ == null) {
+            logger().log(this, "\"style\" must be specified", Level.ERR);
+            throw new BuildException();
+        }
+        try {
+            // First we try as a URI
+            styleURI_ = new URI(style_);
+        } catch (URISyntaxException e) {
+            // Second we try as a file
+        }
+        if ((styleURI_ == null) || !styleURI_.isAbsolute()) {
             styleURI_ = baseDir.toPath().resolve(style_).toUri();
         }
 
-        force_ = force_ || force;
-
-        sinks_.init(baseDir, namespaceContext, force_);
+        sink().init(baseDir, namespaceContext, isForce(), dryRun);
     }
 
     private Map<String, Object> createParamMap(NamespaceContext namespaceContext) {
         return params_.toMap(p -> p.yield(namespaceContext),
-            e -> sinks_.log(this,
-                    "Adding a stylesheet parameter: " + e, Logger.Level.DEBUG),
+            e -> logger().log(this,
+                    "Adding a stylesheet parameter: " + e, Level.DEBUG),
             k -> {
-                sinks_.log(this,
-                    "Stylesheet parameter named " + k + " added twice", Logger.Level.ERR);
+                logger().log(this,
+                    "Stylesheet parameter named " + k + " added twice", Level.ERR);
                 throw new ChionographisBuildException(true);
             });
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         setUpLastModified();
-        if ((!force_) && (lastModified_ != 0)) {
+        if ((!isForce()) && (lastModified_ != 0)) {
             long[] lastModifiedTimes =
-                Arrays.stream(originalSrcLastModifiedTimes)
+                Arrays.stream(origSrcLastModTimes)
                       .map(l -> (l <= 0 ? l : Math.max(l, lastModified_)))
                       .toArray();
-            return sinks_.preexamineBundle(originalSrcFileNames, lastModifiedTimes);
+            return sink().preexamineBundle(origSrcFileNames, lastModifiedTimes);
         } else {
-            boolean[] includes = new boolean[originalSrcFileNames.length];
+            boolean[] includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
             return includes;
         }
@@ -232,24 +207,24 @@ public final class Transform extends Sink implements Driver {
 
     @Override
     void startBundle() {
-        sinks_.startBundle();
+        sink().startBundle();
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> notUsed) {
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> notUsed) {
         try {
-            List<XPathExpression> referents = sinks_.referents();
-            long lastModified = ((originalSrcLastModifiedTime <= 0) || (lastModified_ <= 0)) ?
-                0 : Math.max(originalSrcLastModifiedTime, lastModified_);
+            List<XPathExpression> referents = sink().referents();
+            long lastModified = ((origSrcLastModTime <= 0) || (lastModified_ <= 0)) ?
+                0 : Math.max(origSrcLastModTime, lastModified_);
             if (!referents.isEmpty()) {
                 return new FinisherDOMResult(
                     r -> {
                         List<String> referredContents = Referral.extract(r.getNode(), referents);
-                        sinks_.log(this, "Referred source data: "
-                            + String.join(", ", referredContents), Logger.Level.DEBUG);
+                        logger().log(this, "Referred source data: "
+                            + String.join(", ", referredContents), Level.DEBUG);
                         Result openedResult =
-                            sinks_.startOne(originalSrcIndex, originalSrcFileName,
+                            sink().startOne(origSrcIndex, origSrcFileName,
                                 lastModified, referredContents);
                         if (openedResult != null) {
                             try {
@@ -258,20 +233,20 @@ public final class Transform extends Sink implements Driver {
                             } catch (TransformerException e) {
                                 throw new BuildException(e);
                             }
-                            sinks_.finishOne(openedResult);
+                            sink().finishOne(openedResult);
                         }
                     },
                     () -> {});
             } else {
                 Result openedResult =
-                    sinks_.startOne(originalSrcIndex, originalSrcFileName,
+                    sink().startOne(origSrcIndex, origSrcFileName,
                         lastModified, Collections.emptyList());
                 if (openedResult != null) {
                     TransformerHandler styler = stylesheet_.newTransformerHandler();
                     styler.setResult(openedResult);
                     return new FinisherSAXResult(styler,
-                        () -> sinks_.finishOne(openedResult),
-                        () -> sinks_.abortOne(openedResult));
+                        () -> sink().finishOne(openedResult),
+                        () -> sink().abortOne(openedResult));
                 } else {
                     return null;
                 }
@@ -297,7 +272,7 @@ public final class Transform extends Sink implements Driver {
 
     @Override
     void finishBundle() {
-        sinks_.finishBundle();
+        sink().finishBundle();
     }
 
     private static interface Finisher {
@@ -379,29 +354,29 @@ public final class Transform extends Sink implements Driver {
                 styleURI_,
                 u -> {},
                 u -> {
-                    sinks_.log(Transform.this,
-                        "Reusing compiled stylesheet: " + u.toString(), Logger.Level.DEBUG);
+                    logger().log(Transform.this,
+                        "Reusing compiled stylesheet: " + u.toString(), Level.DEBUG);
                 },
                 this::compileStylesheet);
         }
 
         private Templates compileStylesheet(URI styleURI) {
             String styleSystemID = styleURI.toString();
-            sinks_.log(Transform.this,
-                "Compiling stylesheet: " + styleSystemID, Logger.Level.VERBOSE);
+            logger().log(Transform.this,
+                "Compiling stylesheet: " + styleSystemID, Level.VERBOSE);
             synchronized (LOCK) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 if (usesCache_) {
                     resolver_ = new CachingResolver(
-                        r -> sinks_.log(Transform.this, "Caching " + r, Logger.Level.DEBUG),
-                        r -> sinks_.log(Transform.this, "Reusing " + r, Logger.Level.DEBUG));
+                        r -> logger().log(Transform.this, "Caching " + r, Level.DEBUG),
+                        r -> logger().log(Transform.this, "Reusing " + r, Level.DEBUG));
                     tfac_.setURIResolver(resolver_);
                 }
                 try {
                     return tfac_.newTemplates(new StreamSource(styleSystemID));
                 } catch (TransformerConfigurationException e) {
-                    sinks_.log(Transform.this,
-                        "Failed to compile stylesheet: " + styleSystemID, Logger.Level.ERR);
+                    logger().log(Transform.this,
+                        "Failed to compile stylesheet: " + styleSystemID, Level.ERR);
                     throw new FatalityException(e);
                 }
             }

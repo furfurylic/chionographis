@@ -44,8 +44,11 @@ public abstract class Sink {
      * @param force
      *      whether the driver wants this object to process all inputs regardless
      *      if the output files are up to date or not.
+     * @param dryRun
+     *      whether the driver wants this object not to finalize its outputs onto external devices.
      */
-    abstract void init(File baseDir, NamespaceContext namespaceContext, boolean force);
+    abstract void init(File baseDir, NamespaceContext namespaceContext,
+        boolean force, boolean dryRun);
 
     /**
      * Returns XPath expressions which point the source document contents required by this object.
@@ -54,7 +57,8 @@ public abstract class Sink {
      * the data is informed as the argument of {@link #startOne(int, String, long, List)}.</p>
      *
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,
-     * boolean)} arbitrary number of times. If the driver is not responsive to this sink's request,
+     * boolean, boolean)} arbitrary number of times.
+     * If the driver is not responsive to this sink's request,
      * this method might never be invoked.</p>
      *
      * <p>This method may be called simultaneously by multiple threads on one object.</p>
@@ -81,10 +85,10 @@ public abstract class Sink {
      *
      * <p>Callees must not try to modify arrays passed as parameters.</p>
      *
-     * @param originalSrcFileNames
+     * @param origSrcFileNames
      *      the source file names of the original input sources to the {@linkplain Chionographis
      *      Chionographis task}, whose elements shall not be {@code null}.
-     * @param originalSrcLastModifiedTimes
+     * @param origSrcLastModTimes
      *      the last modification times of the source files which correspond the file names in
      *      {@code srcURIs} from the epoch, each element of which is positive if significant, or
      *      {@code 0} if unknown.
@@ -95,8 +99,7 @@ public abstract class Sink {
      *      to be included in the process,
      *      that is, the corresponding output is already up to date.
      */
-    abstract boolean[] preexamineBundle(
-        String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes);
+    abstract boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes);
 
     abstract void startBundle();
 
@@ -110,20 +113,20 @@ public abstract class Sink {
      *
      * <p>This method may be called simultaneously by multiple threads on one object.</p>
      *
-     * @param originalSrcIndex
+     * @param origSrcIndex
      *      the index of the corresponding original source,
-     *      which meets the index for {@code originalSrcURIs} and {@code originalSrcFileNames}
+     *      which meets the index for {@code origSrcFileNames}
      *      parameters in {@link #preexamineBundle(String[], long[])};
      *      or -1 if the driver have not invoked {@link #preexamineBundle(String[], long[])}.
-     * @param originalSrcFileName
+     * @param origSrcFileName
      *      the file name of the corresponding original source,
-     *      which is equal to {@code originalSrcFileNames[originalSrcIndex]} where
-     *      {@code originalSrcFileNames} is the argument passed in the prior call of {@link
+     *      which is equal to {@code origSrcFileNames[origSrcIndex]} where
+     *      {@code origSrcFileNames} is the argument passed in the prior call of {@link
      *      #preexamineBundle(String[], long[])}; or {@code null} if the driver have not invoked
      *      {@link #preexamineBundle(String[], long[])}.
-     * @param originalSrcLastModifiedTime
+     * @param origSrcLastModTime
      *      the last modification time of the original source file from the epoch,
-     *      which is positive if significant, or {@code 0} if unknown..
+     *      which is positive if significant, or {@code 0} if unknown.
      * @param referredContents
      *      an list whose size is the same as the return value of
      *      {@link #referents()} and contains the required input document contents
@@ -131,14 +134,20 @@ public abstract class Sink {
      *      or an empty list if the driver is not responsive to the request.
      *
      * @return
-     *      an TrAX {@code Result} object which receives the input document.
+     *      an TrAX {@code Result} object which receives the input document; is possibly
+     *      {@code null} when this sink judges that there is no need to process the input.
      */
-    abstract Result startOne(int originalSrcIndex,
-        String originalSrcFileName, long originalSrcLastModifiedTime,
+    abstract Result startOne(int origSrcIndex, String origSrcFileName, long origSrcLastModTime,
         List<String> referredContents);
 
     /**
      * Finishes to receive one input document.
+     *
+     * <p>This method is called after {@link #startOne(int, String, long, List)} with the
+     *  identical TrAX {@code Result} object which it has returned
+     *  (only if {@link #abortOne(Result)} has not been invoked).
+     *  However, if {@link #startOne(int, String, long, List)} has returned {@code null},
+     *  corresponding call of this method shall not occur.</p>
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
@@ -146,7 +155,8 @@ public abstract class Sink {
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
-     *      {@link #startOne(int, String, long, List)} of this object.
+     *      {@link #startOne(int, String, long, List)} of this object;
+     *      which is never {@code null}.
      */
     abstract void finishOne(Result result);
 

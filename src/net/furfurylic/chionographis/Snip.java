@@ -13,8 +13,11 @@ import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -22,6 +25,7 @@ import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathException;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
@@ -31,6 +35,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import net.furfurylic.chionographis.Logger.Level;
+
 /**
  * A <i>Snip</i> filter performs extraction of tree fragments from the source documents
  * and passes the fragments to its sinks.
@@ -38,12 +44,9 @@ import org.w3c.dom.NodeList;
  * <p>The way of extraction is specified by <i>XPath</i> expression.
  * The root nodes of the fragments are the matched elements with the XPath expression.</p>
  */
-public final class Snip extends Sink implements Driver {
+public final class Snip extends Filter {
 
-    private Sinks sinks_;
     private String select_;
-    private boolean force_;
-
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
     private final ReentrantLock lock_ = new ReentrantLock();
@@ -53,9 +56,15 @@ public final class Snip extends Sink implements Driver {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process;
+     *      which shall not be {@code null}.
      */
-    Snip(Logger logger) {
-        sinks_ = new Sinks(logger);
+    Snip(Logger logger, Function<String, String> expander,
+            Consumer<BuildException> exceptionPoster) {
+        super(logger, expander, exceptionPoster);
     }
 
     /**
@@ -77,66 +86,25 @@ public final class Snip extends Sink implements Driver {
      * {@inheritDoc}
      */
     @Override
-    public void setForce(boolean force) {
-        force_ = force;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Transform createTransform() {
-        return sinks_.createTransform();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public All createAll() {
-        return sinks_.createAll();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Snip createSnip() {
-        return sinks_.createSnip();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Output createOutput() {
-        return sinks_.createOutput();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        force_ = force_ || force;
-        sinks_.init(baseDir, namespaceContext, force_);
+    void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
+        sink().init(baseDir, namespaceContext, isForce(), dryRun);
         namespaceContext_ = namespaceContext;
     }
 
     @Override
-    boolean[] preexamineBundle(String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
-        return sinks_.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes);
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+        return sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
     }
 
     @Override
     void startBundle() {
-        sinks_.startBundle();
+        sink().startBundle();
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> notUsed) {
-        return new SnipDOMResult(originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime);
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> notUsed) {
+        return new SnipDOMResult(origSrcIndex, origSrcFileName, origSrcLastModTime);
     }
 
     @Override
@@ -145,59 +113,63 @@ public final class Snip extends Sink implements Driver {
         assert result instanceof SnipDOMResult;
         SnipDOMResult r = (SnipDOMResult) result;
 
-        try {
-            // Apply XPath expression to current document
-            sinks_.log(this, "Applying snipping criterion " + select_ +
-                "; the original source is " + r.originalSrcFileName(), Logger.Level.DEBUG);
-            NodeList nodes = extractNodes(r);
+        // Apply XPath expression to current document
+        logger().log(this, "Applying snipping criterion " + select_ +
+            "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
+        NodeList nodes = extractNodes(r);
 
-            int count;
-            ForkJoinPool pool = ForkJoinTask.getPool();
-            if (pool != null) {
-                // We do document creation sequentially.
-                List<Document> documents =
-                    IntStream.range(0, nodes.getLength())
-                             .mapToObj(i -> nodes.item(i))
-                             .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
-                             .map(n -> newFragmentDocument(n))
-                             .collect(Collectors.toList());
-                // Created documents are passed to sink in parallel.
-                count = pool.submit(() -> documents.stream()
-                                                   .parallel()
-                                                   .mapToInt(d -> sendFragmentDocument(d, r))
-                                                   .sum())
-                            .join();
-                // It is OK if some fragments failed.
-            } else {
-                count = IntStream.range(0, nodes.getLength())
-                                 .mapToObj(i -> nodes.item(i))
-                                 .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
-                                 .map(n -> newFragmentDocument(n))
-                                 .mapToInt(d -> sendFragmentDocument(d, r))
-                                 .sum();
-            }
-            if (count > 0) {
-                sinks_.log(this, count + " snipped fragments processed", Logger.Level.DEBUG);
-            } else {
-                sinks_.log(this, "No snipped fragments generated; the original source is " +
-                        r.originalSrcFileName(), Logger.Level.INFO);
-            }
-
-        } catch (XPathExpressionException e) {
-            throw new BuildException(e);
+        int count;
+        ForkJoinPool pool = ForkJoinTask.getPool();
+        Stream<Document> fragsStream =
+            IntStream.range(0, nodes.getLength())
+                     .mapToObj(i -> nodes.item(i))
+                     .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
+                     .map(n -> newFragmentDocument(n));
+        if (pool != null) {
+            // We do document creation sequentially.
+            List<Document> documents = fragsStream.collect(Collectors.toList());
+            // Created documents are passed to sink in parallel.
+            count = pool.submit(() -> documents.stream()
+                                               .parallel()
+                                               .mapToInt(d -> sendFragmentDocument(d, r))
+                                               .sum())
+                        .join();
+            // It is OK if some fragments failed.
+        } else {
+            count = fragsStream.mapToInt(d -> sendFragmentDocument(d, r))
+                               .sum();
+        }
+        if (count > 0) {
+            logger().log(this, count + " snipped fragments processed", Level.DEBUG);
+        } else {
+            logger().log(this, "No snipped fragments generated; the original source is " +
+                    r.originalSrcFileName(), Level.INFO);
         }
     }
 
-    private NodeList extractNodes(DOMResult result) throws XPathExpressionException {
+    private NodeList extractNodes(DOMResult result) {
         lock_.lock();
         try {
             NodeList nodes;
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext_);
-                expr_ = xpath.compile(select_);
+                try {
+                    expr_ = xpath.compile(select_);
+                } catch (XPathException e) {
+                    logger().log(this,
+                        "Failed to compile the XPath expression: " + select_, Level.ERR);
+                    throw new FatalityException(e);
+                }
             }
-            nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
+            try {
+                nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
+            } catch (XPathExpressionException e) {
+                logger().log(this,
+                    "Failed to apply the XPath expression: " + select_, Level.ERR);
+                logger().log(this, e, "  Cause: ", Level.ERR, Level.VERBOSE);
+                throw new ChionographisBuildException(e, true);
+            }
             return nodes;
         } finally {
             lock_.unlock();
@@ -212,24 +184,24 @@ public final class Snip extends Sink implements Driver {
 
     private int sendFragmentDocument(Document document, SnipDOMResult result) {
         // Search the source contents if necessary
-        List<XPathExpression> referents = sinks_.referents();
+        List<XPathExpression> referents = sink().referents();
         List<String> referredContents;
         if (!referents.isEmpty()) {
             referredContents = Referral.extract(document, referents);
-            sinks_.log(this, "Referred source data: "
-                + String.join(", ", referredContents), Logger.Level.DEBUG);
+            logger().log(this, "Referred source data: "
+                + String.join(", ", referredContents), Level.DEBUG);
         } else {
             referredContents = Collections.emptyList();
         }
 
         // Open sink's result
-        Result rr = sinks_.startOne(result.originalSrcIndex(), result.originalSrcFileName(),
+        Result rr = sink().startOne(result.originalSrcIndex(), result.originalSrcFileName(),
             result.originalSrcLastModifiedTime(), referredContents);
         if (rr != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
             // Finish sink
-            sinks_.finishOne(rr);
+            sink().finishOne(rr);
         }
 
         return 1;
@@ -237,39 +209,37 @@ public final class Snip extends Sink implements Driver {
 
     @Override
     void abortOne(Result result) {
-        // sink_.startOne(int, String) is not invoked yet,
-        // so we can evade call sink_.abortOne().
+        // sink().startOne(int, String) is not invoked yet,
+        // so we can evade call sink().abortOne().
     }
 
     @Override
     void finishBundle() {
-        sinks_.finishBundle();
+        sink().finishBundle();
     }
 
     private static class SnipDOMResult extends DOMResult {
-        private int originalSrcIndex_;
-        private String originalSrcFileName_;
-        private long originalSrcLastModifiedTime_;
+        private int origSrcIndex_;
+        private String origSrcFileName_;
+        private long origSrcLastModTime_;
 
-        public SnipDOMResult(
-                int originalSrcIndex, String originalSrcFileName,
-                long originalSrcLastModifiedTime) {
+        public SnipDOMResult(int origSrcIndex, String origSrcFileName, long origSrcLastModTime) {
             super();
-            originalSrcIndex_ = originalSrcIndex;
-            originalSrcFileName_ = originalSrcFileName;
-            originalSrcLastModifiedTime_ = originalSrcLastModifiedTime;
+            origSrcIndex_ = origSrcIndex;
+            origSrcFileName_ = origSrcFileName;
+            origSrcLastModTime_ = origSrcLastModTime;
         }
 
         public int originalSrcIndex() {
-            return originalSrcIndex_;
+            return origSrcIndex_;
         }
 
         public String originalSrcFileName() {
-            return originalSrcFileName_;
+            return origSrcFileName_;
         }
 
         public long originalSrcLastModifiedTime() {
-            return originalSrcLastModifiedTime_;
+            return origSrcLastModTime_;
         }
     }
 }

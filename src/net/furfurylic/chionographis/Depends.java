@@ -7,9 +7,15 @@
 
 package net.furfurylic.chionographis;
 
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.function.Consumer;
+
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
+
+import net.furfurylic.chionographis.Logger.Level;
 
 /**
  * Objects of this class are used to instruct their enclosing <i>{@linkplain Chionographis}</i>
@@ -24,6 +30,7 @@ import org.apache.tools.ant.types.ResourceCollection;
 public final class Depends {
 
     private Logger logger_;
+    private Consumer<BuildException> exceptionPoster_;
 
     /** Instructions for the case of the pointed resources do not exist. */
     public enum Absent {
@@ -43,8 +50,9 @@ public final class Depends {
     private ResourceCollection resources_ = null;
     private Absent absent_ = Absent.FAIL;
 
-    Depends(Logger logger) {
+    Depends(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
+        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -60,8 +68,8 @@ public final class Depends {
         try {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
-            logger_.log(this, "Bad \"absent\" attribute value: " + absent, Logger.Level.ERR);
-            throw new BuildException();
+            logger_.log(this, "Bad \"absent\" attribute value: " + absent, Level.ERR);
+            exceptionPoster_.accept(new BuildException());
         }
     }
 
@@ -79,13 +87,13 @@ public final class Depends {
      * Returns the last modified time of the newest resource.
      *
      * @return
-     *      -1 if all of the resources are very old (or the caller can neglect its new-ness),
+     *      -1 if all of the resources are very old (or the caller can neglect its newness),
      *      0 if one of the resource is very new,
      *      positive value otherwise.
      */
     long lastModified() {
         long l = -1;
-        for (Resource r : (Iterable<Resource>) (() -> resources_.iterator())) {
+        for (Resource r : (Iterable<Resource>) (() -> iterator())) {
             long t = lastModifiedOne(r);
             if (t == 0) {
                 return 0;
@@ -96,6 +104,15 @@ public final class Depends {
             }
         }
         return (l == -1) ? ofAbsent(null) : l;
+    }
+
+    private Iterator<Resource> iterator() {
+        try {
+            return resources_.iterator();
+        } catch (BuildException e) {
+            // FileSet.iterator() throws an exception when file="a/b/c" and a/b does not exist.
+            return Collections.<Resource>emptyIterator();
+        }
     }
 
     private long lastModifiedOne(Resource r) {
@@ -114,19 +131,18 @@ public final class Depends {
             if (r != null) {
                 logger_.log(this,
                     "Referred resource \"" + r.toString() + "\" is missing to be regarded as new",
-                    Logger.Level.INFO);
+                    Level.INFO);
             } else {
                 logger_.log(this,
-                    "Referred resources are missing to be regarded as new",
-                    Logger.Level.INFO);
+                    "Referred resources are missing to be regarded as new", Level.INFO);
             }
             return 0;
         case FAIL:
             if (r != null) {
                 logger_.log(this,
-                    "Required resource \"" + r.toString() + "\" is missing", Logger.Level.ERR);
+                    "Required resource \"" + r.toString() + "\" is missing", Level.ERR);
             } else {
-                logger_.log(this, "Required resources are missing", Logger.Level.ERR);
+                logger_.log(this, "Required resources are missing", Level.ERR);
             }
             throw new BuildException();
         default:

@@ -9,12 +9,13 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -29,6 +30,7 @@ import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
+import org.apache.tools.ant.BuildException;
 import org.w3c.dom.Node;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
@@ -39,9 +41,8 @@ import org.xml.sax.ext.LexicalHandler;
 /**
  * Represents a composite of {@code Sink} objects.
  */
-final class Sinks extends Sink implements Logger {
+final class Sinks extends Sink/* implements Logger*/ {
 
-    private Logger logger_;
     private List<Sink> sinks_;
 
     /**
@@ -52,38 +53,40 @@ final class Sinks extends Sink implements Logger {
      */
     private boolean[][] includes_;
 
+    /**
+     * A map which maps a TrAX Result object returned {@link #startOne(int, String, long, List)}
+     * of this object to {@link Sink} objects responsive to it.
+     *
+     * <p>This map is based on idenditity of the keys (that is, mapping by keys' identities).</p>
+     */
     private Map<Result, List<Sink>> activeSinkMap_;
 
     /**
      * Sole constructor.
-     *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      */
-    public Sinks(Logger logger) {
-        logger_ = logger;
+    public Sinks() {
         sinks_ = new ArrayList<>();
-    }
-
-    @Override
-    public void log(Object issuer, String message, Logger.Level level) {
-        logger_.log(issuer, message, level);
-    }
-
-    @Override
-    public void log(Object issuer, Throwable ex, String heading,
-            Logger.Level headingLevel, Logger.Level bodyLevel) {
-        logger_.log(issuer, ex, heading, headingLevel, bodyLevel);
     }
 
     /**
      * Adds a {@link Transform} filter into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      a {@link Transform} filter object.
      */
-    public Transform createTransform() {
-        Transform sink = new Transform(logger_);
+    public Transform createTransform(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        Transform sink = new Transform(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -91,11 +94,22 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds an {@link All} filter into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      an {@link All} filter object.
      */
-    public All createAll() {
-        All sink = new All(logger_);
+    public All createAll(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        All sink = new All(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -103,11 +117,22 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds a {@link Snip} filter into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param expander
+     *      an object which expands properties in a text, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      a {@link Snip} filter object.
      */
-    public Snip createSnip() {
-        Snip sink = new Snip(logger_);
+    public Snip createSnip(Logger logger, Function<String, String> expander,
+        Consumer<BuildException> exceptionPoster) {
+        Snip sink = new Snip(logger, expander, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
@@ -115,34 +140,45 @@ final class Sinks extends Sink implements Logger {
     /**
      * Adds an {@link Output} sink into this composite.
      *
+     * @param logger
+     *      a logger, which shall not be {@code null}.
+     * @param exceptionPoster
+     *      an object which consumes exceptions occurred during the preparation process
+     *      (in other words, in prior to the task execution); which shall not be {@code null}.
+     *      Invocation of this results an immediate build failure or a postponed build error
+     *      (not a failure).
+     *
      * @return
      *      an {@link Output} sink object.
      */
-    public Output createOutput() {
-        Output sink = new Output(logger_);
+    public Output createOutput(Logger logger, Consumer<BuildException> exceptionPoster) {
+        Output sink = new Output(logger, exceptionPoster);
         sinks_.add(sink);
         return sink;
     }
 
+    public boolean isEmpty() {
+        return sinks_.isEmpty();
+    }
+
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force) {
-        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force));
+    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
+        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
     }
 
     @Override
     List<XPathExpression> referents() {
         return sinks_.stream()
                       .map(s -> s.referents())
-                      .flatMap(r -> r.stream())
+                      .flatMap(List::stream)
                       .collect(Collectors.toList());
     }
 
     @Override
-    boolean[] preexamineBundle(
-            String[] originalSrcFileNames, long[] originalSrcLastModifiedTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
-            .map(s -> s.preexamineBundle(originalSrcFileNames, originalSrcLastModifiedTimes))
+            .map(s -> s.preexamineBundle(origSrcFileNames, origSrcLastModTimes))
             .toArray(boolean[][]::new);
 
         boolean[] results = new boolean[includes_[0].length];
@@ -171,38 +207,31 @@ final class Sinks extends Sink implements Logger {
     }
 
     @Override
-    Result startOne(int originalSrcIndex, String originalSrcFileName,
-            long originalSrcLastModifiedTime, List<String> referredContents) {
-        List<Sink> activeSinks = null;
+    Result startOne(int origSrcIndex, String origSrcFileName,
+            long origSrcLastModTime, List<String> referredContents) {
+        Assemblage<Sink> activeSinks = new Assemblage<>();
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int j = 0;
         try {
             int i = 0;
             for (; j < sinks_.size(); ++j) {
+                // Grab referred contents for this sink.
                 List<String> referredContentsOne =
                     referredContents.subList(i, i + sinks_.get(j).referents().size());
                 i += sinks_.get(j).referents().size();
+                // If the sink does not include sources at all, skip it.
                 if (includes_ != null) {
                     boolean[] includesOne = includes_[j];
                     if (IntStream.range(0, includesOne.length).noneMatch(k -> includesOne[k])) {
                         continue;
                     }
                 }
+                // Open the result of the sink.
                 Result result = sinks_.get(j).startOne(
-                    originalSrcIndex, originalSrcFileName, originalSrcLastModifiedTime,
-                    referredContentsOne);
+                    origSrcIndex, origSrcFileName, origSrcLastModTime, referredContentsOne);
                 if (result != null) {
                     // First, we populate activeSinks.
-                    if (activeSinks == null) {
-                        activeSinks = Collections.singletonList(sinks_.get(j));
-                    } else{
-                        if (activeSinks.size() == 1) {
-                            Sink s = activeSinks.get(0);
-                            activeSinks = new ArrayList<>();
-                            activeSinks.add(s);
-                        }
-                        activeSinks.add(sinks_.get(j));
-                    }
+                    activeSinks.add(sinks_.get(j));
                     // Second, we populate builder.
                     builder.add(result);    // We don't assume if any exception thrown here
                                             // it is a recoverable situation.
@@ -213,7 +242,7 @@ final class Sinks extends Sink implements Logger {
             Result r = builder.newCompositeResult();
             if (r != null) {
                 try {
-                    abort(r, activeSinks);
+                    abort(r, activeSinks.getList());
                 } catch (RuntimeException ex) {
                     // e is more essential than ex for this abortion.
                 }
@@ -222,8 +251,10 @@ final class Sinks extends Sink implements Logger {
         }
 
         Result r = builder.newCompositeResult();
-        synchronized (activeSinkMap_) {
-            activeSinkMap_.put(r, activeSinks);
+        if (r != null) {
+            synchronized (activeSinkMap_) {
+                activeSinkMap_.put(r, activeSinks.getList());
+            }
         }
         return r;
     }
@@ -302,7 +333,8 @@ final class Sinks extends Sink implements Logger {
          *      if one of {@code sinks} throws a {@link RuntimeException}.
          *      This situation should be considered as unrecoverable.
          */
-        public void abort(List<Sink> sinks) {
+        public final void abort(List<Sink> sinks) {
+            assert sinks.size() == results_.size();
             Optional<RuntimeException> ex =
                 IntStream.range(0, sinks.size())
                          .mapToObj(i -> abortSinkSilent(sinks.get(i), results_.get(i)))
@@ -313,7 +345,7 @@ final class Sinks extends Sink implements Logger {
             }
         }
 
-        protected void abortSilent(IntStream indices, List<Sink> sinks) {
+        protected final void abortSilent(IntStream indices, List<Sink> sinks) {
             indices.forEach(k -> abortSinkSilent(sinks.get(k), results_.get(k)));
         }
 
@@ -331,6 +363,7 @@ final class Sinks extends Sink implements Logger {
         }
     }
 
+    /** An interface of holders of one {@link Results} object. */
     private static interface CompositeResult {
         Results results();
     }
@@ -344,7 +377,7 @@ final class Sinks extends Sink implements Logger {
             results_ = new Results(results) {
                 @Override
                 public void finish(List<Sink> sinks) {
-                    List<Result> rs = results_.asList();
+                    List<Result> rs = asList();
                     int i = 0;
                     try {
                         while (i < sinks.size()) {
@@ -374,7 +407,7 @@ final class Sinks extends Sink implements Logger {
             results_ = new Results(results) {
                 @Override
                 public void finish(List<Sink> sinks) {
-                    List<Result> rs = results_.asList();
+                    List<Result> rs = asList();
 
                     // Search a real DOMResult
                     // Those which getNode() == null have high priority
@@ -400,6 +433,7 @@ final class Sinks extends Sink implements Logger {
                             }
                         }
                     } catch (RuntimeException e) {
+                        // Sinks which have not been finished shall be aborted
                         abortSilent(
                             IntStream.concat(IntStream.range(i, sinks.size()), IntStream.of(j))
                                      .distinct(),
@@ -571,7 +605,7 @@ final class Sinks extends Sink implements Logger {
 
             @Override
             public void startElement(String uri, String localName, String qName, Attributes atts)
-                throws SAXException {
+                    throws SAXException {
                 for (ContentHandler handler : contentHandlers_) {
                     handler.startElement(uri, localName, qName, atts);
                 }
@@ -616,4 +650,3 @@ final class Sinks extends Sink implements Logger {
         }
     }
 }
-
