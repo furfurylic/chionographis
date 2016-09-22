@@ -326,7 +326,6 @@ public final class Transform extends Filter {
         private final Object LOCK = new Object();
 
         private SAXTransformerFactory tfac_ = null;
-        private CachingResolver resolver_ = null;
 
         public Transformer newTransformer() throws TransformerConfigurationException {
             Templates compiledStylesheet = getCompiledStylesheet();
@@ -361,16 +360,13 @@ public final class Transform extends Filter {
         }
 
         private Templates compileStylesheet(URI styleURI) {
-            String styleSystemID = styleURI.toString();
+            String styleSystemID = styleURI.normalize(). toString();
             logger().log(Transform.this,
                 "Compiling stylesheet: " + styleSystemID, Level.VERBOSE);
             synchronized (LOCK) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 if (usesCache_) {
-                    resolver_ = new CachingResolver(
-                        r -> logger().log(Transform.this, "Caching " + r, Level.DEBUG),
-                        r -> logger().log(Transform.this, "Reusing " + r, Level.DEBUG));
-                    tfac_.setURIResolver(resolver_);
+                    tfac_.setURIResolver(newURIResolver());
                 }
                 try {
                     return tfac_.newTemplates(new StreamSource(styleSystemID));
@@ -387,8 +383,14 @@ public final class Transform extends Filter {
                 transformer.setParameter(param.getKey(), param.getValue());
             }
             if (usesCache_) {
-                transformer.setURIResolver(resolver_);
+                transformer.setURIResolver(newURIResolver());
             }
+        }
+
+        private CachingResolver newURIResolver() {
+            return new CachingResolver(
+                r -> logger().log(Transform.this, "Caching " + r, Level.DEBUG),
+                r -> logger().log(Transform.this, "Reusing " + r, Level.DEBUG));
         }
     }
 }
