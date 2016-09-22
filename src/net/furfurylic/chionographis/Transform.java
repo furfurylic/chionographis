@@ -360,7 +360,7 @@ public final class Transform extends Filter {
         }
 
         private Templates compileStylesheet(URI styleURI) {
-            String styleSystemID = styleURI.normalize(). toString();
+            String styleSystemID = styleURI.toString();
             logger().log(Transform.this,
                 "Compiling stylesheet: " + styleSystemID, Level.VERBOSE);
             synchronized (LOCK) {
