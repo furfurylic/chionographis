@@ -1,3 +1,16 @@
+Changes for 1.1.0:
+
+ * Added "timid" attribute to Output sink which can inhibit unnecessary
+   touching.
+ * Made Transform filter accept not only the URI but also the file paths of
+   the stylesheet.
+ * Added Main class which gives version information.
+ * Added "dry run" mode.
+ * Made Ant properties in <param>'s contents able to be expanded.
+ * Added "failOnNonfatalError" and "failOnError" attributes to the task.
+ * Made multiple <meta>s with identical names, or targets of processing
+   instructions, accepted.
+
 Changes for 1.0.2:
 
  * Fixed a fatal bug by which existing files were not truncated prior to 
