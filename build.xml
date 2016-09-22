@@ -84,6 +84,7 @@
         javadoc.setDoctitle("Chionographis API");
         javadoc.setHeader("Chionographis API");
       }
+      javadoc.setUse(true);
       javadoc.perform();
     ]]></script>
   </target>
