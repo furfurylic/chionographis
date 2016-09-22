@@ -102,7 +102,7 @@ public final class All extends Filter {
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
                 if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
                     logger().log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
-                    throw new FatalityException();
+                    throw new BuildException();
                 }
                 String localName = root_.substring(indexOfColon + 1);
                 rootQ_ = new QName(namespaceURI, localName, prefix);

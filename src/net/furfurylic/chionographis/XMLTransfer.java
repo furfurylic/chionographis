@@ -99,10 +99,10 @@ final class XMLTransfer {
      * @param result
      *      a TrAX {@code Result} object, which must not be {@code null}.
      *
-     * @throws FatalityException
-     *      if a serious configuration problem occurs.
-     * @throws BuildException
+     * @throws NonfatalBuildException
      *      if a recoverable error occurs.
+     * @throws BuildException
+     *      if a serious configuration problem occurs.
      */
     public void transfer(Source source, Result result) {
         try {
@@ -138,9 +138,9 @@ final class XMLTransfer {
             identity_.get().get().transform(source, result);
 
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
-            throw new FatalityException(e);
-        } catch (IOException | SAXException | TransformerException e) {
             throw new BuildException(e);
+        } catch (IOException | SAXException | TransformerException e) {
+            throw new NonfatalBuildException(e);
         }
     }
 
@@ -160,10 +160,10 @@ final class XMLTransfer {
      * @param adopts
      *      {@code true} if nodes are moved; {@code false} otherwise, that is, they are copied.
      *
-     * @throws FatalityException
-     *      if a serious configuration problem occurs.
-     * @throws BuildException
+     * @throws NonfatalBuildException
      *      if a recoverable error occurs.
+     * @throws BuildException
+     *      if a serious configuration problem occurs.
      */
     public void transfer(DOMSource source, Result result, boolean adopts) {
         if (result instanceof DOMResult) {
@@ -183,7 +183,7 @@ final class XMLTransfer {
             try {
                 identity_.get().get().transform(source, result);
             } catch (TransformerException e) {
-                throw new BuildException(e);
+                throw new NonfatalBuildException(e);
             }
         }
     }
@@ -197,16 +197,16 @@ final class XMLTransfer {
      * @return
      *      the resulted DOM document.
      *
-     * @throws FatalityException
-     *      if a serious configuration problem occurs.
-     * @throws BuildException
+     * @throws NonfatalBuildException
      *      if a recoverable error occurs.
+     * @throws BuildException
+     *      if a serious configuration problem occurs.
      */
     public Document parse(StreamSource source) {
         try {
             return builder_.get().get().parse(SAXSource.sourceToInputSource(source));
         } catch (IOException | SAXException e) {
-            throw new BuildException(e);
+            throw new NonfatalBuildException(e);
         }
     }
 
@@ -216,7 +216,7 @@ final class XMLTransfer {
      * @return
      *      the resulted DOM document.
      *
-     * @throws FatalityException
+     * @throws BuildException
      *      if a serious configuration problem occurs.
      */
     public Document newDocument() {
@@ -252,7 +252,8 @@ final class XMLTransfer {
         }
     }
 
-    private void transferSAX2SAX(SAXSource saxSource, SAXResult saxResult) throws SAXException, IOException {
+    private void transferSAX2SAX(SAXSource saxSource, SAXResult saxResult)
+            throws SAXException, IOException {
         fillUpSAXSource(saxSource);
         setHandlers(saxSource.getXMLReader(), saxResult);
         saxSource.getXMLReader().parse(saxSource.getInputSource());
@@ -303,7 +304,7 @@ final class XMLTransfer {
                     pfac.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
                     return pfac.newSAXParser();
                 } catch (ParserConfigurationException | SAXException e) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             },
             p -> {
@@ -315,13 +316,14 @@ final class XMLTransfer {
                     }
                     return xmlReader;
                 } catch (SAXException e) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             });
         return reader;
     }
 
-    private static Supplier<DocumentBuilder> createDocumentBuilderSupplier(EntityResolver resolver) {
+    private static Supplier<DocumentBuilder> createDocumentBuilderSupplier(
+            EntityResolver resolver) {
         Supplier<DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
             () -> {
                 try {
@@ -329,7 +331,7 @@ final class XMLTransfer {
                     dbfac.setNamespaceAware(true);
                     return dbfac.newDocumentBuilder();
                 } catch (ParserConfigurationException e) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             },
             b -> {
@@ -349,7 +351,7 @@ final class XMLTransfer {
                     TransformerFactory tfac = TransformerFactory.newInstance();
                     return tfac.newTransformer();
                 } catch (TransformerConfigurationException e) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             },
             t -> {

@@ -155,20 +155,22 @@ final class ChionographisWorker {
 
             try {
                 xfer_.transfer(source, result);
-            } catch (BuildException e) {
+            } catch (NonfatalBuildException e) {
                 logger_.log(null, "Aborting processing " + systemID, Level.WARN);
                 if (!failOnNonfatalError_) {
                     logCause(e);
                 }
                 try {
                     sink_.abortOne(result);
-                } catch (FatalityException ex) {
+                } catch (NonfatalBuildException ex) {
+                    throw new BuildException(ex);
+                } catch (BuildException ex) {
                     throw ex;
                 } catch (Exception ex) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
                 if (failOnNonfatalError_) {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 } else {
                     return 0;
                 }
@@ -180,15 +182,16 @@ final class ChionographisWorker {
             sink_.finishOne(result);
             return 1;
 
-        } catch (FatalityException e) {
-            throw e;
         } catch (Exception e) {
+            if ((e instanceof BuildException) && !(e instanceof NonfatalBuildException)) {
+                throw (BuildException) e;
+            }
             logger_.log(null, "Failed to process " + systemID, Level.WARN);
             if (failOnNonfatalError_) {
                 if (e instanceof RuntimeException) {
                     throw (RuntimeException) e;
                 } else {
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             } else {
                 logCause(e);
@@ -198,8 +201,8 @@ final class ChionographisWorker {
     }
 
     private void logCause(Exception e) {
-        if (!(e instanceof ChionographisBuildException) ||
-            !((ChionographisBuildException) e).isLoggedAlready()) {
+        if (!(e instanceof NonfatalBuildException) ||
+            !((NonfatalBuildException) e).isLogged()) {
             logger_.log(null, e, "  Cause: " + e, Level.INFO, Level.VERBOSE);
         }
     }

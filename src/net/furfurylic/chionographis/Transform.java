@@ -166,7 +166,7 @@ public final class Transform extends Filter {
             k -> {
                 logger().log(this,
                     "Stylesheet parameter named " + k + " added twice", Level.ERR);
-                throw new ChionographisBuildException(true);
+                throw new BuildException();
             });
     }
 
@@ -252,7 +252,7 @@ public final class Transform extends Filter {
                 }
             }
         } catch (TransformerConfigurationException e) {
-            throw new FatalityException(e);
+            throw new BuildException(e);
         }
     }
 
@@ -377,7 +377,7 @@ public final class Transform extends Filter {
                 } catch (TransformerConfigurationException e) {
                     logger().log(Transform.this,
                         "Failed to compile stylesheet: " + styleSystemID, Level.ERR);
-                    throw new FatalityException(e);
+                    throw new BuildException(e);
                 }
             }
         }
