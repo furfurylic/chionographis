@@ -132,7 +132,7 @@ abstract class Filter extends Sink implements Driver {
             boolean force, boolean dryRun) {
         if (sinks_.isEmpty()) {
             logger_.log(this, "No sinks configured", Level.ERR);
-            throw new FatalityException();
+            throw new BuildException();
         }
         force_ = force_ || force;
         doInit(baseDir, namespaceContext, dryRun);

@@ -339,7 +339,7 @@ final class Sinks extends Sink/* implements Logger*/ {
                 IntStream.range(0, sinks.size())
                          .mapToObj(i -> abortSinkSilent(sinks.get(i), results_.get(i)))
                          .filter(e -> e != null)
-                         .reduce((e1, e2) -> (e2 instanceof FatalityException) ? e2 : e1);
+                         .reduce((e1, e2) -> (e2 instanceof NonfatalBuildException) ? e1 : e2);
             if (ex.isPresent()) {
                 throw ex.get();
             }
@@ -503,7 +503,7 @@ final class Sinks extends Sink/* implements Logger*/ {
                 return new CompositeSAXResult(
                     new CompositeHandler(contentHandlers, lexicalHandlers), results_);
             } catch (TransformerConfigurationException e) {
-                throw new FatalityException(e);
+                throw new BuildException(e);
             }
         }
 

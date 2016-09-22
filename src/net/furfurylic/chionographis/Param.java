@@ -123,7 +123,7 @@ public final class Param {
      *      The key is the parameter name in {@code localName} or {@code {namespaceURI}localName}
      *      form, and the value is the parameter value.
      *
-     * @throws FatalityException
+     * @throws BuildException
      *      if the {@linkplain #setName(String) name} is not set
      *      or has an unbound namespace prefix.
      */
@@ -131,7 +131,7 @@ public final class Param {
         if (name_ == null) {
             String message = "Incomplete stylesheet parameter found: value=" + value_;
             logger_.log(this, message, Level.ERR);
-            throw new FatalityException();
+            throw new BuildException();
         }
         Object value = (value_ == null) ? "" : value_;
 
@@ -143,7 +143,7 @@ public final class Param {
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
                 if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
                     logger_.log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
-                    throw new FatalityException();
+                    throw new BuildException();
                 }
                 String localName = name.substring(indexOfColon + 1);
                 name = '{' + namespaceURI + '}' + localName;
