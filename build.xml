@@ -1,12 +1,22 @@
-<project name="chionographis" default="classes">
+<project name="chionographis" default="jar">
 
-  <target name="release" depends="classes,api-docs,users-guide">
-    <zip destfile="release/doc/api.zip" basedir="release/doc/api" level="9"/>
-    <delete dir="release/classes"/>
-    <delete dir="release/doc/api"/>
+  <target name="release" depends="jar,api-docs,users-guide">
+    <delete dir="release/notices"/>
+    <mkdir dir="release/notices"/>
+    <copy file="LICENSE" todir="release/notices"/>
+    <copy file="CHANGES" todir="release/notices"/>
+    <condition property="archive.name"
+        value="chionographis-${rev.number}.zip" else="chionographis.zip">
+        <equals arg1="${rev.base}" arg2="${rev.number}"/>
+    </condition>
+    <zip destfile="release/artifact/${archive.name}"
+      basedir="release" includes="doc/**, notices/**, chionographis.jar" level="9"/>
+    <delete dir="release/notices"/>
   </target>
 
-  <target name="classes" depends="-compile,-archive"/>
+  <target name="jar" depends="-compile,-archive">
+    <delete dir="release/classes"/>
+  </target>
 
   <target name="-compile">
     <delete dir="release/classes"/>
@@ -17,8 +27,6 @@
   </target>
 
   <target name="-archive" depends="-rev">
-    <delete dir="release/lib"/>
-    <mkdir dir="release/lib"/>
     <script language="javascript"><![CDATA[
       manifest = new org.apache.tools.ant.taskdefs.Manifest();
       manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
@@ -42,7 +50,7 @@
       }
 
       jar = project.createTask("jar");
-      jar.setDestFile(new java.io.File(project.getBaseDir(), "release/lib/chionographis.jar"));
+      jar.setDestFile(new java.io.File(project.getBaseDir(), "release/chionographis.jar"));
       jar.setBasedir(new java.io.File(project.getBaseDir(), "release/classes"));
       jar.setIncludes("**/*");
       jar.setUpdate(false);
@@ -58,35 +66,24 @@
     <delete dir="release/doc/api"/>
     <mkdir dir="release/doc/api"/>
     <script language="javascript"><![CDATA[
-      javadoc = project.createTask("javadoc");
-      javadoc.setLocale("en");
-      javadoc.setPackagenames("net.furfurylic.chionographis.*");
-      javadoc.setSourcepath(new org.apache.tools.ant.types.Path(project, "src"));
-      javadoc.setDestdir(new java.io.File(project.getBaseDir(), "release/doc/api"));
-      javadoc.setEncoding("UTF-8");
-      javadoc.setDocencoding("UTF-8");
-      javadoc.setCharset("UTF-8");
-      javadoc.setClasspath(new org.apache.tools.ant.types.Path(
-        project, project.getProperty("ant.home") + "/lib/ant.jar"));
-
       number = project.getProperty("rev.number");
       spec = project.getProperty("rev.spec");
       if (spec != null) {
-        javadoc.setWindowtitle("Chionographis API version " + spec + " (" + number + ")");
-        javadoc.setDoctitle("Chionographis API v" + spec);
-        javadoc.setHeader("Chionographis API v" + spec);
+        project.setNewProperty("doc.api.title",
+          "Chionographis API version " + spec + " (" + number + ")");
+        project.setNewProperty("doc.api.header", "Chionographis API v" + spec);
       } else {
-        if (number != null) {
-          javadoc.setWindowtitle("Chionographis API (version " + number + ")");
-        } else {
-          javadoc.setWindowtitle("Chionographis API");
-        }
-        javadoc.setDoctitle("Chionographis API");
-        javadoc.setHeader("Chionographis API");
+        project.setNewProperty("doc.api.title",
+          (number != null) ?
+            "Chionographis API (version " + number + ")" :
+            "Chionographis API");
+        project.setNewProperty("doc.api.header", "Chionographis API");
       }
-      javadoc.setUse(true);
-      javadoc.perform();
     ]]></script>
+    <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
+      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
+      charset="UTF-8" classpath="${ant.home}/lib/ant.jar" use="yes"
+      windowtitle="${doc.api.title}" doctitle="${doc.api.header}" header="${doc.api.header}"/>
   </target>
 
   <target name="-rev" depends="-git-check,-rev-git"/>
@@ -156,10 +153,10 @@
     <mkdir dir="devel/doc/api"/>
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
       sourcepath="src" destdir="devel/doc/api" encoding="UTF-8" docencoding="UTF-8"
+      classpath="${ant.home}/lib/ant.jar" access="package" use="yes"
       charset="UTF-8" windowtitle="Chionographis API for developers"
       doctitle="Chionographis API for developers"
-      header="Chionographis API for developers"
-      classpath="${ant.home}/lib/ant.jar" access="package" use="yes"/>
+      header="Chionographis API for developers"/>
   </target>
 
 </project>
