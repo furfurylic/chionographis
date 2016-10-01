@@ -121,12 +121,17 @@ final class XMLTransfer {
             } else if (source instanceof StreamSource) {
                 if (result instanceof SAXResult) {
                     InputSource input = SAXSource.sourceToInputSource(source);
-                    transferSAX2SAX(new SAXSource(input), (SAXResult) result);
+                    SAXSource saxSource = new SAXSource(input);
+                    if (saxSource.getSystemId() == null) {
+                        saxSource.setSystemId(source.getSystemId());
+                    }
+                    transferSAX2SAX(saxSource, (SAXResult) result);
                     return;
                 } else if (result instanceof DOMResult){
                     InputSource input = SAXSource.sourceToInputSource(source);
                     Document document = builder_.get().get().parse(input);
-                    transferDOM2DOM(new DOMSource(document), (DOMResult) result, true);
+                    transferDOM2DOM(new DOMSource(document, source.getSystemId()),
+                        (DOMResult) result, true);
                     return;
                 } else {
                     // Fall through
@@ -136,6 +141,7 @@ final class XMLTransfer {
             }
 
             identity_.get().get().transform(source, result);
+            copySystemID(source, result);
 
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
             throw new BuildException(e);
@@ -169,7 +175,9 @@ final class XMLTransfer {
         if (result instanceof DOMResult) {
             transferDOM2DOM(source, (DOMResult) result, adopts);
             return;
-        } else if (result instanceof StreamResult) {
+        }
+
+        if (result instanceof StreamResult) {
             StreamResult streamResult = (StreamResult) result;
             DOMImplementationLS ls =
                 (DOMImplementationLS) builder_.get().get().getDOMImplementation();
@@ -178,7 +186,6 @@ final class XMLTransfer {
             output.setCharacterStream(streamResult.getWriter());
             output.setSystemId(streamResult.getSystemId());
             ls.createLSSerializer().write(source.getNode(), output);
-            return;
         } else {
             try {
                 identity_.get().get().transform(source, result);
@@ -186,6 +193,7 @@ final class XMLTransfer {
                 throw new NonfatalBuildException(e);
             }
         }
+        copySystemID(source, result);
     }
 
     /**
@@ -257,6 +265,7 @@ final class XMLTransfer {
         fillUpSAXSource(saxSource);
         setHandlers(saxSource.getXMLReader(), saxResult);
         saxSource.getXMLReader().parse(saxSource.getInputSource());
+        copySystemID(saxSource, saxResult);
     }
 
     private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts) {
@@ -264,6 +273,7 @@ final class XMLTransfer {
             if (adopts) {
                 result.setNode(source.getNode());
                 source.setNode(null);
+                copySystemID(source, result);
                 return;
             } else {
                 result.setNode(newDocument());
@@ -293,6 +303,17 @@ final class XMLTransfer {
         }
 
         assert result.getNode() != null;
+        copySystemID(source, result);
+    }
+
+    private static void copySystemID(Source source, Result result) {
+        if (result.getSystemId() == null) {
+            if (source.getSystemId() != null) {
+                result.setSystemId(source.getSystemId());
+            } else if (source instanceof SAXSource) {
+                result.setSystemId(((SAXSource) source).getInputSource().getSystemId());
+            }
+        }
     }
 
     private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {
