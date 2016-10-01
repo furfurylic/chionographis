@@ -61,15 +61,15 @@ public final class All extends Filter {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param expander
+     * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      * @param exceptionPoster
      *      an object which consumes exceptions occurred during the preparation process;
      *      which shall not be {@code null}.
      */
-    All(Logger logger, Function<String, String> expander,
+    All(Logger logger, Function<String, String> propertyExpander,
             Consumer<BuildException> exceptionPoster) {
-        super(logger, expander, exceptionPoster);
+        super(logger, propertyExpander, exceptionPoster);
     }
 
     /**

@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -49,7 +50,7 @@ public final class Output extends Sink {
     private Path destDir_ = null;
     private Path dest_ = null;
     private boolean mkDirs_ = true;
-    private String referent_ = null;
+    private String refer_ = null;
     private boolean force_ = false;
     private boolean timid_ = false;
     private boolean dryRun_ = false;
@@ -57,7 +58,13 @@ public final class Output extends Sink {
 
     private Logger logger_;
     private Consumer<BuildException> exceptionPoster_;
+
+    /**
+     * A mapper from the original source file names
+     * to the corresponding destination file paths.
+     */
     private Function<String, Set<Path>> destMapping_ = null;
+
     private List<XPathExpression> referents_;
 
     private AtomicInteger countInBundle_;
@@ -139,7 +146,7 @@ public final class Output extends Sink {
      * @see #add(FileNameMapper)
      */
     public void setRefer(String refer) {
-        referent_ = refer;
+        refer_ = refer;
     }
 
     /**
@@ -217,7 +224,7 @@ public final class Output extends Sink {
 
         if (dest_ != null) {
             // A predefined destination path exists.
-            if (referent_ != null) {
+            if (refer_ != null) {
                 logger_.log(this,
                     "\"dest\" and \"refer\" can be set exclusively", Level.ERR);
                 throw new BuildException();
@@ -229,16 +236,16 @@ public final class Output extends Sink {
             dest_ = destDir_.resolve(dest_);
             assert dest_.isAbsolute();
 
-        } else if (referent_ != null) {
+        } else if (refer_ != null) {
             // No predefined destination path exists
             // and specified to refer the source document contents.
             try {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext);
-                referents_ = Collections.singletonList(xpath.compile(referent_));
+                referents_ = Collections.singletonList(xpath.compile(refer_));
             } catch (XPathExpressionException e) {
                 logger_.log(this,
-                    "Failed to compile XPath expression: " + referent_, Level.ERR);
+                    "Failed to compile XPath expression: " + refer_, Level.ERR);
                 throw new BuildException(e);
             }
 
@@ -257,33 +264,51 @@ public final class Output extends Sink {
         }
 
         // Configure destMapping_.
-        destMapping_ = null;
         if (mapper_ != null) {
             // There is a mapper and the output path will be decided later using it.
-            destMapping_ = s -> {
-                if (s != null) {
-                    String[] mapped;
-                    synchronized (mapper_) {
-                        // Ant's FileNameMapper seems not to be thread safe.
-                        mapped = mapper_.mapFileName(s);
-                    }
-                    if (mapped != null) {
-                        return Arrays.stream(mapped)
-                                     .map(destDir_::resolve)
-                                     .collect(Collectors.toSet());
-                    }
-                }
-                return Collections.emptySet();
-            };
+            destMapping_ = new DestinationMapping(destDir_, mapper_);
         } else if (referents_.isEmpty()) {
             // There is no mapper and the output path has been already decided.
             assert dest_ != null;
             assert dest_.isAbsolute();
             destMapping_ = s -> Collections.singleton(dest_);
+        } else {
+            destMapping_ = null;
         }
 
         force_ = force_ || force;
         dryRun_ = dryRun;
+    }
+
+    private static class DestinationMapping implements Function<String, Set<Path>> {
+        private final ReentrantLock LOCK = new ReentrantLock();
+        private Path destDir_ = null;
+        private FileNameMapper mapper_ = null;
+
+        public DestinationMapping(Path destDir, FileNameMapper mapper) {
+            destDir_ = destDir;
+            mapper_ = mapper;
+        }
+
+        @Override
+        public Set<Path> apply(String orgSrcFileName) {
+            if (orgSrcFileName != null) {
+                String[] mapped;
+                // Ant's FileNameMapper seems not to be thread safe.
+                LOCK.lock();
+                try {
+                    mapped = mapper_.mapFileName(orgSrcFileName);
+                } finally {
+                    LOCK.unlock();
+                }
+                if (mapped != null) {
+                    return Arrays.stream(mapped)
+                                  .map(destDir_::resolve)
+                                  .collect(Collectors.toSet());
+                }
+            }
+            return Collections.emptySet();
+        }
     }
 
     @Override
@@ -322,11 +347,9 @@ public final class Output extends Sink {
             assert destMapping_ != null;
             dests = destMapping_.apply(origSrcFileName);
         } else if (!(referredContents.isEmpty() || (referredContents.get(0) == null))) {
-            if (destMapping_ != null) {
-                dests = destMapping_.apply(referredContents.get(0));
-            } else {
-                dests = Collections.singleton(destDir_.resolve(referredContents.get(0)));
-            }
+            dests = (destMapping_ != null) ?
+                destMapping_.apply(referredContents.get(0)) :
+                Collections.singleton(destDir_.resolve(referredContents.get(0)));
         }
         if (dests.isEmpty()) {
             logger_.log(this, "Cannot decide the output file path", Level.ERR);
@@ -349,15 +372,14 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOrigSrcNewer(
-            long originalSrcLastModifiedTime, Set<Path> dests) {
-        if (originalSrcLastModifiedTime <= 0) {
+    private static boolean isOrigSrcNewer(long origSrcLastModTime, Set<Path> dests) {
+        if (origSrcLastModTime <= 0) {
             return true;
         } else {
             return
                 dests.stream()
                      .anyMatch(f -> (!Files.exists(f)
-                                  || (f.toFile().lastModified() < originalSrcLastModifiedTime)));
+                                  || (f.toFile().lastModified() < origSrcLastModTime)));
         }
     }
 
@@ -401,7 +423,6 @@ public final class Output extends Sink {
                         }
                     }
                     logger_.log(this, "Creating " + absolute, Level.FINE);
-                    // We take advantage of FileChannel for its capability to be interrupted
                     try (FileChannel channel = FileChannel.open(absolute,
                             StandardOpenOption.WRITE, StandardOpenOption.CREATE,
                             StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -446,7 +467,7 @@ public final class Output extends Sink {
     @Override
     void abortOne(Result result) {
         placeBackBuffer(
-            (ExposingByteArrayOutputStream) ((OutputStreamResult) result).getOutputStream());
+            (ExposingByteArrayOutputStream) ((StreamResult) result).getOutputStream());
     }
 
     private void placeBackBuffer(ExposingByteArrayOutputStream buffer) {
@@ -469,8 +490,8 @@ public final class Output extends Sink {
         }
     }
 
+    /** An extension of StreamResult which has corresponding path information. */
     private static class OutputStreamResult extends StreamResult {
-
         Set<Path> destinations_;
 
         public OutputStreamResult(OutputStream outputStream, Set<Path> destinations) {
@@ -483,6 +504,7 @@ public final class Output extends Sink {
         }
     }
 
+    /** An extension of ByteArrayOutputStream which exposes its internal byte buffer. */
     private static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
 
         public byte[] buffer() {

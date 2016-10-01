@@ -33,7 +33,6 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
-import org.xml.sax.ContentHandler;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -66,15 +65,15 @@ public final class Transform extends Filter {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param expander
+     * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      * @param exceptionPoster
      *      an object which consumes exceptions occurred during the preparation process;
      *      which shall not be {@code null}.
      */
-    Transform(Logger logger, Function<String, String> expander,
+    Transform(Logger logger, Function<String, String> propertyExpander,
             Consumer<BuildException> exceptionPoster) {
-        super(logger, expander, exceptionPoster);
+        super(logger, propertyExpander, exceptionPoster);
     }
 
     /**
@@ -116,7 +115,7 @@ public final class Transform extends Filter {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(logger(), expander(), exceptionPoster());
+        Param param = new Param(logger(), propertyExpander(), exceptionPoster());
         params_.add(param);
         return param;
     }
@@ -213,46 +212,16 @@ public final class Transform extends Filter {
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
             long origSrcLastModTime, List<String> notUsed) {
-        try {
-            List<XPathExpression> referents = sink().referents();
-            long lastModified = ((origSrcLastModTime <= 0) || (lastModified_ <= 0)) ?
-                0 : Math.max(origSrcLastModTime, lastModified_);
-            if (!referents.isEmpty()) {
-                return new FinisherDOMResult(
-                    r -> {
-                        List<String> referredContents = Referral.extract(r.getNode(), referents);
-                        logger().log(this, "Referred source data: "
-                            + String.join(", ", referredContents), Level.DEBUG);
-                        Result openedResult =
-                            sink().startOne(origSrcIndex, origSrcFileName,
-                                lastModified, referredContents);
-                        if (openedResult != null) {
-                            try {
-                                stylesheet_.newTransformer()
-                                    .transform(new DOMSource(r.getNode()), openedResult);
-                            } catch (TransformerException e) {
-                                throw new BuildException(e);
-                            }
-                            sink().finishOne(openedResult);
-                        }
-                    },
-                    () -> {});
-            } else {
-                Result openedResult =
-                    sink().startOne(origSrcIndex, origSrcFileName,
-                        lastModified, Collections.emptyList());
-                if (openedResult != null) {
-                    TransformerHandler styler = stylesheet_.newTransformerHandler();
-                    styler.setResult(openedResult);
-                    return new FinisherSAXResult(styler,
-                        () -> sink().finishOne(openedResult),
-                        () -> sink().abortOne(openedResult));
-                } else {
-                    return null;
-                }
-            }
-        } catch (TransformerConfigurationException e) {
-            throw new BuildException(e);
+        List<XPathExpression> referents = sink().referents();
+        long lastModified = ((origSrcLastModTime <= 0) || (lastModified_ <= 0)) ?
+            0 : Math.max(origSrcLastModTime, lastModified_);
+        if (!referents.isEmpty()) {
+            return new FinisherDOMResult(origSrcIndex, origSrcFileName, lastModified);
+        } else {
+            Result openedResult =
+                sink().startOne(origSrcIndex, origSrcFileName,
+                    lastModified, Collections.emptyList());
+            return (openedResult != null) ? new FinisherSAXResult(openedResult) : null;
         }
     }
 
@@ -280,69 +249,103 @@ public final class Transform extends Filter {
         void abort();
     }
 
-    private static class FinisherSAXResult extends SAXResult implements Finisher {
-        private Runnable finisher_;
-        private Runnable aborter_;
+    private class FinisherSAXResult extends SAXResult implements Finisher {
+        private Result openedResult_;
 
-        public FinisherSAXResult(ContentHandler handler, Runnable finisher, Runnable aborter) {
-            super(handler);
-            finisher_ = finisher;
-            aborter_ = aborter;
+        public FinisherSAXResult(Result openedResult) {
+            openedResult_ = openedResult;
+            TransformerHandler styler = stylesheet_.newTransformerHandler();
+            styler.setResult(openedResult_);
+            setHandler(styler);
         }
 
         @Override
         public void finish() {
-            finisher_.run();
+            sink().finishOne(openedResult_);
         }
 
         @Override
         public void abort() {
-            aborter_.run();
+            sink().abortOne(openedResult_);
         }
     }
 
-    private static class FinisherDOMResult extends DOMResult implements Finisher {
-        private Consumer<DOMResult> finisher_;
-        private Runnable aborter_;
+    private class FinisherDOMResult extends DOMResult implements Finisher {
+        private int origSrcIndex_;
+        private String origSrcFileName_;
+        private long lastModified_;
 
-        public FinisherDOMResult(Consumer<DOMResult> finisher, Runnable aborter) {
-            super();
-            finisher_ = finisher;
-            aborter_ = aborter;
+        public FinisherDOMResult(int origSrcIndex, String origSrcFileName, long lastModified) {
+            origSrcIndex_ = origSrcIndex;
+            origSrcFileName_ = origSrcFileName;
+            lastModified_ = lastModified;
         }
 
         @Override
         public void finish() {
-            finisher_.accept(this);
+            List<String> referredContents = Referral.extract(getNode(), sink().referents());
+            logger().log(Transform.this, "Referred source data: "
+                + String.join(", ", referredContents), Level.DEBUG);
+            Result openedResult =
+                sink().startOne(origSrcIndex_, origSrcFileName_,
+                    lastModified_, referredContents);
+            if (openedResult != null) {
+                try {
+                    stylesheet_.newTransformer()
+                        .transform(new DOMSource(getNode()), openedResult);
+                } catch (TransformerException e) {
+                    throw new BuildException(e);
+                }
+                sink().finishOne(openedResult);
+            }
         }
 
         @Override
         public void abort() {
-            aborter_.run();
         }
     }
 
+    /** Represents a compiled XSLT stylesheet. */
     private class Stylesheet {
         private final Object LOCK = new Object();
 
         private SAXTransformerFactory tfac_ = null;
 
-        public Transformer newTransformer() throws TransformerConfigurationException {
+        /**
+         * Creates a transformer and configure it in terms of parameters and URI resolvers.
+         *
+         * @return
+         *      the transformer.
+         */
+        public Transformer newTransformer() {
             Templates compiledStylesheet = getCompiledStylesheet();
-            Transformer transformer = compiledStylesheet.newTransformer();
-            configureTransformer(transformer);
-            return transformer;
+            try {
+                Transformer transformer = compiledStylesheet.newTransformer();
+                configureTransformer(transformer);
+                return transformer;
+            } catch (TransformerConfigurationException e) {
+                throw new BuildException(e);
+            }
         }
 
-        public TransformerHandler newTransformerHandler()
-                throws TransformerConfigurationException {
-            Templates compiledStylesheet = getCompiledStylesheet();
+        /**
+         * Creates a transformer handler and configure it
+         * in terms of parameters and URI resolvers.
+         *
+         * @return
+         *      the transformer handler.
+         */
+        public TransformerHandler newTransformerHandler() {
             TransformerHandler styler;
             synchronized (LOCK) {
                 if (tfac_ == null) {
                     tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
                 }
-                styler = tfac_.newTransformerHandler(compiledStylesheet);
+                try {
+                    styler = tfac_.newTransformerHandler(getCompiledStylesheet());
+                } catch (TransformerConfigurationException e) {
+                    throw new BuildException(e);
+                }
             }
             configureTransformer(styler.getTransformer());
             return styler;

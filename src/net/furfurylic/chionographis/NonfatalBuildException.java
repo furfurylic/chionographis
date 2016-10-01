@@ -47,7 +47,7 @@ class NonfatalBuildException extends BuildException {
      * Sets the flag of whether the cause exception of this exception is reported already to
      * {@code true}.
      *
-     * <p>This flag cannot be set to {@false} once it has been set to {@code true}.</p>
+     * <p>This flag cannot be set to {@code false} once it has been set to {@code true}.</p>
      *
      * @return
      *      {@code this}
