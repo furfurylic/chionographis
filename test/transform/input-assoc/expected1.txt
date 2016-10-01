@@ -1,0 +1,1 @@
+<xml-stylesheet=href="styles/flatten.xsl" type="text/xsl">[input1:]
