@@ -203,6 +203,7 @@ generates output XML documents one per one input document and pass them to sinks
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
+|assoc|A narrowing information of the search of the associated stylesheet.| No; at most one can be specified.
 |param|A key-value pair of stylesheet parameter. As of now, only string parameter values are supported.| No
 |depends|Resources depended by this filter additionally. The resources are used only to decide whether the corresponding output files are up to date. +
 The way to configure this element is the same as that to configure one that appears in _Chionographis_ driver. So please see the _Chionographis_ driver's explanation for details.| No
@@ -212,6 +213,18 @@ The way to configure this element is the same as that to configure one that appe
 |output|An _Output_ sink.
 |=================
 
+[NOTE]
+_style_ and _assoc_ can be specified exclusively.
+
+===== Assoc element's attributes
+
+[options="header", cols="1,3,1"]
+|=================
+| Attribute | Description | Required
+|media|The media for which the referenced stylesheet applies. | No
+|title|The title of the referenced stylesheet in a stylesheet set. | No
+|charset|An advisory character encoding for the referenced stylesheet. | No
+|=================
 
 ===== Param element's attributes / text content
 
