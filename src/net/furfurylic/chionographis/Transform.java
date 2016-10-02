@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -54,6 +55,7 @@ public final class Transform extends Filter {
 
     private String style_ = null;
     private boolean usesCache_ = true;
+    private Optional<Assoc> assoc_ = Optional.empty();
     private Assemblage<Param> params_ = new Assemblage<>();
     private Depends depends_ = null;
 
@@ -92,7 +94,14 @@ public final class Transform extends Filter {
      *      the URI or the file path of the XSLT stylesheet.
      */
     public void setStyle(String style) {
-        style_ = style;
+        if (assoc_.isPresent()) {
+            logger().log(this,
+                "Stylesheet URI and stylesheet association must be specified exclisively",
+                Level.ERR);
+            exceptionPoster().accept(new BuildException());
+        } else {
+            style_ = style;
+        }
     }
 
     /**
@@ -112,6 +121,34 @@ public final class Transform extends Filter {
      */
     public void setCache(boolean cache) {
         usesCache_ = cache;
+    }
+
+    /**
+     * Adds a narrowing information of the search of the associated stylesheet.
+     *
+     * <p>This information cannot be specified
+     * when {@linkplain #setStyle(String) the URI of the stylesheet is explicitly specified}.</p>
+     *
+     * @return
+     *      a narrowing information of the search of the associated stylesheet.
+     *
+     * @since 1.2
+     */
+    public Assoc createAssoc() {
+        if (assoc_.isPresent()) {
+            logger().log(this, "Stylesheet association specified twice", Level.ERR);
+            exceptionPoster().accept(new BuildException());
+        } else if (style_ != null) {
+            // According to Ant's manual, setStyle must occur prior to createAssoc.
+            // But...
+            logger().log(this,
+                "Stylesheet URI and stylesheet association must be specified exclisively",
+                Level.ERR);
+            exceptionPoster().accept(new BuildException());
+            style_ = null;
+        }
+        assoc_ = Optional.of(new Assoc());
+        return assoc_.get();
     }
 
     /**
@@ -496,7 +533,11 @@ public final class Transform extends Filter {
     private Source getAssociatedStylesheet(Source source) {
         LOCK.lock();
         try {
-            return tfac_.getAssociatedStylesheet(source, null, null, null);
+            return tfac_.getAssociatedStylesheet(
+                source,
+                assoc_.map(Assoc::getMedia).orElse(null),
+                assoc_.map(Assoc::getTitle).orElse(null),
+                assoc_.map(Assoc::getCharset).orElse(null));
         } catch (TransformerConfigurationException e) {
             logger().log(this,
                 "Cannot get associated stylesheet information", Level.WARN);
