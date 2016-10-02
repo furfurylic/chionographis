@@ -34,7 +34,6 @@ public abstract class Sink {
 
     /**
      * Initializes this object. This method can be invoked once at most in one lifetime.
-     * This method shall not be called simultaneously by multiple threads on one object.
      *
      * @param baseDir
      *      the base directory of the {@linkplain Chionographis task},
