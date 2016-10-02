@@ -56,15 +56,15 @@ public final class Snip extends Filter {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param expander
+     * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      * @param exceptionPoster
      *      an object which consumes exceptions occurred during the preparation process;
      *      which shall not be {@code null}.
      */
-    Snip(Logger logger, Function<String, String> expander,
+    Snip(Logger logger, Function<String, String> propertyExpander,
             Consumer<BuildException> exceptionPoster) {
-        super(logger, expander, exceptionPoster);
+        super(logger, propertyExpander, exceptionPoster);
     }
 
     /**
@@ -115,7 +115,7 @@ public final class Snip extends Filter {
 
         // Apply XPath expression to current document
         logger().log(this, "Applying snipping criterion " + select_ +
-            "; the original source is " + r.originalSrcFileName(), Level.DEBUG);
+            "; the original source is " + r.origSrcFileName(), Level.DEBUG);
         NodeList nodes = extractNodes(r);
 
         int count;
@@ -143,7 +143,7 @@ public final class Snip extends Filter {
             logger().log(this, count + " snipped fragments processed", Level.DEBUG);
         } else {
             logger().log(this, "No snipped fragments generated; the original source is " +
-                    r.originalSrcFileName(), Level.INFO);
+                    r.origSrcFileName(), Level.INFO);
         }
     }
 
@@ -195,8 +195,8 @@ public final class Snip extends Filter {
         }
 
         // Open sink's result
-        Result rr = sink().startOne(result.originalSrcIndex(), result.originalSrcFileName(),
-            result.originalSrcLastModifiedTime(), referredContents);
+        Result rr = sink().startOne(result.origSrcIndex(), result.origSrcFileName(),
+            result.origSrcLastModTime(), referredContents);
         if (rr != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
@@ -230,15 +230,15 @@ public final class Snip extends Filter {
             origSrcLastModTime_ = origSrcLastModTime;
         }
 
-        public int originalSrcIndex() {
+        public int origSrcIndex() {
             return origSrcIndex_;
         }
 
-        public String originalSrcFileName() {
+        public String origSrcFileName() {
             return origSrcFileName_;
         }
 
-        public long originalSrcLastModifiedTime() {
+        public long origSrcLastModTime() {
             return origSrcLastModTime_;
         }
     }
