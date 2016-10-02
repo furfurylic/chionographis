@@ -48,19 +48,20 @@
     <antcall target="transform-error-stylesheet"/>
     <antcall target="transform-params"/>
     <antcall target="transform-params-ns"/>
+    <antcall target="transform-assoc"/>
     <antcall target="transform-error-params-bad-prefix"/>
     <antcall target="transform-error-params-no-name-no-value"/>
     <antcall target="transform-error-params-no-name"/>
     <antcall target="transform-error-params-empty-name"/>
     <antcall target="transform-error-params-added-twice"/>
     <antcall target="transform-error-params-value-format"/>
+    <antcall target="transform-error-style-and-assoc"/>
     <antcall target="transform-refer-content"/>
     <antcall target="transform-not-up-to-date"/>
     <antcall target="transform-not-up-to-date-at-start"/>
     <antcall target="transform-not-up-to-date-by-depends"/>
     <antcall target="transform-not-up-to-date-by-depends-new"/>
     <antcall target="transform-force"/>
-    <antcall target="transform-assoc"/>
     <antcall target="all"/>
     <antcall target="all-up-to-date"/>
     <antcall target="all-up-to-date-late"/>
@@ -1223,6 +1224,53 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="transform-assoc">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="assoc"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <mkdir dir="${dir.output}/styles"/>
+
+    <copy file="flatten.xsl" todir="${dir.output}/styles"/>
+    <copy file="${dir.input}/flatten2.xsl" todir="${dir.output}/styles"/>
+    <copy todir="${dir.output}">
+      <fileset dir="${dir.input}" includes="input*.xml"/>
+    </copy>
+    <copy file="${dir.output}/input2a.xml" tofile="${dir.output}/input2b.xml"/>
+
+    <touch file="${dir.output}/actual1.txt"  datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/actual2a.txt" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/>
+    <touch file="${dir.output}/styles/flatten.xsl"  datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/styles/flatten2.xsl" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/input1.xml"  datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/input2a.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/input2b.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
+      <transform cache="no">
+        <assoc media="screen" title="a" charset="UTF-8"/>
+        <param name="p">__</param>
+        <output destdir="${dir.output}">
+          <globmapper from="input*.xml" to="actual*.txt"/>
+        </output>
+      </transform>
+    </chionographis>
+
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
+    <assertfileeq name="${test.name} - 2a"
+      expected="${dir.input}/expected2a.txt" actual="${dir.output}/actual2a.txt"/>
+    <assertfilelastmodified name="${test.name} - 2b"
+      file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
   <target name="transform-error-params-bad-prefix">
     <property name="test.prefix" value="transform"/>
     <property name="test.title" value="error-params-bad-prefix"/>
@@ -1360,6 +1408,28 @@
     </chionographis>
 
     <assertfilenotexists name="${test.name}" file="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="transform-error-style-and-assoc">
+    <property name="test.prefix" value="transform"/>
+    <property name="test.title" value="error-style-and-assoc"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-assoc"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <chionographis basedir="${dir.input}" includes="input2a.xml" cache="no" failonerror="no">
+      <transform style="flatten2.xsl" cache="no">
+        <assoc media="screen" title="a" charset="UTF-8"/>
+        <output dest="${dir.output}/actual2a.txt"/>
+      </transform>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/actual2a.txt"/>
 
     <delete dir="${dir.output}"/>
   </target>
@@ -1554,51 +1624,6 @@
 
     <assertfileeq name="${test.name}"
       expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
-
-    <delete dir="${dir.output}"/>
-  </target>
-
-  <target name="transform-assoc">
-    <property name="test.prefix" value="transform"/>
-    <property name="test.title" value="assoc"/>
-    <property name="test.name" value="${test.prefix}-${test.title}"/>
-    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
-    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
-
-    <delete dir="${dir.output}"/>
-    <mkdir dir="${dir.output}"/>
-    <mkdir dir="${dir.output}/styles"/>
-
-    <copy file="flatten.xsl" todir="${dir.output}/styles"/>
-    <copy file="${dir.input}/flatten2.xsl" todir="${dir.output}/styles"/>
-    <copy todir="${dir.output}">
-      <fileset dir="${dir.input}" includes="input*.xml"/>
-    </copy>
-    <copy file="${dir.output}/input2a.xml" tofile="${dir.output}/input2b.xml"/>
-
-    <touch file="${dir.output}/actual1.txt"  datetime="01/01/2001 00:01:10 AM"/>
-    <touch file="${dir.output}/actual2a.txt" datetime="01/01/2001 00:01:10 AM"/>
-    <touch file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/>
-    <touch file="${dir.output}/styles/flatten.xsl"  datetime="01/01/2001 00:01:20 AM"/>
-    <touch file="${dir.output}/styles/flatten2.xsl" datetime="01/01/2001 00:01:20 AM"/>
-    <touch file="${dir.output}/input1.xml"  datetime="01/01/2001 00:01:20 AM"/>
-    <touch file="${dir.output}/input2a.xml" datetime="01/01/2001 00:01:20 AM"/>
-    <touch file="${dir.output}/input2b.xml" datetime="01/01/2001 00:01:20 AM"/>
-
-    <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
-      <transform cache="no">
-        <output destdir="${dir.output}">
-          <globmapper from="input*.xml" to="actual*.txt"/>
-        </output>
-      </transform>
-    </chionographis>
-
-    <assertfileeq name="${test.name} - 1"
-      expected="${dir.input}/expected1.txt" actual="${dir.output}/actual1.txt"/>
-    <assertfileeq name="${test.name} - 2a"
-      expected="${dir.input}/expected2a.txt" actual="${dir.output}/actual2a.txt"/>
-    <assertfilelastmodified name="${test.name} - 2b"
-      file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/>
 
     <delete dir="${dir.output}"/>
   </target>
