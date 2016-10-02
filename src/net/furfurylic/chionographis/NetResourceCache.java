@@ -108,7 +108,7 @@ final class NetResourceCache<T> {
                 }
                 strongOne.put(canonicalizedURI, cached);
             }
-            return cached.get();
+            return cached.orElse(null);
         }
     }
 
