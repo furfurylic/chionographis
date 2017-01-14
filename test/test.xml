@@ -1253,7 +1253,7 @@
 
     <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
       <transform cache="no">
-        <assoc media="screen" title="a" charset="UTF-8"/>
+        <assoc title="a" charset="UTF-8"/>
         <param name="p">__</param>
         <output destdir="${dir.output}">
           <globmapper from="input*.xml" to="actual*.txt"/>
