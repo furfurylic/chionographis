@@ -507,7 +507,10 @@ public final class Transform extends Filter {
 
         // If the system ID of the stylesheet is available,
         // we will compile it into a Template, otherwise we will compile it into a Transformer
-        if (styleSystemID != null) {
+        // (Some processors set the source's system ID itself to the associated stylesheet's
+        //  system ID, and this is very harmful to the caching behaviour,
+        //  so we evade caching then)
+        if ((styleSystemID != null) && !styleSystemID.equals(source.getSystemId())) {
             StylesheetLocation stylesheetLocation =
                 new StylesheetLocation(getAbsoluteURI_.apply(styleSystemID), depends_);
             return new AbstractMap.SimpleEntry<Long, Supplier<Transformer>>(
