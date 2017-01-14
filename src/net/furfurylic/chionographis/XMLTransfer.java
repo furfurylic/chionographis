@@ -24,6 +24,7 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.URIResolver;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
@@ -63,27 +64,45 @@ final class XMLTransfer {
     }
 
     /**
-     * Creates a new instance which uses the specified entity resolver.
+     * Creates a new instance which uses the specified resolvers.
      *
-     * @param resolver
+     * <p>If {@code entityResolver} is {@code null}, {@code uriResolver} is used
+     * as a SAX entity resolver provided that it implements {@code EntityResolver},
+     * and vice versa.</p>
+     *
+     * @param entityResolver
      *      a SAX entity resolver.
-     *      If {@code null} is specified, no special resolution of external entities are done.
+     *      If {@code null} is specified and {@code uriResolver} is not a SAX entity resolver,
+     *      no special resolution of external entities are done.
+     * @param uriResolver
+     *      a TrAX URI resolver.
+     *      If {@code null} is specified and {@code entityResolver} is not a TrAX URI resolver,
+     *      no special resolution of external sources are done.
      */
-    public XMLTransfer(EntityResolver resolver) {
-        reader_ = ThreadLocal.withInitial(() -> createXMLReaderSupplier(resolver));
-        builder_ = ThreadLocal.withInitial(() -> createDocumentBuilderSupplier(resolver));
-        identity_ = ThreadLocal.withInitial(() -> createIdentityTransformerSupplier());
+    public XMLTransfer(EntityResolver entityResolver, URIResolver uriResolver) {
+        EntityResolver usedEntityResolver =
+            ((entityResolver == null) && (uriResolver instanceof EntityResolver)) ?
+                ((EntityResolver) uriResolver) : entityResolver;
+        URIResolver usedURIResolver =
+            ((uriResolver == null) && (entityResolver instanceof URIResolver)) ?
+                ((URIResolver) entityResolver) : uriResolver;
+        reader_ = ThreadLocal.withInitial(
+            () -> createXMLReaderSupplier(usedEntityResolver));
+        builder_ = ThreadLocal.withInitial(
+            () -> createDocumentBuilderSupplier(usedEntityResolver));
+        identity_ = ThreadLocal.withInitial(
+            () -> createIdentityTransformerSupplier(usedURIResolver));
     }
 
     /**
-     * Identical to {@code XMLTransfer(null)}.
+     * Identical to {@code XMLTransfer(null, null)}.
      */
     public XMLTransfer() {
-        this(null);
+        this(null, null);
     }
 
     /**
-     * Sends a document from a source to a result. Note that this method is detstuctive
+     * Sends a document from a source to a result. Note that this method is destuctive
      * to the source.
      *
      * <p>If the source is a {@code SAXSource} object and the {@code XMLReader} is absent,
@@ -152,7 +171,7 @@ final class XMLTransfer {
 
     /**
      * Sends a document from a TrAX {@code DOMSource} to a {@code DOMResult}.
-     * Note that this method is detstuctive to the source.
+     * Note that this method is destuctive to the source.
      *
      * <p>If {@code adopts} is {@code true} and {@code result} is a {@code DOMResult} object,
      * this method removes away the child nodes of the {@code source}'s node,
@@ -288,7 +307,7 @@ final class XMLTransfer {
 
         Function<Node, Node> transferNode = adopts ?
             n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
-                    null : resultDocument.importNode(n, true) :
+                    null : resultDocument.adoptNode(n) :
             n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
                     null : resultDocument.importNode(n, true);
 
@@ -365,12 +384,16 @@ final class XMLTransfer {
         return builder;
     }
 
-    private static Supplier<Transformer> createIdentityTransformerSupplier() {
+    private static Supplier<Transformer> createIdentityTransformerSupplier(URIResolver resolver) {
         Supplier<Transformer> transformer = new One<Transformer, Transformer>(
             () -> {
                 try {
                     TransformerFactory tfac = TransformerFactory.newInstance();
-                    return tfac.newTransformer();
+                    Transformer transform = tfac.newTransformer();
+                    if (resolver != null) {
+                        transform.setURIResolver(resolver);
+                    }
+                    return transform;
                 } catch (TransformerConfigurationException e) {
                     throw new BuildException(e);
                 }
