@@ -60,7 +60,7 @@ final class Assemblage<T> {
      * Maps each element of this collection to a key-value pair to yield a map.
      *
      * <p>This method does not change the state of this object;
-     * that is, this method can be invoked mutiple times.</p>
+     * that is, this method can be invoked multiple times.</p>
      *
      * @param <K>
      *      the type of the keys of the map.
@@ -73,7 +73,7 @@ final class Assemblage<T> {
      *      a logger called just after an key-value pair is stored to the resulting map.
      * @param logTwice
      *      a logger called when duplicated keys are found.
-     *      It is receommended that this logger exits with an appropriate exception to signal
+     *      It is recommended that this logger exits with an appropriate exception to signal
      *      this error. This method will fail just after this logger normally returns, however.
      *
      * @return

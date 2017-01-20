@@ -12,6 +12,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.AbstractMap;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,7 @@ public final class Transform extends Filter {
     private boolean usesCache_ = true;
     private Optional<Assoc> assoc_ = Optional.empty();
     private Assemblage<Param> params_ = new Assemblage<>();
-    private Depends depends_ = null;
+    private Assemblage<Depends> depends_ = new Assemblage<>();
 
     private Function<String, URI> getAbsoluteURI_;
     private StylesheetLocation stylesheetLocation_;
@@ -173,8 +174,9 @@ public final class Transform extends Filter {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(logger(), exceptionPoster());
-        return depends_;
+        Depends depends = new Depends(logger(), exceptionPoster());
+        depends_.add(depends);
+        return depends;
     }
 
     /**
@@ -200,7 +202,8 @@ public final class Transform extends Filter {
 
         if (style_ != null) {
             getAbsoluteURI_ = null;
-            stylesheetLocation_ = new StylesheetLocation(getAbsoluteURI.apply(style_), depends_);
+            stylesheetLocation_ = new StylesheetLocation(
+                    getAbsoluteURI.apply(style_), depends_.getList());
         } else {
             getAbsoluteURI_ = getAbsoluteURI;
             stylesheetLocation_ = null;
@@ -377,25 +380,24 @@ public final class Transform extends Filter {
         private URI uri_;
         private long lastModified_;
 
-        public StylesheetLocation(URI uri, Depends depends) {
+        public StylesheetLocation(URI uri, Collection<Depends> allDepends) {
             uri_ = uri;
 
             if (uri_.getScheme().equalsIgnoreCase("file")) {
                 lastModified_ = new File(uri_).lastModified();
-                if (depends == null) {
+                if (lastModified_ <= 0) {
                     return;
                 }
-                if (lastModified_ > 0) {
+                for (Depends depends : allDepends) {
                     long dependsLastModified = depends.lastModified();
                     if (dependsLastModified != 0) {
                         lastModified_ = Math.max(lastModified_, dependsLastModified);
-                        return;
                     } else {
-                        // fall through: 0 means "unknown"
+                        lastModified_ = 0;  // 0 means "unknown" or "very new"
+                        break;
                     }
                 }
             }
-            lastModified_ = 0;  // "unknown" or "very new"
         }
 
         public URI uri() {
@@ -512,7 +514,7 @@ public final class Transform extends Filter {
         //  so we evade caching then)
         if ((styleSystemID != null) && !styleSystemID.equals(source.getSystemId())) {
             StylesheetLocation stylesheetLocation =
-                new StylesheetLocation(getAbsoluteURI_.apply(styleSystemID), depends_);
+                new StylesheetLocation(getAbsoluteURI_.apply(styleSystemID), depends_.getList());
             return new AbstractMap.SimpleEntry<Long, Supplier<Transformer>>(
                 stylesheetLocation.mixLastModified(lastModified),
                 () -> {
