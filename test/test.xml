@@ -1242,14 +1242,17 @@
     </copy>
     <copy file="${dir.output}/input2a.xml" tofile="${dir.output}/input2b.xml"/>
 
-    <touch file="${dir.output}/actual1.txt"  datetime="01/01/2001 00:01:10 AM"/>
-    <touch file="${dir.output}/actual2a.txt" datetime="01/01/2001 00:01:10 AM"/>
-    <touch file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/>
+    <touch file="${dir.output}/actual1.txt"  datetime="01/01/2001 00:01:10 AM"/> <!-- older -->
+    <touch file="${dir.output}/actual2a.txt" datetime="01/01/2001 00:01:10 AM"/> <!-- older -->
+    <touch file="${dir.output}/actual2b.txt" datetime="01/01/2001 00:01:30 AM"/> <!-- newer -->
     <touch file="${dir.output}/styles/flatten.xsl"  datetime="01/01/2001 00:01:20 AM"/>
     <touch file="${dir.output}/styles/flatten2.xsl" datetime="01/01/2001 00:01:20 AM"/>
     <touch file="${dir.output}/input1.xml"  datetime="01/01/2001 00:01:20 AM"/>
     <touch file="${dir.output}/input2a.xml" datetime="01/01/2001 00:01:20 AM"/>
     <touch file="${dir.output}/input2b.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <!-- input1.xml is associated to flatten.xsl,
+         and input2a.xml and input2b.xml is to flatten2.xsl with title 'a' -->
 
     <chionographis basedir="${dir.output}" includes="input*.xml" cache="no">
       <transform cache="no">

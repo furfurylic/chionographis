@@ -59,11 +59,11 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean dryRun_ = false;
     private boolean failOnError_ = true;
     private boolean failOnNonfatalError_ = false;
-    private Depends depends_ = null;
 
     private BuildException exsInPreparation_ = null;
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
+    private Assemblage<Depends> depends_ = new Assemblage<>();
 
     private Sinks sinks_ = null;
     private Logger logger_ = null;
@@ -269,8 +269,9 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty additional depended resource container object.
      */
     public Depends createDepends() {
-        depends_ = new Depends(logger_, exceptionPoster());
-        return depends_;
+        Depends depends = new Depends(logger_, exceptionPoster());
+        depends_.add(depends);
+        return depends;
     }
 
     /**
@@ -485,25 +486,37 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private long[] getLastModifiedTimes(URI[] uris) {
+        long dependsLastModified = getDependsLastModifiedTime();
         LongUnaryOperator mutateLastModified;
-        if (depends_ != null) {
-            long depends = depends_.lastModified();
-            if (depends == 0) {
-                // 0 means "unknown"
-                long[] zeroes = new long[uris.length];
-                Arrays.fill(zeroes, 0);
-                return zeroes;
-            } else {
-                mutateLastModified = l -> Math.max(l, depends);
-            }
-        } else {
+        if (dependsLastModified == 0) {
+            // 0 means "unknown"
+            long[] zeroes = new long[uris.length];
+            Arrays.fill(zeroes, 0);
+            return zeroes;
+        } else if (dependsLastModified == -1) {
             mutateLastModified = l -> l;
+        } else {
+            mutateLastModified = l -> Math.max(l, dependsLastModified);
         }
         return Stream.of(uris)
                       .map(File::new)
                       .mapToLong(File::lastModified)
                       .map(mutateLastModified)
                       .toArray();
+    }
+
+    private long getDependsLastModifiedTime() {
+        long dependsLastModified = -1;
+        for (Depends depends : depends_.getList()) {
+            long dependsLastModifiedOne = depends.lastModified();
+            if (dependsLastModifiedOne == 0) {
+                // 0 means "unknown"
+                return 0;
+            } else {
+                dependsLastModified = Math.max(dependsLastModifiedOne, dependsLastModified);
+            }
+        }
+        return dependsLastModified;
     }
 
     private EntityResolver createEntityResolver() {
