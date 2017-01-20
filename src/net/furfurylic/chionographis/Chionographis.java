@@ -461,17 +461,16 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private boolean isDryRun() {
-        boolean dryRun;
         String dryRunProperty = getProject().getProperty(
             getClass().getPackage().getName() + ".dry-run");
-        if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = true;
-        } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
-            dryRun = false;
-        } else {
-            dryRun = dryRun_;
+        if (dryRunProperty != null) {
+            if (String.valueOf(true).equalsIgnoreCase(dryRunProperty)) {
+                return true;
+            } else if (String.valueOf(false).equalsIgnoreCase(dryRunProperty)) {
+                return false;
+            } // else: fall through
         }
-        return dryRun;
+        return dryRun_;
     }
 
     private void setUpDirectories() {
