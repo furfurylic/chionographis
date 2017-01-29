@@ -7,13 +7,23 @@
 
 package net.furfurylic.chionographis;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
+import org.apache.tools.ant.types.resources.FileResource;
+import org.apache.tools.ant.types.selectors.AbstractSelectorContainer;
+import org.apache.tools.ant.types.selectors.FileSelector;
+import org.apache.tools.ant.util.FileUtils;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -27,7 +37,9 @@ import net.furfurylic.chionographis.Logger.Level;
  * {@code style-included.xsl}, then the filter shall refer both last modified times
  * and recognizes the latest one as its stylesheet's last modified time.</p>
  */
-public final class Depends {
+public final class Depends extends AbstractSelectorContainer {
+
+    private static final FileUtils FILE_UTILS = FileUtils.getFileUtils();
 
     private Logger logger_;
     private Consumer<BuildException> exceptionPoster_;
@@ -47,8 +59,13 @@ public final class Depends {
         IGNORE
     }
 
-    private ResourceCollection resources_ = null;
     private Absent absent_ = Absent.FAIL;
+    private Assemblage<ResourceCollection> resources_ = new Assemblage<>();
+    private File baseDir_;
+    private Assemblage<Depends> children_ = new Assemblage<>();
+
+    Depends() {
+    }
 
     Depends(Logger logger, Consumer<BuildException> exceptionPoster) {
         logger_ = logger;
@@ -68,8 +85,13 @@ public final class Depends {
         try {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
-            logger_.log(this, "Bad \"absent\" attribute value: " + absent, Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            String message = "Bad \"absent\" attribute value: " + absent;
+            if (logger_ != null) {
+                logger_.log(this, message, Level.ERR);
+                exceptionPoster_.accept(new BuildException());
+            } else {
+                throw new BuildException(message);
+            }
         }
     }
 
@@ -80,7 +102,29 @@ public final class Depends {
      *      the pointed resorces.
      */
     public void add(ResourceCollection resources) {
-        resources_ = resources;
+        resources_.add(resources);
+    }
+
+    /**
+     *
+     * @param baseDir
+     *
+     * @since 1.2
+     */
+    public void setBaseDir(File baseDir) {
+        baseDir_ = baseDir;
+    }
+
+    /**
+     *
+     * @return
+     *
+     * @since 1.2
+     */
+    public Depends createDepends() {
+        Depends depends = new Depends(logger_, exceptionPoster_);
+        children_.add(depends);
+        return depends;
     }
 
     /**
@@ -108,7 +152,7 @@ public final class Depends {
 
     private Iterator<Resource> iterator() {
         try {
-            return resources_.iterator();
+            return new SerialIterator<>(resources_.getList());
         } catch (BuildException e) {
             // FileSet.iterator() throws an exception when file="a/b/c" and a/b does not exist.
             return Collections.<Resource>emptyIterator();
@@ -148,6 +192,132 @@ public final class Depends {
         default:
             assert false;
             return 0;
+        }
+    }
+
+
+    NewerSourceFinder detach(File baseDir) {
+        if (isReference()) {
+            dieOnCircularReference();
+            Object o = getRefid().getReferencedObject();
+            if (o instanceof Depends) {
+                return ((Depends) o).detach(baseDir);
+            } else {
+                throw new BuildException(); // TODO: message?
+            }
+        }
+
+        // validate all selectors
+        validate();
+
+        // set up the base directory
+        File myBaseDir = (baseDir_ == null) ? baseDir : baseDir_;
+
+        Predicate<File> selector;
+        FileSelector[] selectors = getSelectors(getProject());
+        selector = (selectors.length > 0) ?
+            (File target) -> {
+                return selectors[0].isSelected(
+                    myBaseDir, FILE_UTILS.removeLeadingPath(myBaseDir, target), target);
+            } :
+            (File target) -> true;  // TODO: what if size > 1?
+
+        NewerSourceFinder detachedChild = NewerSourceFinder.combine(
+            children_.getList().stream()
+                               .map(x -> x.detach(baseDir))
+                               .collect(Collectors.toList()));
+
+        Iterable<Resource> sources = () -> new SerialIterator<Resource>(resources_.getList());
+        return new DetachedDepends(sources, selector, detachedChild, absent_, logger_);
+    }
+
+    private static class DetachedDepends implements NewerSourceFinder {
+        private Logger logger_;
+        private Absent absent_;
+
+        private Iterable<Resource> sources_;
+        private Predicate<File> selector_;
+        private NewerSourceFinder child_;
+
+        private List<File> sourceFiles_ = null;
+        private Resource newestSource_ = null;
+
+        public DetachedDepends(Iterable<Resource> sources, Predicate<File> selector,
+                NewerSourceFinder child, Absent absent, Logger logger) {
+            absent_ = absent;
+            logger_ = logger;
+            sources_ = sources;
+            selector_ = selector;
+            child_ = child;
+        }
+
+        @Override
+        public Resource findAnyNewerSource(
+                File file, long lastModified, NewerSourceFinder reentry) {
+            if (!selector_.test(file)) {
+                return null;
+            }
+            if (sourceFiles_ == null) {
+                sourceFiles_ = new ArrayList<>();
+                newestSource_ = null;
+                scanSources: for (Resource source : sources_) {
+                    if ((newestSource_ ==  null)
+                     || isAbsentOrNewer(source, newestSource_.getLastModified())) {
+                        if (newestSource_.getLastModified() == 0){
+                            switch (absent_) {
+                            case NEW:
+                            case FAIL:
+                                newestSource_ = source;
+                                break scanSources;
+                            case IGNORE:
+                                continue scanSources;
+                            default:
+                                assert(false);
+                                break;
+                            }
+                        }
+                    }
+                    if (source instanceof FileResource) {
+                        sourceFiles_.add(((FileResource) source).getFile());
+                    }
+                }
+            }
+            if ((newestSource_ != null)
+             && isAbsentOrNewer(newestSource_, lastModified)) {
+                if (newestSource_.getLastModified() == 0) {
+                    switch (absent_) {
+                    case IGNORE:
+                        break;
+                    case NEW:
+                        logger_.log(this,
+                            "Referred resource \"" + newestSource_ + "\" is missing to be regarded as new",
+                            Level.INFO);
+                        break;
+                    case FAIL:
+                        logger_.log(this,
+                            "Referred resource \"" + newestSource_ + "\" is missing", Level.ERR);
+                        throw new BuildException();
+                    default:
+                        assert false;
+                        break;
+                    }
+                }
+                return newestSource_;
+            }
+            Optional<Resource> newer =
+                sourceFiles_.stream()
+                            .map(s -> reentry.findAnyNewerSource(s, lastModified, reentry))
+                            .filter(f -> f != null)
+                            .findAny();
+            if (newer.isPresent()) {
+                return newer.get();
+            }
+            return child_.findAnyNewerSource(file, lastModified, reentry);
+        }
+
+        private boolean isAbsentOrNewer(Resource source, long lastModified) {
+            long l = source.getLastModified();
+            return (l <= 0) || (l > lastModified);
         }
     }
 }
