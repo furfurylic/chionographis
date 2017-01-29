@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -31,6 +32,7 @@ import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Node;
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
@@ -175,10 +177,10 @@ final class Sinks extends Sink/* implements Logger*/ {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
         includes_ = IntStream.range(0, sinks_.size())
             .mapToObj(i -> sinks_.get(i))
-            .map(s -> s.preexamineBundle(origSrcFileNames, origSrcLastModTimes))
+            .map(s -> s.preexamineBundle(origSrcFileNames, finders))
             .toArray(boolean[][]::new);
 
         boolean[] results = new boolean[includes_[0].length];
@@ -208,7 +210,7 @@ final class Sinks extends Sink/* implements Logger*/ {
 
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
-            long origSrcLastModTime, List<String> referredContents) {
+            LongFunction<Resource> finder, List<String> referredContents) {
         Assemblage<Sink> activeSinks = new Assemblage<>();
         CompositeResultBuilder builder = new CompositeResultBuilder();
         int j = 0;
@@ -228,7 +230,7 @@ final class Sinks extends Sink/* implements Logger*/ {
                 }
                 // Open the result of the sink.
                 Result result = sinks_.get(j).startOne(
-                    origSrcIndex, origSrcFileName, origSrcLastModTime, referredContentsOne);
+                    origSrcIndex, origSrcFileName, finder, referredContentsOne);
                 if (result != null) {
                     // First, we populate activeSinks.
                     activeSinks.add(sinks_.get(j));
