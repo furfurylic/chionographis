@@ -15,6 +15,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -31,6 +32,7 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -92,8 +94,8 @@ public final class Snip extends Filter {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
-        return sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
+    boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
+        return sink().preexamineBundle(origSrcFileNames, finders);
     }
 
     @Override
@@ -103,8 +105,8 @@ public final class Snip extends Filter {
 
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
-            long origSrcLastModTime, List<String> notUsed) {
-        return new SnipDOMResult(origSrcIndex, origSrcFileName, origSrcLastModTime);
+            LongFunction<Resource> finder, List<String> notUsed) {
+        return new SnipDOMResult(origSrcIndex, origSrcFileName, finder);
     }
 
     @Override
@@ -196,7 +198,7 @@ public final class Snip extends Filter {
 
         // Open sink's result
         Result rr = sink().startOne(result.origSrcIndex(), result.origSrcFileName(),
-            result.origSrcLastModTime(), referredContents);
+            result.finder(), referredContents);
         if (rr != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
@@ -221,13 +223,13 @@ public final class Snip extends Filter {
     private static class SnipDOMResult extends DOMResult {
         private int origSrcIndex_;
         private String origSrcFileName_;
-        private long origSrcLastModTime_;
+        private LongFunction<Resource> finder_;
 
-        public SnipDOMResult(int origSrcIndex, String origSrcFileName, long origSrcLastModTime) {
+        public SnipDOMResult(int origSrcIndex, String origSrcFileName, LongFunction<Resource> finder) {
             super();
             origSrcIndex_ = origSrcIndex;
             origSrcFileName_ = origSrcFileName;
-            origSrcLastModTime_ = origSrcLastModTime;
+            finder_ = finder;
         }
 
         public int origSrcIndex() {
@@ -238,8 +240,8 @@ public final class Snip extends Filter {
             return origSrcFileName_;
         }
 
-        public long origSrcLastModTime() {
-            return origSrcLastModTime_;
+        public LongFunction<Resource> finder() {
+            return finder_;
         }
     }
 }

@@ -10,6 +10,12 @@ package net.furfurylic.chionographis;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * An iterator class whose objects serially iterate objects other iterators iterate.
+ *
+ * @param <E>
+ *      the type of iterated objects
+ */
 final class SerialIterator<E> implements Iterator<E> {
 
     private Iterator<? extends E> currentIterator_;
@@ -59,9 +65,14 @@ final class SerialIterator<E> implements Iterator<E> {
         while (i_.hasNext()) {
             Iterable<? extends E> collection = i_.next();
             if (collection != null) {
-                final Iterator<? extends E> it = collection.iterator();
-                if (it.hasNext()) {
-                    return it;
+                try {
+                    Iterator<? extends E> it = collection.iterator();
+                    if (it.hasNext()) {
+                        return it;
+                    }
+                } catch (RuntimeException e) {
+                    // FileSet.iterator() throws an exception
+                    // when file="a/b/c" and a/b does not exist.
                 }
             }
         }

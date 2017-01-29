@@ -21,7 +21,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
@@ -41,6 +44,8 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
+import org.apache.tools.ant.types.resources.URLResource;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -224,13 +229,13 @@ public final class Transform extends Filter {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
         if ((!isForce()) && (stylesheetLocation_ != null)) {
-            long[] lastModifiedTimes =
-                Arrays.stream(origSrcLastModTimes)
-                      .map(l -> stylesheetLocation_.mixLastModified(l))
-                      .toArray();
-            return sink().preexamineBundle(origSrcFileNames, lastModifiedTimes);
+            finders = finders.clone();
+            for (int i = 0; i < finders.length; ++i) {
+                finders[i] = stylesheetLocation_.mixFinder(finders[i]);
+            }
+            return sink().preexamineBundle(origSrcFileNames, finders);
         } else {
             boolean[] includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
@@ -245,19 +250,19 @@ public final class Transform extends Filter {
 
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
-            long origSrcLastModTime, List<String> notUsed) {
+            LongFunction<Resource> finder, List<String> notUsed) {
         List<XPathExpression> referents = sink().referents();
-        long lastModified = ((origSrcLastModTime <= 0) || (stylesheetLocation_ == null)) ?
-            // if stylesheet is not decided, use origSrcLastModTime only
-            Math.max(0, origSrcLastModTime) :
-            // otherwise use max of origSrcLastModTime and stylesheet's last mod
-            stylesheetLocation_.mixLastModified(origSrcLastModTime);
+        if (stylesheetLocation_ != null) {
+            // if stylesheet is decided, use max of origSrcLastModTime and stylesheet's last mod
+            finder = stylesheetLocation_.mixFinder(finder);
+        }   // otherwise use origSrcLastModTime only
+
         if (!referents.isEmpty() || (stylesheetLocation_ == null)) {
-            return new FinisherDOMResult(origSrcIndex, origSrcFileName, lastModified);
+            return new FinisherDOMResult(origSrcIndex, origSrcFileName, finder);
         } else {
             Result openedResult =
                 sink().startOne(origSrcIndex, origSrcFileName,
-                    lastModified, Collections.emptyList());
+                        finder, Collections.emptyList());
             return (openedResult != null) ? new FinisherSAXResult(openedResult) : null;
         }
     }
@@ -310,9 +315,9 @@ public final class Transform extends Filter {
     private class FinisherDOMResult extends DOMResult implements Finisher {
         private int origSrcIndex_;
         private String origSrcFileName_;
-        private long lastModified_;
+        private LongFunction<Resource> lastModified_;
 
-        public FinisherDOMResult(int origSrcIndex, String origSrcFileName, long lastModified) {
+        public FinisherDOMResult(int origSrcIndex, String origSrcFileName, LongFunction<Resource> lastModified) {
             origSrcIndex_ = origSrcIndex;
             origSrcFileName_ = origSrcFileName;
             lastModified_ = lastModified;
@@ -346,10 +351,10 @@ public final class Transform extends Filter {
                 } else {
                     // With a stylesheet associated with the source
                     DOMSource source = new DOMSource(getNode(), getSystemId());
-                    Map.Entry<Long, Supplier<Transformer>> assoc =
+                    Map.Entry<LongFunction<Resource>, Supplier<Transformer>> assoc =
                         extractAssociation(source, lastModified_);
                     openedResult = sink().startOne(origSrcIndex_, origSrcFileName_,
-                            assoc.getKey().longValue(), referredContents);
+                            assoc.getKey(), referredContents);
                     if (openedResult != null) {
                         assoc.getValue().get().transform(source, openedResult);
                     } else {
@@ -378,25 +383,17 @@ public final class Transform extends Filter {
 
     private static class StylesheetLocation {
         private URI uri_;
-        private long lastModified_;
+        private LongFunction<Resource> finder_;
 
         public StylesheetLocation(URI uri, Collection<Depends> allDepends) {
             uri_ = uri;
 
             if (uri_.getScheme().equalsIgnoreCase("file")) {
-                lastModified_ = new File(uri_).lastModified();
-                if (lastModified_ <= 0) {
-                    return;
-                }
-                for (Depends depends : allDepends) {
-                    long dependsLastModified = depends.lastModified();
-                    if (dependsLastModified != 0) {
-                        lastModified_ = Math.max(lastModified_, dependsLastModified);
-                    } else {
-                        lastModified_ = 0;  // 0 means "unknown" or "very new"
-                        break;
-                    }
-                }
+                finder_ = NewerSourceFinder.combine(
+                              allDepends.stream()
+                                        .map(d -> d.detach())
+                                        .collect(Collectors.toList()))
+                          .close(new File(uri_));
             }
         }
 
@@ -414,14 +411,13 @@ public final class Transform extends Filter {
          * @return
          *      0 if "unknown" (or "very new"), positive otherwise.
          */
-        public long mixLastModified(long otherLastModified) {
-            if (otherLastModified <= 0) {
-                return otherLastModified;
-            } else if (lastModified_ == 0) {
-                return 0;
-            } else {
-                return Math.max(otherLastModified, lastModified_);
-            }
+        public LongFunction<Resource> mixFinder(LongFunction<Resource> other) {
+            return (long lastModified) ->
+                Stream.of(finder_, other)
+                      .map(f -> f.apply(lastModified))
+                      .filter(f -> f != null)
+                      .findAny()
+                      .orElse(null);
         }
     }
 
@@ -487,8 +483,8 @@ public final class Transform extends Filter {
      * @throws NonfatalBuildException
      *      when no associated stylesheet information found.
      */
-    private Map.Entry<Long, Supplier<Transformer>> extractAssociation(
-            Source source, long lastModified) {
+    private Map.Entry<LongFunction<Resource>, Supplier<Transformer>> extractAssociation(
+            Source source, LongFunction<Resource> lastModified) {
         prepareTransformerFactory();
 
         // Get Source object of the stylesheet
@@ -500,12 +496,9 @@ public final class Transform extends Filter {
         }
 
         // Get the system ID of the stylesheet
-        String styleSystemID = null;
-        if (styleSource instanceof SAXSource) {
-            styleSystemID = ((SAXSource) styleSource).getInputSource().getSystemId();
-        } else {
-            styleSystemID = styleSource.getSystemId();
-        }
+        String styleSystemID = (styleSource instanceof SAXSource) ?
+            ((SAXSource) styleSource).getInputSource().getSystemId() :
+            styleSource.getSystemId();
 
         // If the system ID of the stylesheet is available,
         // we will compile it into a Template, otherwise we will compile it into a Transformer
@@ -515,8 +508,8 @@ public final class Transform extends Filter {
         if ((styleSystemID != null) && !styleSystemID.equals(source.getSystemId())) {
             StylesheetLocation stylesheetLocation =
                 new StylesheetLocation(getAbsoluteURI_.apply(styleSystemID), depends_.getList());
-            return new AbstractMap.SimpleEntry<Long, Supplier<Transformer>>(
-                stylesheetLocation.mixLastModified(lastModified),
+            return new AbstractMap.SimpleEntry<LongFunction<Resource>, Supplier<Transformer>>(
+                stylesheetLocation.mixFinder(lastModified),
                 () -> {
                     try {
                         return configureTransformer(
@@ -527,8 +520,8 @@ public final class Transform extends Filter {
                     }
                 });
         } else {
-            return new AbstractMap.SimpleEntry<Long, Supplier<Transformer>>(
-                0L,
+            return new AbstractMap.SimpleEntry<LongFunction<Resource>, Supplier<Transformer>>(
+                (long l) -> new URLResource(styleSystemID),
                 () -> {
                     return configureTransformer(compileStylesheet1(styleSource));
                 });
