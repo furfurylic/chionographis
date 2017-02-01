@@ -23,7 +23,9 @@
     <mkdir dir="release/classes"/>
     <javac srcdir="src" includes="net/furfurylic/chionographis/**/*.java"
       destdir="release/classes" nowarn="yes" source="1.8" debug="yes"
-      debuglevel="source,lines" includeantruntime="yes"/>
+      debuglevel="source,lines" includeantruntime="yes">
+      <compilerarg value="-Xdiags:verbose"/>
+    </javac>
   </target>
 
   <target name="-archive" depends="-rev">
