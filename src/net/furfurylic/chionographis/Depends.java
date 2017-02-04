@@ -9,6 +9,8 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
@@ -17,6 +19,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.FileList;
+import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
 import org.apache.tools.ant.types.resources.FileResource;
@@ -159,9 +163,36 @@ public final class Depends extends AbstractSelectorContainer {
 
         Iterable<Resource> sources = resources_.getList().isEmpty() ?
             null :
-            () -> new SerialIterator<>(createResourceIterableIterable());
+            new Iterable<Resource>() {
+                @Override
+                public Iterator<Resource> iterator() {
+                    return new SerialIterator<>(createResourceIterableIterable());
+                }
+                @Override
+                public String toString() {
+                    return '['
+                         + String.join(
+                             ", ",
+                             () -> new TransformIterator<>(
+                                 resources_.getList().iterator(),
+                                 r -> stringValueOfResourceCollection(r)))
+                         + ']';
+                }
+                private CharSequence stringValueOfResourceCollection(ResourceCollection r) {
+                    if (r instanceof FileSet) {
+                        return "FileSet(dir=" + ((FileSet) r).getDir() + ")";
+                    } else if (r instanceof FileList) {
+                        FileList l = (FileList) r;
+                        return "FileList(dir=" + l.getDir(getProject()) +
+                               ", files=" + Arrays.asList(l.getFiles(getProject())) + ")";
+                    } else {
+                        String raw = r.toString();
+                        return raw.isEmpty() ? r.getClass().getName() : raw;
+                    }
+                }
+            };
 
-        return new DetachedDepends(sources, selector, detachedChild, absent_, logger);
+        return new DetachedDepends(this, sources, selector, detachedChild, absent_, logger);
     }
 
     private Predicate<File> createFileSelector() {
@@ -202,6 +233,7 @@ public final class Depends extends AbstractSelectorContainer {
     private static class DetachedDepends implements NewerSourceFinder {
         private final ReentrantLock scanLock_ = new ReentrantLock();
 
+        private Object issuer_;
         private Logger logger_;
         private Absent absent_;
 
@@ -213,8 +245,9 @@ public final class Depends extends AbstractSelectorContainer {
         private List<File> sourceFiles_ = null;
         private Resource newestSource_ = null;
 
-        public DetachedDepends(Iterable<Resource> sources, Predicate<File> selector,
-                NewerSourceFinder child, Absent absent, Logger logger) {
+        public DetachedDepends(Object issuer, Iterable<Resource> sources,
+                Predicate<File> selector, NewerSourceFinder child, Absent absent, Logger logger) {
+            issuer_ = issuer;
             absent_ = absent;
             logger_ = logger;
             sources_ = sources;
@@ -302,16 +335,15 @@ public final class Depends extends AbstractSelectorContainer {
         }
 
         private Resource handleSignificantAbsence() {
-            // FIXME: is newestSource_ referrable?
             switch (absent_) {
             case NEW:
-                logger_.log(this,
-                    "Referred resource \"" + newestSource_ + "\" is missing to be regarded as new",
+                logger_.log(issuer_,
+                    "Referred resources " + sources_ + " are missing to be regarded as new",
                     Level.INFO);
                 return new FileResource();
             case FAIL:
-                logger_.log(this,
-                    "Referred resource \"" + newestSource_ + "\" is missing", Level.ERR);
+                logger_.log(issuer_,
+                    "Referred resources " + sources_ + " are missing", Level.ERR);
                 throw new BuildException();
             case IGNORE:
             default:
