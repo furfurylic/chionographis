@@ -10,9 +10,12 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.FileList;
 import org.apache.tools.ant.types.FileSet;
+import org.apache.tools.ant.types.Reference;
 import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.types.ResourceCollection;
 import org.apache.tools.ant.types.resources.FileResource;
@@ -161,20 +165,42 @@ public final class Depends extends AbstractSelectorContainer {
      *      a new {@link NewerSourceFinder} object.
      */
     NewerSourceFinder detach() {
+        dieOnCircularReference();
         assert logger_ != null;
         return detach(logger_);
     }
 
+    @Override
+    protected void dieOnCircularReference() {
+        dieOnCircularReference(Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private void dieOnCircularReference(Set<Depends> s) {
+        if (s.contains(this)) {
+            throw circularReference();
+        }
+        s.add(this);
+        if (isReference()) {
+            Reference refid = getRefid();
+            Object o = refid.getReferencedObject();
+            if (o instanceof Depends) {
+                ((Depends) o).dieOnCircularReference(s);
+            } else {
+                logger_.log(this, "Refid \"" + refid.getRefId() + "\" must have type "
+                        + Depends.class.getName(), Level.ERR);
+                throw new BuildException();
+            }
+        } else {
+            children_.getList().stream().forEach(c -> c.dieOnCircularReference(s));
+        }
+        s.remove(this);
+    }
+
     private NewerSourceFinder detach(Logger logger) {
         if (isReference()) {
-            // TODO: do more thorough circular reference check
-            dieOnCircularReference();
             Object o = getRefid().getReferencedObject();
-            if (o instanceof Depends) {
-                return ((Depends) o).detach(logger);
-            } else {
-                throw new BuildException(); // TODO: message?
-            }
+            assert o instanceof Depends;   // checked in dieOnCircularReference
+            return ((Depends) o).detach(logger);
         }
 
         Predicate<File> selector = createFileSelector();
