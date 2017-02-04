@@ -170,13 +170,13 @@ public final class Transform extends Filter {
     }
 
     /**
-     * Adds an additional depended resources by this task.
+     * Adds a dependency spec between resources.
      *
      * <p>The depended resources are simply used for the decision
      * whether the outputs are up to date.</p>
      *
      * @return
-     *      an empty additional depended resource container object.
+     *      an empty object which instructs dependency between resources to this driver.
      */
     public Depends createDepends() {
         Depends depends = new Depends(logger(), exceptionPoster());
