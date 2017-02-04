@@ -10,10 +10,13 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.LongFunction;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
 import javax.xml.xpath.XPathExpression;
+
+import org.apache.tools.ant.types.Resource;
 
 /**
  * A <i>sink</i> object is a destination of processed documents.
@@ -53,7 +56,8 @@ public abstract class Sink {
      * Returns XPath expressions which point the source document contents required by this object.
      *
      * <p>When the driver is responsive to the requirement and finds the pointees,
-     * the data is informed as the argument of {@link #startOne(int, String, long, List)}.</p>
+     * the data is informed as the argument of
+     * {@link #startOne(int, String, LongFunction, List)}.</p>
      *
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,
      * boolean, boolean)} arbitrary number of times.
@@ -87,10 +91,11 @@ public abstract class Sink {
      * @param origSrcFileNames
      *      the source file names of the original input sources to the {@linkplain Chionographis
      *      Chionographis task}, whose elements shall not be {@code null}.
-     * @param origSrcLastModTimes
-     *      the last modification times of the source files which correspond the file names in
-     *      {@code srcURIs} from the epoch, each element of which is positive if significant, or
-     *      {@code 0} if unknown.
+     * @param finders
+     *      an array of functions which takes the last modified time of the target from the epoch
+     *      and returns non-null reference to a {@link Resource} if the corresponding source file
+     *      is considered to be newer than the target (then this reference may point one newer
+     *      file), otherwise {@code null}.
      *
      * @return
      *      an array of necessity for a process for each input source;
@@ -98,7 +103,8 @@ public abstract class Sink {
      *      to be included in the process,
      *      that is, the corresponding output is already up to date.
      */
-    abstract boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes);
+    abstract boolean[] preexamineBundle(
+        String[] origSrcFileNames, LongFunction<Resource>[] finders);
 
     abstract void startBundle();
 
@@ -115,17 +121,20 @@ public abstract class Sink {
      * @param origSrcIndex
      *      the index of the corresponding original source,
      *      which meets the index for {@code origSrcFileNames}
-     *      parameters in {@link #preexamineBundle(String[], long[])};
-     *      or -1 if the driver have not invoked {@link #preexamineBundle(String[], long[])}.
+     *      parameters in {@link #preexamineBundle(String[], LongFunction[])};
+     *      or -1 if the driver have not invoked
+     *      {@link #preexamineBundle(String[], LongFunction[])}.
      * @param origSrcFileName
      *      the file name of the corresponding original source,
      *      which is equal to {@code origSrcFileNames[origSrcIndex]} where
-     *      {@code origSrcFileNames} is the argument passed in the prior call of {@link
-     *      #preexamineBundle(String[], long[])}; or {@code null} if the driver have not invoked
-     *      {@link #preexamineBundle(String[], long[])}.
-     * @param origSrcLastModTime
-     *      the last modification time of the original source file from the epoch,
-     *      which is positive if significant, or {@code 0} if unknown.
+     *      {@code origSrcFileNames} is the argument passed in the prior call of
+     *      {@link #preexamineBundle(String[], LongFunction[])}; or {@code null} if the driver
+     *      have not invoked {@link #preexamineBundle(String[], LongFunction[])}.
+     * @param finder
+     *      a function which takes the last modified time of the target from the epoch
+     *      and returns non-null reference to a {@link Resource} if the corresponding source file
+     *      is considered to be newer than the target (then this reference may point one newer
+     *      file), otherwise {@code null}.
      * @param referredContents
      *      an list whose size is the same as the return value of
      *      {@link #referents()} and contains the required input document contents
@@ -136,25 +145,25 @@ public abstract class Sink {
      *      an TrAX {@code Result} object which receives the input document; is possibly
      *      {@code null} when this sink judges that there is no need to process the input.
      */
-    abstract Result startOne(int origSrcIndex, String origSrcFileName, long origSrcLastModTime,
-        List<String> referredContents);
+    abstract Result startOne(int origSrcIndex, String origSrcFileName,
+        LongFunction<Resource> finder, List<String> referredContents);
 
     /**
      * Finishes to receive one input document.
      *
-     * <p>This method is called after {@link #startOne(int, String, long, List)} with the
+     * <p>This method is called after {@link #startOne(int, String, LongFunction, List)} with the
      *  identical TrAX {@code Result} object which it has returned
      *  (only if {@link #abortOne(Result)} has not been invoked).
-     *  However, if {@link #startOne(int, String, long, List)} has returned {@code null},
+     *  However, if {@link #startOne(int, String, LongFunction, List)} has returned {@code null},
      *  corresponding call of this method shall not occur.</p>
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
-     * called {@link #startOne(int, String, long, List)}.</p>
+     * called {@link #startOne(int, String, LongFunction, List)}.</p>
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
-     *      {@link #startOne(int, String, long, List)} of this object;
+     *      {@link #startOne(int, String, LongFunction, List)} of this object;
      *      which is never {@code null}.
      */
     abstract void finishOne(Result result);
@@ -162,7 +171,7 @@ public abstract class Sink {
     /**
      * Aborts processing one source document.
      *
-     * <p>This method will be called when {@link #startOne(int, String, long, List)}
+     * <p>This method will be called when {@link #startOne(int, String, LongFunction, List)}
      * has been returned successfully and then something that prevents {@link #finishOne(Result)}
      * from being called happened. If {@link #finishOne(Result)} throws an exception, this method
      * will not be invoked.</p>
@@ -172,11 +181,11 @@ public abstract class Sink {
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
-     * called {@link #startOne(int, String, long, List)}.</p>
+     * called {@link #startOne(int, String, LongFunction, List)}.</p>
      *
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
-     *      {@link #startOne(int, String, long, List)} of this object.
+     *      {@link #startOne(int, String, LongFunction, List)} of this object.
      */
     abstract void abortOne(Result result);
 

@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
 import javax.xml.namespace.NamespaceContext;
@@ -36,6 +37,7 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
 import org.apache.tools.ant.util.FileNameMapper;
 
 import net.furfurylic.chionographis.Logger.Level;
@@ -317,7 +319,7 @@ public final class Output extends Sink {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
         boolean[] includes = new boolean[origSrcFileNames.length];
         if (force_ || !referents_.isEmpty()) {
             Arrays.fill(includes, true);
@@ -325,7 +327,7 @@ public final class Output extends Sink {
             assert destMapping_ != null;
             for (int i = 0; i < origSrcFileNames.length; ++i) {
                 includes[i] = isOrigSrcNewer(
-                    origSrcLastModTimes[i], destMapping_.apply(origSrcFileNames[i]));
+                    finders[i], destMapping_.apply(origSrcFileNames[i]));
             }
         }
         return includes;
@@ -338,7 +340,7 @@ public final class Output extends Sink {
 
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
-            long origSrcLastModTime, List<String> referredContents) {
+            LongFunction<Resource> finder, List<String> referredContents) {
         OutputStream buffer = BUFFER.get();
 
         // Configure dests.
@@ -356,7 +358,7 @@ public final class Output extends Sink {
             throw new NonfatalBuildException();
         }
 
-        if (!force_ && !isOrigSrcNewer(origSrcLastModTime, dests)) {
+        if (!force_ && !isOrigSrcNewer(finder, dests)) {
             if (dests.size() > 1) {
                 String files = dests.stream()
                                     .map(Path::toString)
@@ -372,15 +374,11 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOrigSrcNewer(long origSrcLastModTime, Set<Path> dests) {
-        if (origSrcLastModTime <= 0) {
-            return true;
-        } else {
-            return
-                dests.stream()
-                     .anyMatch(f -> (!Files.exists(f)
-                                  || (f.toFile().lastModified() < origSrcLastModTime)));
-        }
+    private static boolean isOrigSrcNewer(LongFunction<Resource> finder, Set<Path> dests) {
+        return
+            dests.stream()
+                 .anyMatch(f -> (!Files.exists(f)
+                              || (finder.apply(f.toFile().lastModified()) != null)));
     }
 
     @Override

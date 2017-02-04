@@ -23,7 +23,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
-import java.util.function.LongUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -38,6 +38,7 @@ import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
+import org.apache.tools.ant.types.Resource;
 import org.xml.sax.EntityResolver;
 
 import net.furfurylic.chionographis.Logger.Level;
@@ -260,13 +261,13 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
-     * Adds an additional depended resources by this task.
+     * Adds a dependency spec between resources.
      *
      * <p>The depended resources are simply used for the decision
      * whether the outputs are up to date.</p>
      *
      * @return
-     *      an empty additional depended resource container object.
+     *      an empty object which instructs dependency between resources to this task.
      */
     public Depends createDepends() {
         Depends depends = new Depends(logger_, exceptionPoster());
@@ -378,13 +379,13 @@ public final class Chionographis extends MatchingTask implements Driver {
                               .map(srcDir_::resolve)
                               .map(Path::toUri)
                               .toArray(URI[]::new);
-        long[] srcLastModifiedTimes = getLastModifiedTimes(srcURIs);
+        LongFunction<Resource>[] finders = createNewerSourceFinders(srcURIs);
 
         sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_, dryRun);
 
         // Tell whether destinations are older.
-        boolean[] includes = (force_ || (srcLastModifiedTimes == null)) ?
-            null : sinks_.preexamineBundle(srcFileNames, srcLastModifiedTimes);
+        boolean[] includes = (force_ || (finders == null)) ?
+            null : sinks_.preexamineBundle(srcFileNames, finders);
         if (includes != null) {
             int includedCount = 0;
             for (int i = 0; i < includes.length; ++i) {
@@ -403,7 +404,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
-            failOnNonfatalError_, srcURIs, srcFileNames, srcLastModifiedTimes,
+            failOnNonfatalError_, srcURIs, srcFileNames, finders,
             sinks_, createEntityResolver(), logger_, createMetaFuncs());
 
         // This report is placed here in order to appear after all preparation passed in peace.
@@ -447,6 +448,18 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private LongFunction<Resource>[] createNewerSourceFinders(URI[] srcURIs) {
+        NewerSourceFinder finder =
+            NewerSourceFinder.combine(
+                depends_.getList().stream()
+                                  .map(d -> d.detach())
+                                  .collect(Collectors.toList()));
+        return Arrays.stream(srcURIs)
+                     .map(u -> finder.close(new File(u)))
+                     .toArray(LongFunction[]::new);
+    }
+
     private boolean isDryRun() {
         boolean dryRun;
         String dryRunProperty = getProject().getProperty(
@@ -483,40 +496,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         DirectoryScanner scanner = getDirectoryScanner(srcDir_.toFile());
         scanner.scan();
         return scanner.getIncludedFiles();
-    }
-
-    private long[] getLastModifiedTimes(URI[] uris) {
-        long dependsLastModified = getDependsLastModifiedTime();
-        LongUnaryOperator mutateLastModified;
-        if (dependsLastModified == 0) {
-            // 0 means "unknown"
-            long[] zeroes = new long[uris.length];
-            Arrays.fill(zeroes, 0);
-            return zeroes;
-        } else if (dependsLastModified == -1) {
-            mutateLastModified = l -> l;
-        } else {
-            mutateLastModified = l -> Math.max(l, dependsLastModified);
-        }
-        return Stream.of(uris)
-                      .map(File::new)
-                      .mapToLong(File::lastModified)
-                      .map(mutateLastModified)
-                      .toArray();
-    }
-
-    private long getDependsLastModifiedTime() {
-        long dependsLastModified = -1;
-        for (Depends depends : depends_.getList()) {
-            long dependsLastModifiedOne = depends.lastModified();
-            if (dependsLastModifiedOne == 0) {
-                // 0 means "unknown"
-                return 0;
-            } else {
-                dependsLastModified = Math.max(dependsLastModifiedOne, dependsLastModified);
-            }
-        }
-        return dependsLastModified;
     }
 
     private EntityResolver createEntityResolver() {
@@ -570,7 +549,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         private boolean failOnNonfatalError_;
         private URI[] uris_;
         private String[] fileNames_;
-        private long[] lastModifiedTimes_;
+        private LongFunction<Resource>[] finders_;
         private XMLTransfer xfer_;
         private Sink sink_;
         private Logger logger_;
@@ -579,13 +558,13 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         public ChionographisWorkerFactory(
                 boolean failOnNonfatalError,
-                URI[] uris, String[] fileNames, long[] lastModifiedTimes,
+                URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver, Logger logger,
                 List<Map.Entry<String, Function<URI, String>>> metaFuncs) {
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
-            lastModifiedTimes_ = lastModifiedTimes;
+            finders_ = lastModifiedTimes;
             sink_ = sink;
             xfer_ = new XMLTransfer(resolver, null);
             logger_ = logger;
@@ -594,10 +573,8 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         public IntSupplier create(int index) {
-            long lastModifiedTime = (lastModifiedTimes_ != null)
-                ? lastModifiedTimes_[index] : 0;
             return new ChionographisWorker(failOnNonfatalError_, index,
-                uris_[index], fileNames_[index], lastModifiedTime,
+                uris_[index], fileNames_[index], finders_[index],
                 sink_, logger_, metaFuncs_, xfer_,
                 () -> isOK_)::run;
         }

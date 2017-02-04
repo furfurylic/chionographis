@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import java.util.function.LongFunction;
 
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
@@ -22,6 +23,7 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Document;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
@@ -43,7 +45,7 @@ final class ChionographisWorker {
     private int index_;
     private URI uri_;
     private String fileName_;
-    private long lastModified_;
+    private LongFunction<Resource> finder_;
 
     private IntSupplier isOK_;
 
@@ -64,7 +66,7 @@ final class ChionographisWorker {
      *      the URI of the original source.
      * @param fileName
      *      the file name of the original source.
-     * @param lastModified
+     * @param finder
      *      the last modified time of the original source, which is the number of milliseconds
      *      from the epoch.
      * @param sink
@@ -81,7 +83,7 @@ final class ChionographisWorker {
      */
     public ChionographisWorker(
             boolean failOnNonfatalError,
-            int index, URI uri, String fileName, long lastModified,
+            int index, URI uri, String fileName, LongFunction<Resource> finder,
             Sink sink, Logger logger,
             List<Map.Entry<String, Function<URI, String>>> metaFuncs, XMLTransfer xfer,
             IntSupplier isOK) {
@@ -89,7 +91,7 @@ final class ChionographisWorker {
         index_ = index;
         uri_ = uri;
         fileName_ = fileName;
-        lastModified_ = lastModified;
+        finder_ = finder;
         sink_ = sink;
         logger_ = logger;
         metaFuncs_ = metaFuncs;
@@ -148,7 +150,7 @@ final class ChionographisWorker {
                 }
             }
 
-            Result result = sink_.startOne(index_, fileName_, lastModified_, referredContents);
+            Result result = sink_.startOne(index_, fileName_, finder_, referredContents);
             if (result == null) {
                 return 1;
             }
