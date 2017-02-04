@@ -342,7 +342,7 @@
 
     <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input.xml" cache="no">
       <!-- depends: absence means new -->
-      <depends absent="new"><fileset file="${dir.output}/ghost"/></depends>
+      <depends absent="new"><filelist dir="${dir.output}" files="ghost"/></depends>
       <output dest="${test.prefix}/output-${test.title}/output.xml"/>
     </chionographis>
 
