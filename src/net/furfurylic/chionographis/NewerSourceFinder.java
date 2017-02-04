@@ -8,7 +8,10 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -26,15 +29,16 @@ interface NewerSourceFinder {
      *      The last modification time of this file itself is not taken into account.
      * @param lastModified
      *      the time from epoch.
-     * @param reenty
+     * @param reentry
      *      the recursive call target, which must not be {@code null}.
+     *      Implementation classes may not be afraid of circular reentrance on using this.
      *
      * @return
      *      if it is considered that there is at least one updated after <var>lastModified</var>
      *      which is referred by <var>file</var>, a {@link Resource} which possively points it;
      *      otherwise {@code null}.
      */
-    Resource findAnyNewerSource(File file, long lastModified, NewerSourceFinder reenty);
+    Resource findAnyNewerSource(File file, long lastModified, NewerSourceFinder reentry);
 
     /**
      * Combines multiple objects of this type into one.
@@ -74,9 +78,33 @@ interface NewerSourceFinder {
      */
     default LongFunction<Resource> close(File file) {
         long l = file.lastModified();
-        return lastModified ->
-            ((l == 0) || (l > lastModified)) ?
-                new FileResource(file) :
-                findAnyNewerSource(file, lastModified, this);
+        return lastModified -> {
+            if ((l == 0) || (l > lastModified)) {
+                return new FileResource(file);
+            } else {
+                NewerSourceFinder bare = this;
+                Set<File> s = new HashSet<>();
+                NewerSourceFinder checking =
+                    (File file2, long lastModified2, NewerSourceFinder reentry) -> {
+                        File canon;
+                        try {
+                            canon = file2.getCanonicalFile();
+                        } catch (IOException e) {
+                            // If canonicalization fails, the source should be considered as
+                            // "unknown", or "very-new".
+                            return new FileResource(file);
+                        }
+                        if (s.contains(canon)) {
+                            // Circular dependency is simply ignored
+                            return null;
+                        }
+                        s.add(canon);
+                        Resource r = bare.findAnyNewerSource(file2, lastModified2, reentry);
+                        s.remove(canon);
+                        return r;
+                    };
+                return checking.findAnyNewerSource(file, lastModified, checking);
+            }
+        };
     }
 }
