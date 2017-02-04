@@ -12,6 +12,7 @@
     <antcall target="basic-not-up-to-date-by-depends-new"/>
     <antcall target="basic-up-to-date-by-depends-ignore"/>
     <antcall target="basic-complex-depends"/>
+    <antcall target="basic-depends-circularity"/>
     <antcall target="basic-error-depends-fail"/>
     <antcall target="basic-error-depends"/>
     <antcall target="basic-refer-content"/>
@@ -438,6 +439,44 @@
       expected="${dir.input}/expected1.txt" actual="${dir.output}/x/actual1.txt"/>
     <assertfilelastmodified name="${test.name} - 2"
       file="${dir.output}/x/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-depends-circularity">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="depends-circularity"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:00 AM"/>
+    <touch file="${dir.output}/input2.xml" datetime="01/01/2001 00:01:00 AM"/>
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <chionographis srcdir="${dir.output}" includes="input*.xml" cache="no">
+      <depends>
+        <depends basedir="${dir.output}">
+          <filename name="input1.xml"/>
+          <filelist dir="${dir.output}" files="input2.xml"/>
+        </depends>
+        <depends basedir="${dir.output}">
+          <filename name="input2.xml"/>
+          <filelist dir="${dir.output}" files="input1.xml"/>
+        </depends>
+      </depends>
+      <output destdir="${dir.output}">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <assertfilelastmodified name="${test.name} - 1"
+      file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <assertfilelastmodified name="${test.name} - 2"
+      file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
 
     <delete dir="${dir.output}"/>
   </target>
