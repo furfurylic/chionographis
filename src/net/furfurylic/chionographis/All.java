@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 
 import javax.xml.XMLConstants;
@@ -26,6 +27,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -52,7 +54,7 @@ public final class All extends Filter {
     private QName rootQ_;
 
     private Document resultDocument_;
-    private long lastModifiedTime_;
+    private Assemblage<LongFunction<Resource>> finders_;
 
     private Queue<Node> nodes_;
 
@@ -123,13 +125,13 @@ public final class All extends Filter {
     }
 
     @Override
-    boolean[] preexamineBundle(String[] origSrcFileNames, long[] origSrcLastModTimes) {
+    boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
         boolean[] includes;
         if (isForce()) {
             includes = new boolean[origSrcFileNames.length];
             Arrays.fill(includes, true);
         } else {
-            includes = sink().preexamineBundle(origSrcFileNames, origSrcLastModTimes);
+            includes = sink().preexamineBundle(origSrcFileNames, finders);
             if (IntStream.range(0, includes.length).anyMatch(i -> includes[i])) {
                 Arrays.fill(includes, true);
             }
@@ -150,18 +152,15 @@ public final class All extends Filter {
                 rootQ_.getNamespaceURI());
         }
         resultDocument_.appendChild(docElement);
-        lastModifiedTime_ = 1;
+        finders_ = new Assemblage<>();
     }
 
     @Override
     Result startOne(int origSrcIndex, String origSrcFileName,
-            long origSrcLastModTime, List<String> notUsed) {
+            LongFunction<Resource> finder, List<String> notUsed) {
         assert resultDocument_ != null;
         synchronized (resultDocument_) {
-            lastModifiedTime_ = ((origSrcLastModTime <= 0) || (lastModifiedTime_ <= 0)) ?
-                0 : Math.max(origSrcLastModTime, lastModifiedTime_);
-        }
-        synchronized (resultDocument_) {
+            finders_.add(finder);
             if (nodes_ != null) {
                 return new DOMResult(nodes_.poll());
             }
@@ -212,7 +211,9 @@ public final class All extends Filter {
         } else {
             referredContents = Collections.emptyList();
         }
-        Result result = sink().startOne(-1, null, lastModifiedTime_, referredContents);
+        LongFunction<Resource> finder = (long lastModified) ->
+            finders_.getList().stream().map(fn -> fn.apply(lastModified)).filter(f -> f != null).findAny().orElse(null);
+        Result result = sink().startOne(-1, null, finder, referredContents);
         if (result != null) {
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(resultDocument_), result);

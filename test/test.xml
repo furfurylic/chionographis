@@ -1,6 +1,7 @@
 <project name="chinographis-test" basedir="." default="full">
 
   <taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
+  <typedef name="depends" classname="net.furfurylic.chionographis.Depends"/>
 
   <target name="full">
     <antcall target="basic-mapper"/>
@@ -10,6 +11,7 @@
     <antcall target="basic-mapper-up-to-date"/>
     <antcall target="basic-not-up-to-date-by-depends-new"/>
     <antcall target="basic-up-to-date-by-depends-ignore"/>
+    <antcall target="basic-complex-depends"/>
     <antcall target="basic-error-depends-fail"/>
     <antcall target="basic-error-depends"/>
     <antcall target="basic-refer-content"/>
@@ -340,7 +342,7 @@
 
     <chionographis srcdir="${test.prefix}/output-${test.title}" includes="input.xml" cache="no">
       <!-- depends: absence means new -->
-      <depends absent="new"><fileset file="${dir.output}/ghost"/></depends>
+      <depends absent="new"><filelist dir="${dir.output}" files="ghost"/></depends>
       <output dest="${test.prefix}/output-${test.title}/output.xml"/>
     </chionographis>
 
@@ -385,6 +387,61 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <depends id="depends1-basic-complex-depends">
+    <depends basedir="basic/output-complex-depends">
+      <filename name="x/input1.xml"/>
+      <fileset dir="basic/output-complex-depends/x" includes="input1.dtd"/>
+    </depends>
+    <depends basedir="basic/output-complex-depends">
+      <filename name="x/input2.xml"/>
+      <fileset dir="basic/output-complex-depends/x" includes="input2.dtd"/>
+    </depends>
+    <depends basedir="basic/output-complex-depends">
+      <filename name="x/input1.dtd"/>
+      <fileset file="basic/output-complex-depends/default.dtd"/>
+    </depends>
+  </depends>
+
+  <target name="basic-complex-depends">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="complex-depends"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <copy todir="${dir.output}/x">
+      <fileset dir="${dir.input}" includes="input*.xml input*.dtd"/>
+    </copy>
+    <copy file="${dir.input}/default.dtd" tofile="${dir.output}"/>
+    <touch file="${dir.output}/x/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/x/input2.xml" datetime="01/01/2001 00:01:10 AM"/>
+    <touch file="${dir.output}/x/input1.dtd" datetime="01/01/2001 00:01:00 AM"/>
+    <touch file="${dir.output}/x/input2.dtd" datetime="01/01/2001 00:01:15 AM"/>
+    <touch file="${dir.output}/default.dtd" datetime="01/01/2001 00:01:30 AM"/>
+
+    <touch file="${dir.output}/x/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+    <touch file="${dir.output}/x/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <chionographis srcdir="${test.prefix}/output-${test.title}/x" includes="input*.xml" cache="no">
+      <depends refid="depends1-basic-complex-depends"/>
+      <output destdir="${test.prefix}/output-${test.title}/x">
+        <globmapper from="input*.xml" to="output*.xml"/>
+      </output>
+    </chionographis>
+
+    <xslt style="${basedir}/flatten.xsl"
+            in="${dir.output}/x/output1.xml" out="${dir.output}/x/actual1.txt"/>
+    <assertfileeq name="${test.name} - 1"
+      expected="${dir.input}/expected1.txt" actual="${dir.output}/x/actual1.txt"/>
+    <assertfilelastmodified name="${test.name} - 2"
+      file="${dir.output}/x/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
   <target name="basic-error-depends-fail">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="error-depends-fail"/>
@@ -394,12 +451,21 @@
 
     <delete dir="${dir.output}"/>
 
-    <chionographis srcdir="${dir.input}" includes="input1.xml" cache="no" failonerror="no">
+    <copy file="${dir.input}/input1.xml" tofile="${dir.output}/input1.xml"/>
+    <touch file="${dir.output}/input1.xml" datetime="01/01/2001 00:01:10 AM"/>
+
+    <!-- the output is up to date -->
+    <touch file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <chionographis srcdir="${dir.output}" includes="input1.xml" cache="no" failonerror="no">
       <depends absent="fail"><fileset file="${dir.input}/ghost"/></depends>
       <output dest="${dir.output}/output1.xml"/>
     </chionographis>
 
-    <assertfilenotexists name="${test.name}" file="${dir.output}/output1.xml"/>
+    <assertfilelastmodified name="${test.name} - 1"
+      file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
   </target>
 
   <target name="basic-error-depends">
