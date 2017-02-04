@@ -17,9 +17,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,6 +40,7 @@ import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
+import org.apache.tools.ant.types.resources.FileResource;
 import org.apache.tools.ant.util.FileNameMapper;
 
 import net.furfurylic.chionographis.Logger.Level;
@@ -374,11 +377,45 @@ public final class Output extends Sink {
         return new OutputStreamResult(buffer, dests);
     }
 
-    private static boolean isOrigSrcNewer(LongFunction<Resource> finder, Set<Path> dests) {
-        return
-            dests.stream()
-                 .anyMatch(f -> (!Files.exists(f)
-                              || (finder.apply(f.toFile().lastModified()) != null)));
+    private boolean isOrigSrcNewer(LongFunction<Resource> finder, Set<Path> dests) {
+        Map.Entry<Path, Path> triggers = dests.stream()
+            .map(f -> {
+                if (!Files.exists(f)) {
+                    return new AbstractMap.SimpleImmutableEntry<Path, Path>(f, null);
+                } else {
+                    Resource r = finder.apply(f.toFile().lastModified());
+                    if (r != null) {
+                        if (r instanceof FileResource) {
+                            FileResource fr = (FileResource) r;
+                            if (fr.getFile() != null) {
+                                return new AbstractMap.SimpleImmutableEntry<Path, Path>(
+                                        f, fr.getFile().toPath());
+                            }
+                        }
+                        return new AbstractMap.SimpleImmutableEntry<Path, Path>(f, null);
+                    }
+                    return null;
+                }
+            })
+            .filter(r -> r != null)
+            .findAny()
+            .orElse(null);
+        if (triggers != null) {
+            if (triggers.getValue() != null) {
+                logger_.log(this,
+                    "Triggering processing as the source " + triggers.getValue() +
+                    " is regarded as newer than the target " + triggers.getKey(),
+                    Level.DEBUG);
+            } else {
+                logger_.log(this,
+                    "Triggering processing as the target " + triggers.getKey() +
+                    " does not exist or is regarded as older than the source",
+                    Level.DEBUG);
+            }
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
