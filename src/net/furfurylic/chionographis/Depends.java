@@ -193,23 +193,32 @@ public final class Depends extends AbstractSelectorContainer {
                 }
                 @Override
                 public String toString() {
-                    return '['
-                         + String.join(
-                             ", ",
-                             () -> new TransformIterator<>(
-                                 resources_.getList().iterator(),
-                                 r -> stringValueOfResourceCollection(r)))
-                         + ']';
+                    switch (resources_.getList().size()) {
+                    case 0:
+                        assert false;
+                        return "";
+                    case 1:
+                        return stringValueOfResourceCollection(
+                            resources_.getList().iterator().next());
+                    default:
+                        return '['
+                              + String.join(
+                                    ", ",
+                                    () -> new TransformIterator<>(
+                                            resources_.getList().iterator(),
+                                            r -> stringValueOfResourceCollection(r)))
+                              + ']';
+                    }
                 }
-                private CharSequence stringValueOfResourceCollection(ResourceCollection r) {
+                private String stringValueOfResourceCollection(ResourceCollection r) {
                     if (r instanceof FileSet) {
-                        return "FileSet(dir=" + ((FileSet) r).getDir() + ")";
+                        return "fileset(dir=" + ((FileSet) r).getDir() + ")";
                     } else if (r instanceof FileList) {
                         FileList l = (FileList) r;
-                        return "FileList(dir=" + l.getDir(getProject()) +
+                        return "filelist(dir=" + l.getDir(getProject()) +
                                ", files=" + Arrays.asList(l.getFiles(getProject())) + ")";
                     } else {
-                        String raw = r.toString();
+                        String raw = String.valueOf(r);
                         return raw.isEmpty() ? r.getClass().getName() : raw;
                     }
                 }
