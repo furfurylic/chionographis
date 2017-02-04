@@ -31,14 +31,22 @@ import org.apache.tools.ant.util.FileUtils;
 import net.furfurylic.chionographis.Logger.Level;
 
 /**
+ * This class represents a dependency between resources.
  * Objects of this class are used to instruct their enclosing <i>{@linkplain Chionographis}</i>
  * drivers or <i>{@linkplain Transform}</i> filters that they shall refer the last modified times
- * of the resources the objects of this class point.
+ * of the resources pointed by them.
  *
  * <p>For examble, if a <i>{@linkplain Transform}</i> filter is configured to use stylesheet
  * {@code style.xsl} and has an object of this class as its child element which points
  * {@code style-included.xsl}, then the filter shall refer both last modified times
  * and recognizes the latest one as its stylesheet's last modified time.</p>
+ *
+ * <p>An object of this class can have at most one file selector. If it has one, dependency on
+ * resources it points are applied limitedly to the referrers match the file selector.
+ * In addition, when it has a file selector, it applies its dependency recursively.</p>
+ *
+ * <p>Objects of this class can have nested object of this class. This is how you can bundle
+ * multiple dependencies into one object.</p>
  */
 public final class Depends extends AbstractSelectorContainer {
 
@@ -68,6 +76,8 @@ public final class Depends extends AbstractSelectorContainer {
     private Assemblage<Depends> children_ = new Assemblage<>();
 
     /**
+     * Makes an empty dependency object.
+     *
      * @since 1.2
      */
     public Depends() {
@@ -80,6 +90,9 @@ public final class Depends extends AbstractSelectorContainer {
 
     /**
      * Sets the instruction for the case that the pointed resources do not exist.
+     *
+     * <p>NOTE: all attributes of this class including this have no effects on nested object of
+     * this class.</p>
      *
      * @param absent
      *      an instruction which shall be one of {@code fail}, {@code new} and {@code ignore}.
@@ -102,6 +115,22 @@ public final class Depends extends AbstractSelectorContainer {
     }
 
     /**
+     * Sets the base directory used by the file selector.
+     * If this object has a file selector, specifying the base directory is required.
+     *
+     * <p>NOTE: all attributes of this class including this have no effects on nested object of
+     * this class.</p>
+     *
+     * @param baseDir
+     *      The base directory used by the file selectors.
+     *
+     * @since 1.2
+     */
+    public void setBaseDir(File baseDir) {
+        baseDir_ = baseDir;
+    }
+
+    /**
      * Adds the pointed resources.
      *
      * @param resources
@@ -112,22 +141,10 @@ public final class Depends extends AbstractSelectorContainer {
     }
 
     /**
-     * TODO: description
-     *
-     * @param baseDir
-     *      The base directory used by file selectors.
-     *
-     * @since 1.2
-     */
-    public void setBaseDir(File baseDir) {
-        baseDir_ = baseDir;
-    }
-
-    /**
-     * TODO: description
+     * Creates a nested object of this class.
      *
      * @return
-     *      an empty additional depended resource container object.
+     *      an empty object which instructs dependency between resources to the enclosing driver.
      *
      * @since 1.2
      */
@@ -137,6 +154,12 @@ public final class Depends extends AbstractSelectorContainer {
         return depends;
     }
 
+    /**
+     * Creates a new {@link NewerSourceFinder} object configured properly by this object.
+     *
+     * @return
+     *      a new {@link NewerSourceFinder} object.
+     */
     NewerSourceFinder detach() {
         assert logger_ != null;
         return detach(logger_);
@@ -245,6 +268,17 @@ public final class Depends extends AbstractSelectorContainer {
         private List<File> sourceFiles_ = null;
         private Resource newestSource_ = null;
 
+        /**
+         *
+         * @param sources
+         *      a collection of resources depended by files which matches <var>selector</var>.
+         *      Can be {@code null} when no directly depended resources are known to this object.
+         * @param issuer
+         * @param selector
+         * @param child
+         * @param absent
+         * @param logger
+         */
         public DetachedDepends(Object issuer, Iterable<Resource> sources,
                 Predicate<File> selector, NewerSourceFinder child, Absent absent, Logger logger) {
             issuer_ = issuer;
