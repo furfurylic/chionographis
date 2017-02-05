@@ -20,7 +20,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongFunction;
@@ -61,7 +60,6 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean failOnError_ = true;
     private boolean failOnNonfatalError_ = false;
 
-    private BuildException exsInPreparation_ = null;
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
     private Assemblage<Depends> depends_ = new Assemblage<>();
@@ -86,18 +84,6 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private Function<String, String> expander() {
         return PropertyHelper.getPropertyHelper(getProject())::replaceProperties;
-    }
-
-    private Consumer<BuildException> exceptionPoster() {
-        return this::postExceptionInPreparation;
-    }
-
-    private void postExceptionInPreparation(BuildException e) {
-        if (failOnError_) {
-            throw e;
-        } else if (exsInPreparation_ == null) {
-            exsInPreparation_ = e;
-        }
     }
 
     /**
@@ -233,7 +219,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty instruction of meta-information processing instruction.
      */
     public Meta createMeta() {
-        Meta meta = new Meta(logger_, exceptionPoster());
+        Meta meta = new Meta(logger_);
         metas_.add(meta);
         return meta;
     }
@@ -255,7 +241,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        Namespace namespace = new Namespace(logger_, exceptionPoster());
+        Namespace namespace = new Namespace(logger_);
         namespaces_.add(namespace);
         return namespace;
     }
@@ -270,7 +256,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty object which instructs dependency between resources to this task.
      */
     public Depends createDepends() {
-        Depends depends = new Depends(logger_, exceptionPoster());
+        Depends depends = new Depends(logger_);
         depends_.add(depends);
         return depends;
     }
@@ -280,7 +266,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(logger_, expander(), exceptionPoster());
+        return sinks_.createTransform(logger_, expander());
     }
 
     /**
@@ -288,7 +274,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(logger_, expander(), exceptionPoster());
+        return sinks_.createAll(logger_, expander());
     }
 
     /**
@@ -296,7 +282,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(logger_, expander(), exceptionPoster());
+        return sinks_.createSnip(logger_, expander());
     }
 
     /**
@@ -304,7 +290,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput(logger_, exceptionPoster());
+        return sinks_.createOutput(logger_);
     }
 
     // TODO: Make this task able to accept soures other than files
@@ -318,21 +304,16 @@ public final class Chionographis extends MatchingTask implements Driver {
         if (failOnError_) {
             doExecute();
         } else {
-            if (exsInPreparation_ != null) {
-                logger_.log(this,
-                    exsInPreparation_, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
-            } else {
-                try {
-                    doExecute();
-                } catch (NonfatalBuildException e) {
-                    if (e.isLogged()) {
-                        logger_.log(this, "Exiting with an error", Level.ERR);
-                    } else {
-                        logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
-                    }
-                } catch (RuntimeException e) {
+            try {
+                doExecute();
+            } catch (NonfatalBuildException e) {
+                if (e.isLogged()) {
+                    logger_.log(this, "Exiting with an error", Level.ERR);
+                } else {
                     logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
                 }
+            } catch (RuntimeException e) {
+                logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
             }
         }
     }
