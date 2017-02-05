@@ -382,12 +382,10 @@
       <filename name="x/input1.xml"/>
       <fileset dir="basic/output-complex-depends/x" includes="input1.dtd"/>
     </depends>
-    <depends basedir="basic/output-complex-depends">
-      <filename name="x/input2.xml"/>
+    <depends basedir="basic/output-complex-depends" filename="x/input2.xml">
       <fileset dir="basic/output-complex-depends/x" includes="input2.dtd"/>
     </depends>
-    <depends basedir="basic/output-complex-depends">
-      <filename name="x/input1.dtd"/>
+    <depends file="basic/output-complex-depends/x/input1.dtd">
       <fileset file="basic/output-complex-depends/default.dtd"/>
     </depends>
   </depends>
