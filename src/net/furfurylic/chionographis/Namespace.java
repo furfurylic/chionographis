@@ -9,7 +9,6 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
-import java.util.function.Consumer;
 
 import org.apache.tools.ant.BuildException;
 
@@ -23,7 +22,6 @@ import net.furfurylic.chionographis.Logger.Level;
 public final class Namespace {
 
     private Logger logger_;
-    private Consumer<BuildException> exceptionPoster_;
 
     private String prefix_ = null;
     private String namespaceURI_ = null;
@@ -33,13 +31,9 @@ public final class Namespace {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Namespace(Logger logger, Consumer<BuildException> exceptionPoster) {
+    Namespace(Logger logger) {
         logger_ = logger;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -53,11 +47,9 @@ public final class Namespace {
      */
     public void setPrefix(String prefix) {
         if (prefix.isEmpty()) {
-            logger_.log(this, "Empty namespace prefixes are not acceptable", Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException("Empty namespace prefixes are not acceptable");
         } else if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad namespace prefix: " + prefix, Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException("Bad namespace prefix: " + prefix);
         } else {
             prefix_ = prefix;
         }

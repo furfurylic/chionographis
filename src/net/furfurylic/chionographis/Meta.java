@@ -10,7 +10,6 @@ package net.furfurylic.chionographis;
 import java.net.URI;
 import java.util.AbstractMap;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,7 +92,6 @@ public final class Meta {
     }
 
     private Logger logger_;
-    private Consumer<BuildException> exceptionPoster_;
 
     private Type type_ = null;
     private String name_ = null;
@@ -103,13 +101,9 @@ public final class Meta {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Meta(Logger logger, Consumer<BuildException> exceptionPoster) {
+    Meta(Logger logger) {
         logger_ = logger;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -123,14 +117,12 @@ public final class Meta {
      */
     public void setType(String type) {
         if (type.isEmpty()) {
-            logger_.log(this, "Empty meta-information type is not acceptable", Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException("Empty meta-information type is not acceptable");
         } else {
             try {
                 type_ = Type.valueOf(type.toUpperCase().replace('-', '_'));
             } catch (IllegalArgumentException e) {
-                logger_.log(this, "Bad meta-information type: " + type, Level.ERR);
-                exceptionPoster_.accept(new BuildException());
+                throw new BuildException("Bad meta-information type: " + type);
             }
         }
     }
@@ -146,11 +138,9 @@ public final class Meta {
      */
     public void setName(String name) {
         if (name.isEmpty()) {
-            logger_.log(this, "Empty meta-information name is not acceptable", Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException("Empty meta-information name is not acceptable");
         } else if (name.equalsIgnoreCase("xml")) {
-            logger_.log(this, "Bad meta-information name: " + name, Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            new BuildException("Bad meta-information name: " + name);
         } else {
             name_ = name;
         }

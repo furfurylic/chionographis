@@ -13,7 +13,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.IntStream;
@@ -65,13 +64,9 @@ public final class All extends Filter {
      *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    All(Logger logger, Function<String, String> propertyExpander,
-            Consumer<BuildException> exceptionPoster) {
-        super(logger, propertyExpander, exceptionPoster);
+    All(Logger logger, Function<String, String> propertyExpander) {
+        super(logger, propertyExpander);
     }
 
     /**

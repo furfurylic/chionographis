@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
@@ -77,18 +76,12 @@ final class Sinks extends Sink/* implements Logger*/ {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process
-     *      (in other words, in prior to the task execution); which shall not be {@code null}.
-     *      Invocation of this results an immediate build failure or a postponed build error
-     *      (not a failure).
      *
      * @return
      *      a {@link Transform} filter object.
      */
-    public Transform createTransform(Logger logger, Function<String, String> expander,
-        Consumer<BuildException> exceptionPoster) {
-        Transform sink = new Transform(logger, expander, exceptionPoster);
+    public Transform createTransform(Logger logger, Function<String, String> expander) {
+        Transform sink = new Transform(logger, expander);
         sinks_.add(sink);
         return sink;
     }
@@ -100,18 +93,12 @@ final class Sinks extends Sink/* implements Logger*/ {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process
-     *      (in other words, in prior to the task execution); which shall not be {@code null}.
-     *      Invocation of this results an immediate build failure or a postponed build error
-     *      (not a failure).
      *
      * @return
      *      an {@link All} filter object.
      */
-    public All createAll(Logger logger, Function<String, String> expander,
-        Consumer<BuildException> exceptionPoster) {
-        All sink = new All(logger, expander, exceptionPoster);
+    public All createAll(Logger logger, Function<String, String> expander) {
+        All sink = new All(logger, expander);
         sinks_.add(sink);
         return sink;
     }
@@ -123,18 +110,12 @@ final class Sinks extends Sink/* implements Logger*/ {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process
-     *      (in other words, in prior to the task execution); which shall not be {@code null}.
-     *      Invocation of this results an immediate build failure or a postponed build error
-     *      (not a failure).
      *
      * @return
      *      a {@link Snip} filter object.
      */
-    public Snip createSnip(Logger logger, Function<String, String> expander,
-        Consumer<BuildException> exceptionPoster) {
-        Snip sink = new Snip(logger, expander, exceptionPoster);
+    public Snip createSnip(Logger logger, Function<String, String> expander) {
+        Snip sink = new Snip(logger, expander);
         sinks_.add(sink);
         return sink;
     }
@@ -144,17 +125,12 @@ final class Sinks extends Sink/* implements Logger*/ {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process
-     *      (in other words, in prior to the task execution); which shall not be {@code null}.
-     *      Invocation of this results an immediate build failure or a postponed build error
-     *      (not a failure).
      *
      * @return
      *      an {@link Output} sink object.
      */
-    public Output createOutput(Logger logger, Consumer<BuildException> exceptionPoster) {
-        Output sink = new Output(logger, exceptionPoster);
+    public Output createOutput(Logger logger) {
+        Output sink = new Output(logger);
         sinks_.add(sink);
         return sink;
     }
