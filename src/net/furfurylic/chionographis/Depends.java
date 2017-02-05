@@ -10,17 +10,17 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Location;
+import org.apache.tools.ant.Project;
 import org.apache.tools.ant.types.FileList;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.Reference;
@@ -31,6 +31,7 @@ import org.apache.tools.ant.types.selectors.AbstractSelectorContainer;
 import org.apache.tools.ant.types.selectors.FileSelector;
 import org.apache.tools.ant.types.selectors.FilenameSelector;
 import org.apache.tools.ant.util.FileUtils;
+import org.apache.tools.ant.util.IdentityStack;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -106,7 +107,7 @@ public final class Depends extends AbstractSelectorContainer {
         try {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new BuildException("Bad \"absent\" attribute value: " + absent);
+            throw new BuildException("Bad \"absent\" attribute value: " + absent, getLocation());
         }
     }
 
@@ -214,37 +215,54 @@ public final class Depends extends AbstractSelectorContainer {
         return detach(logger_);
     }
 
-    @Override
-    protected void dieOnCircularReference() {
-        dieOnCircularReference(Collections.newSetFromMap(new IdentityHashMap<>()));
-    }
-
-    private void dieOnCircularReference(Set<Depends> s) {
-        if (s.contains(this)) {
-            throw circularReference();
+    protected void dieOnCircularReference(Stack<Object> stack, Project project)
+            throws BuildException {
+        if (isChecked()) {
+            return;
         }
-        s.add(this);
+
+        // DataType.dieOnCircularReference() and DataType.dieOnCircularReference(Project)
+        // call this method with stack which already contains "this".
+
+        IdentityStack<Object> id = IdentityStack.getInstance(stack);
         if (isReference()) {
-            Reference refid = getRefid();
-            Object o = refid.getReferencedObject();
+            Object o = getRefid().getReferencedObject(project);
             if (o instanceof Depends) {
-                ((Depends) o).dieOnCircularReference(s);
-            } else {
-                logger_.log(this, "Refid \"" + refid.getRefId() + "\" must have type "
-                        + Depends.class.getName(), Level.ERR);
-                throw new BuildException();
+                dieOnCircularReferenceOne(id, project, (Depends) o);
             }
         } else {
-            children_.getList().stream().forEach(c -> c.dieOnCircularReference(s));
+            children_.getList().stream().forEach(c -> dieOnCircularReferenceOne(id, project, c));
         }
-        s.remove(this);
+        setChecked(true);
+    }
+
+    private void dieOnCircularReferenceOne(
+            Stack<Object> stack, Project project, Depends depends) {
+        if (stack.contains(depends)) {
+            throw setLocation(circularReference());
+        }
+        stack.push(depends);
+        depends.dieOnCircularReference(stack, project);
+        stack.pop();
+    }
+
+    private BuildException setLocation(BuildException e) {
+        if (e.getLocation() == null) {
+            e.setLocation(getLocation());
+        }
+        return e;
     }
 
     private NewerSourceFinder detach(Logger logger) {
         if (isReference()) {
-            Object o = getRefid().getReferencedObject();
-            assert o instanceof Depends;   // checked in dieOnCircularReference
-            return ((Depends) o).detach(logger);
+            Reference refid =getRefid();
+            Object o = refid.getReferencedObject();
+            if (o instanceof Depends) {
+                return ((Depends) o).detach(logger);
+            } else {
+                throw new BuildException("Refid \"" + refid.getRefId() + "\" must refer an object"
+                        + " whose type is " + Depends.class.getName(), getLocation());
+            }
         }
 
         Predicate<File> selector = createFileSelector();
@@ -294,7 +312,8 @@ public final class Depends extends AbstractSelectorContainer {
                 }
             };
 
-        return new DetachedDepends(this, sources, selector, detachedChild, absent_, logger);
+        return new DetachedDepends(this, getLocation(),
+            sources, selector, detachedChild, absent_, logger);
     }
 
     private Predicate<File> createFileSelector() {
@@ -304,13 +323,11 @@ public final class Depends extends AbstractSelectorContainer {
         case 1:
             break;
         default:
-            logger_.log(this, "At most one file selector can be specified", Level.ERR);
-            throw new BuildException();
+            throw new BuildException("At most one file selector can be specified", getLocation());
         }
 
         if (baseDir_ == null) {
-            logger_.log(this, "No base directory specified", Level.ERR);
-            throw new BuildException();
+            throw new BuildException("No base directory specified", getLocation());
         }
 
         validate();
@@ -336,6 +353,7 @@ public final class Depends extends AbstractSelectorContainer {
         private final ReentrantLock scanLock_ = new ReentrantLock();
 
         private Object issuer_;
+        private Location location_;
         private Logger logger_;
         private Absent absent_;
 
@@ -353,14 +371,16 @@ public final class Depends extends AbstractSelectorContainer {
          *      a collection of resources depended by files which matches <var>selector</var>.
          *      Can be {@code null} when no directly depended resources are known to this object.
          * @param issuer
+         * @param location
          * @param selector
          * @param child
          * @param absent
          * @param logger
          */
-        public DetachedDepends(Object issuer, Iterable<Resource> sources,
+        public DetachedDepends(Object issuer, Location location, Iterable<Resource> sources,
                 Predicate<File> selector, NewerSourceFinder child, Absent absent, Logger logger) {
             issuer_ = issuer;
+            location_ = location;
             absent_ = absent;
             logger_ = logger;
             sources_ = sources;
@@ -448,16 +468,13 @@ public final class Depends extends AbstractSelectorContainer {
         }
 
         private Resource handleSignificantAbsence() {
+            String message = "Resources referred by " + sources_ + " are missing";
             switch (absent_) {
             case NEW:
-                logger_.log(issuer_,
-                    "Referred resources " + sources_ + " are missing to be regarded as new",
-                    Level.INFO);
+                logger_.log(issuer_, message + " to be regarded as new", Level.INFO);
                 return new FileResource();
             case FAIL:
-                logger_.log(issuer_,
-                    "Referred resources " + sources_ + " are missing", Level.ERR);
-                throw new BuildException();
+                throw new BuildException(message, location_);
             case IGNORE:
             default:
                 assert false;
