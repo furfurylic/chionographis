@@ -74,9 +74,9 @@ public final class Depends extends AbstractSelectorContainer {
         IGNORE
     }
 
-    private Absent absent_ = Absent.FAIL;
+    private Optional<Absent> absent_ = Optional.empty();
     private Assemblage<ResourceCollection> resources_ = new Assemblage<>();
-    private File baseDir_;
+    private File baseDir_ = null;
     private Assemblage<Depends> children_ = new Assemblage<>();
 
     /**
@@ -105,7 +105,7 @@ public final class Depends extends AbstractSelectorContainer {
      */
     public void setAbsent(String absent) {
         try {
-            absent_ = Absent.valueOf(absent.toUpperCase());
+            absent_ = Optional.of(Absent.valueOf(absent.toUpperCase()));
         } catch (IllegalArgumentException e) {
             throw new BuildException("Bad \"absent\" attribute value: " + absent, getLocation());
         }
@@ -258,7 +258,14 @@ public final class Depends extends AbstractSelectorContainer {
 
     private NewerSourceFinder detach(Logger logger) {
         if (isReference()) {
-            Reference refid =getRefid();
+            if (absent_.isPresent() || (!resources_.isEmpty())
+             || (baseDir_ != null) || (!children_.isEmpty())) {
+                throw new BuildException(
+                    "\"refid\" and other attributes can only be specified mutually exclusively",
+                    getLocation());
+            }
+
+            Reference refid = getRefid();
             Object o = refid.getReferencedObject();
             if (o instanceof Depends) {
                 return ((Depends) o).detach(logger);
@@ -316,7 +323,7 @@ public final class Depends extends AbstractSelectorContainer {
             };
 
         return new DetachedDepends(this, getLocation(),
-            sources, selector, detachedChild, absent_, logger);
+            sources, selector, detachedChild, absent_.orElse(Absent.FAIL), logger);
     }
 
     private Predicate<File> createFileSelector() {
