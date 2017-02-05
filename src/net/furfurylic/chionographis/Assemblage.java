@@ -52,6 +52,10 @@ final class Assemblage<T> {
         }
     }
 
+    public boolean isEmpty() {
+        return ts_.isEmpty();
+    }
+
     public List<T> getList() {
         return ts_;
     }
