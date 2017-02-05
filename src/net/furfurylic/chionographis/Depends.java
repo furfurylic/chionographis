@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -57,7 +56,6 @@ public final class Depends extends AbstractSelectorContainer {
     private static final FileUtils FILE_UTILS = FileUtils.getFileUtils();
 
     private Logger logger_;
-    private Consumer<BuildException> exceptionPoster_;
 
     /** Instructions for the case of the pointed resources do not exist. */
     public enum Absent {
@@ -87,9 +85,8 @@ public final class Depends extends AbstractSelectorContainer {
     public Depends() {
     }
 
-    Depends(Logger logger, Consumer<BuildException> exceptionPoster) {
+    Depends(Logger logger) {
         logger_ = logger;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -108,13 +105,7 @@ public final class Depends extends AbstractSelectorContainer {
         try {
             absent_ = Absent.valueOf(absent.toUpperCase());
         } catch (IllegalArgumentException e) {
-            String message = "Bad \"absent\" attribute value: " + absent;
-            if (logger_ != null) {
-                logger_.log(this, message, Level.ERR);
-                exceptionPoster_.accept(new BuildException());
-            } else {
-                throw new BuildException(message);
-            }
+            throw new BuildException("Bad \"absent\" attribute value: " + absent);
         }
     }
 
@@ -153,7 +144,7 @@ public final class Depends extends AbstractSelectorContainer {
      * @since 1.2
      */
     public Depends createDepends() {
-        Depends depends = new Depends(logger_, exceptionPoster_);
+        Depends depends = new Depends(logger_);
         children_.add(depends);
         return depends;
     }

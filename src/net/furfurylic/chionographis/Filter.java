@@ -8,7 +8,6 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
@@ -26,7 +25,6 @@ abstract class Filter extends Sink implements Driver {
     private Sinks sinks_;
     private Logger logger_;
     private Function<String, String> propertyExpander_;
-    private Consumer<BuildException> exceptionPoster_;
 
     private boolean force_ = false;
 
@@ -37,16 +35,11 @@ abstract class Filter extends Sink implements Driver {
      *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Filter(Logger logger, Function<String, String> propertyExpander,
-            Consumer<BuildException> exceptionPoster) {
+    Filter(Logger logger, Function<String, String> propertyExpander) {
         sinks_ = new Sinks();
         logger_ = logger;
         propertyExpander_ = propertyExpander;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -80,23 +73,11 @@ abstract class Filter extends Sink implements Driver {
     }
 
     /**
-     * Returns an object which consumes exceptions occurred during the preparation process.
-     * which shall not be {@code null}.
-     *
-     * @return
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}
-     */
-    final Consumer<BuildException> exceptionPoster() {
-        return exceptionPoster_;
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(logger_, propertyExpander_, exceptionPoster_);
+        return sinks_.createTransform(logger_, propertyExpander_);
     }
 
     /**
@@ -104,7 +85,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(logger_, propertyExpander_, exceptionPoster_);
+        return sinks_.createAll(logger_, propertyExpander_);
     }
 
     /**
@@ -112,7 +93,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(logger_, propertyExpander_, exceptionPoster_);
+        return sinks_.createSnip(logger_, propertyExpander_);
     }
 
     /**
@@ -120,7 +101,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput(logger_, exceptionPoster_);
+        return sinks_.createOutput(logger_);
     }
 
     /**
