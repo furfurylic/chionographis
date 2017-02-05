@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
@@ -62,7 +61,6 @@ public final class Output extends Sink {
     private FileNameMapper mapper_ = null;
 
     private Logger logger_;
-    private Consumer<BuildException> exceptionPoster_;
 
     /**
      * A mapper from the original source file names
@@ -79,13 +77,9 @@ public final class Output extends Sink {
      *
      * @param logger
      *      a logger, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Output(Logger logger, Consumer<BuildException> exceptionPoster) {
+    Output(Logger logger) {
         logger_ = logger;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -210,8 +204,7 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            logger_.log(this, "File mappers added twice", Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException("File mappers added twice");
         } else {
             mapper_ = mapper;
         }

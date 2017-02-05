@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
@@ -77,13 +76,9 @@ public final class Transform extends Filter {
      *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Transform(Logger logger, Function<String, String> propertyExpander,
-            Consumer<BuildException> exceptionPoster) {
-        super(logger, propertyExpander, exceptionPoster);
+    Transform(Logger logger, Function<String, String> propertyExpander) {
+        super(logger, propertyExpander);
     }
 
     /**
@@ -101,10 +96,8 @@ public final class Transform extends Filter {
      */
     public void setStyle(String style) {
         if (assoc_.isPresent()) {
-            logger().log(this,
-                "Stylesheet URI and stylesheet association must be specified exclisively",
-                Level.ERR);
-            exceptionPoster().accept(new BuildException());
+            throw new BuildException(
+                "Stylesheet URI and stylesheet association must be specified exclusively");
         } else {
             style_ = style;
         }
@@ -142,16 +135,12 @@ public final class Transform extends Filter {
      */
     public Assoc createAssoc() {
         if (assoc_.isPresent()) {
-            logger().log(this, "Stylesheet association specified twice", Level.ERR);
-            exceptionPoster().accept(new BuildException());
+            throw new BuildException("Stylesheet association specified twice");
         } else if (style_ != null) {
             // According to Ant's manual, setStyle must occur prior to createAssoc.
             // But...
-            logger().log(this,
-                "Stylesheet URI and stylesheet association must be specified exclisively",
-                Level.ERR);
-            exceptionPoster().accept(new BuildException());
-            style_ = null;
+            throw new BuildException(
+                "Stylesheet URI and stylesheet association must be specified exclusively");
         }
         assoc_ = Optional.of(new Assoc());
         return assoc_.get();
@@ -164,7 +153,7 @@ public final class Transform extends Filter {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(logger(), propertyExpander(), exceptionPoster());
+        Param param = new Param(logger(), propertyExpander());
         params_.add(param);
         return param;
     }
@@ -179,7 +168,7 @@ public final class Transform extends Filter {
      *      an empty object which instructs dependency between resources to this driver.
      */
     public Depends createDepends() {
-        Depends depends = new Depends(logger(), exceptionPoster());
+        Depends depends = new Depends(logger());
         depends_.add(depends);
         return depends;
     }

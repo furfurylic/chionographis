@@ -9,7 +9,6 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.xml.XMLConstants;
@@ -29,7 +28,6 @@ public final class Param {
 
     private Logger logger_;
     private Function<String, String> expander_;
-    private Consumer<BuildException> exceptionPoster_;
 
     private String name_ = null;
     private boolean expand_ = false;
@@ -42,15 +40,10 @@ public final class Param {
      *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
-     * @param exceptionPoster
-     *      an object which consumes exceptions occurred during the preparation process;
-     *      which shall not be {@code null}.
      */
-    Param(Logger logger, Function<String, String> expander,
-            Consumer<BuildException> exceptionPoster) {
+    Param(Logger logger, Function<String, String> expander) {
         logger_ = logger;
         expander_ = expander;
-        exceptionPoster_ = exceptionPoster;
     }
 
     /**
@@ -69,9 +62,8 @@ public final class Param {
      */
     public void setName(String name) {
         if (name.isEmpty()) {
-            logger_.log(this,
-                "Stylesheet parameters with empty names are not acceptable", Level.ERR);
-            exceptionPoster_.accept(new BuildException());
+            throw new BuildException(
+                "Stylesheet parameters with empty names are not acceptable");
         }
         name_ = name;
     }
@@ -104,8 +96,7 @@ public final class Param {
             try {
                 value_ = expander_.apply(value);
             } catch (BuildException e) {
-                logger_.log(this, "Property expansion failed: " + value, Level.ERR);
-                exceptionPoster_.accept(e);
+                throw new BuildException("Property expansion failed: " + value, e);
             }
         } else {
             value_ = value;
