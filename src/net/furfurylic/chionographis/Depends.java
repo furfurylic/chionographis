@@ -215,7 +215,9 @@ public final class Depends extends AbstractSelectorContainer {
         return detach(logger_);
     }
 
-    protected void dieOnCircularReference(Stack<Object> stack, Project project)
+    @Override
+    protected void dieOnCircularReference(
+        @SuppressWarnings("rawtypes") Stack stack, Project project)
             throws BuildException {
         if (isChecked()) {
             return;
@@ -224,7 +226,8 @@ public final class Depends extends AbstractSelectorContainer {
         // DataType.dieOnCircularReference() and DataType.dieOnCircularReference(Project)
         // call this method with stack which already contains "this".
 
-        IdentityStack<Object> id = IdentityStack.getInstance(stack);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        IdentityStack id = IdentityStack.getInstance(stack);
         if (isReference()) {
             Object o = getRefid().getReferencedObject(project);
             if (o instanceof Depends) {
@@ -236,8 +239,8 @@ public final class Depends extends AbstractSelectorContainer {
         setChecked(true);
     }
 
-    private void dieOnCircularReferenceOne(
-            Stack<Object> stack, Project project, Depends depends) {
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private void dieOnCircularReferenceOne(Stack stack, Project project, Depends depends) {
         if (stack.contains(depends)) {
             throw setLocation(circularReference());
         }
