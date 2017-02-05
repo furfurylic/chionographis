@@ -29,6 +29,7 @@ import org.apache.tools.ant.types.ResourceCollection;
 import org.apache.tools.ant.types.resources.FileResource;
 import org.apache.tools.ant.types.selectors.AbstractSelectorContainer;
 import org.apache.tools.ant.types.selectors.FileSelector;
+import org.apache.tools.ant.types.selectors.FilenameSelector;
 import org.apache.tools.ant.util.FileUtils;
 
 import net.furfurylic.chionographis.Logger.Level;
@@ -122,7 +123,59 @@ public final class Depends extends AbstractSelectorContainer {
      * @since 1.2
      */
     public void setBaseDir(File baseDir) {
+        if (baseDir_ != null) {
+            throw new BuildException(
+                "\"baseDir\" and \"file\" must be specified exclusively", getLocation());
+        }
         baseDir_ = baseDir;
+    }
+
+    /**
+     * Sets the name of files to which the dependency applies.
+     *
+     * <p>This method is an abridged version of {@link #addSelector(
+     * org.apache.tools.ant.types.selectors.SelectSelector)} with a new {@link FilenameSelector}
+     * whose {@linkplain FilenameSelector#setName(String) name} is set to <var>fileName</var>.</p>
+     *
+     * <p>NOTE: all attributes of this class including this have no effects on nested object of
+     * this class.</p>
+     *
+     * @param fileName
+     *      the name of files to which the dependency applies.
+     *
+     * @since 1.2
+     */
+    public void setFileName(String fileName) {
+        FilenameSelector selector = new FilenameSelector();
+        selector.setName(fileName);
+        addFilename(selector);
+    }
+
+    /**
+     * Sets the file to which the dependency applies.
+     *
+     * <p>This method is an abridged version of the sequence:</p>
+     * <ul>
+     * <li>calling {@link #setBaseDir(File)} with <var>file</var>{@code .getParentFile()},
+     * and then</li>
+     * <li>calling {@link #addSelector(org.apache.tools.ant.types.selectors.SelectSelector)} with
+     * a new {@link FilenameSelector} whose {@linkplain FilenameSelector#setName(String) name} is
+     * set to <var>file</var>{@code .getName()}.</li>
+     * </ul>
+     *
+     * <p>Note that this method and {@link #setBaseDir(File)} can only be called exclusively.</p>
+     *
+     * <p>NOTE: all attributes of this class including this have no effects on nested object of
+     * this class.</p>
+     *
+     * @param file
+     *      the file to which the dependency applies.
+     *
+     * @since 1.2
+     */
+    public void setFile(File file) {
+        setBaseDir(file.getParentFile());
+        setFileName(file.getName());
     }
 
     /**
