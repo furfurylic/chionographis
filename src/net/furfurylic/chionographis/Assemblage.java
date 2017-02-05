@@ -106,9 +106,4 @@ final class Assemblage<T> {
         }
         return map;
     }
-
-    @Override
-    public String toString() {
-        return ts_.toString();
-    }
 }
