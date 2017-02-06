@@ -97,7 +97,8 @@ public final class Transform extends Filter {
     public void setStyle(String style) {
         if (assoc_.isPresent()) {
             throw new BuildException(
-                "Stylesheet URI and stylesheet association must be specified exclusively");
+                "Stylesheet URI and stylesheet association must be specified exclusively",
+                getLocation());
         } else {
             style_ = style;
         }
@@ -135,12 +136,13 @@ public final class Transform extends Filter {
      */
     public Assoc createAssoc() {
         if (assoc_.isPresent()) {
-            throw new BuildException("Stylesheet association specified twice");
+            throw new BuildException("Stylesheet association specified twice", getLocation());
         } else if (style_ != null) {
             // According to Ant's manual, setStyle must occur prior to createAssoc.
             // But...
             throw new BuildException(
-                "Stylesheet URI and stylesheet association must be specified exclusively");
+                "Stylesheet URI and stylesheet association must be specified exclusively",
+                getLocation());
         }
         assoc_ = Optional.of(new Assoc());
         return assoc_.get();
@@ -153,7 +155,7 @@ public final class Transform extends Filter {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(logger(), propertyExpander());
+        Param param = new Param(propertyExpander());
         params_.add(param);
         return param;
     }
@@ -211,9 +213,8 @@ public final class Transform extends Filter {
             e -> logger().log(this,
                     "Adding a stylesheet parameter: " + e, Level.DEBUG),
             k -> {
-                logger().log(this,
-                    "Stylesheet parameter named " + k + " added twice", Level.ERR);
-                throw new BuildException();
+                throw new BuildException(
+                    "Stylesheet parameter named " + k + " added twice", getLocation());
             });
     }
 
@@ -355,9 +356,9 @@ public final class Transform extends Filter {
                     sink().abortOne(openedResult);
                 }
                 if (stylesheetLocation_ != null) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, getLocation());
                 } else {
-                    throw new NonfatalBuildException(e);
+                    throw new NonfatalBuildException(e, getLocation());
                 }
             }
 
@@ -425,7 +426,7 @@ public final class Transform extends Filter {
             return configureTransformer(
                 getCompiledStylesheet(stylesheetLocation_.uri(), null, true).newTransformer());
         } catch (TransformerConfigurationException e) {
-            throw new BuildException(e);
+            throw new BuildException(e, getLocation());
         }
     }
 
@@ -447,7 +448,7 @@ public final class Transform extends Filter {
             styler = tfac_.newTransformerHandler(
                 getCompiledStylesheet(stylesheetLocation_.uri(), null, true));
         } catch (TransformerConfigurationException e) {
-            throw new BuildException(e);
+            throw new BuildException(e, getLocation());
         } finally {
             LOCK.unlock();
         }
@@ -479,9 +480,8 @@ public final class Transform extends Filter {
         // Get Source object of the stylesheet
         Source styleSource = getAssociatedStylesheet(source);
         if (styleSource == null) {
-            logger().log(this,
-                "Cannot get associated stylesheet information", Level.WARN);
-            throw new NonfatalBuildException().setLogged();
+            throw new NonfatalBuildException(
+                "Cannot get associated stylesheet information", getLocation());
         }
 
         // Get the system ID of the stylesheet
@@ -526,10 +526,8 @@ public final class Transform extends Filter {
                 assoc_.map(Assoc::getTitle).orElse(null),
                 assoc_.map(Assoc::getCharset).orElse(null));
         } catch (TransformerConfigurationException e) {
-            logger().log(this,
-                "Cannot get associated stylesheet information", Level.WARN);
-            logger().log(Transform.this, e, "  Cause: ", Level.WARN, Level.VERBOSE);
-            throw new NonfatalBuildException().setLogged();
+            throw new NonfatalBuildException(
+                "Cannot get associated stylesheet information", e, getLocation());
         } finally {
             LOCK.unlock();
         }
@@ -591,9 +589,9 @@ public final class Transform extends Filter {
                 return f.newTemplates(s);
             } catch (TransformerConfigurationException e) {
                 if (failsFatal) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, getLocation());
                 } else {
-                    throw new NonfatalBuildException(e);
+                    throw new NonfatalBuildException(e, getLocation());
                 }
             }
         });
@@ -647,12 +645,10 @@ public final class Transform extends Filter {
                 "Failed to compile stylesheet";
             if (e instanceof NonfatalBuildException) {
                 logger().log(this, log, Level.WARN);
-                logger().log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                throw ((NonfatalBuildException) e).setLogged();
             } else {
                 logger().log(this, log, Level.ERR);
-                throw e;
             }
+            throw e;
         } finally {
             LOCK.unlock();
         }

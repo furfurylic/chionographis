@@ -204,7 +204,7 @@ public final class Output extends Sink {
      */
     public void add(FileNameMapper mapper) throws BuildException {
         if (mapper_ != null) {
-            throw new BuildException("File mappers added twice");
+            throw new BuildException("File mappers added twice", getLocation());
         } else {
             mapper_ = mapper;
         }
@@ -223,13 +223,11 @@ public final class Output extends Sink {
         if (dest_ != null) {
             // A predefined destination path exists.
             if (refer_ != null) {
-                logger_.log(this,
-                    "\"dest\" and \"refer\" can be set exclusively", Level.ERR);
-                throw new BuildException();
+                throw new BuildException(
+                    "\"dest\" and \"refer\" can be set exclusively", getLocation());
             } else if (mapper_ != null) {
-                logger_.log(this,
-                    "\"dest\" and file mappers can be set exclusively", Level.ERR);
-                throw new BuildException();
+                throw new BuildException(
+                    "\"dest\" and file mappers can be set exclusively", getLocation());
             }
             dest_ = destDir_.resolve(dest_);
             assert dest_.isAbsolute();
@@ -242,9 +240,8 @@ public final class Output extends Sink {
                 xpath.setNamespaceContext(namespaceContext);
                 referents_ = Collections.singletonList(xpath.compile(refer_));
             } catch (XPathExpressionException e) {
-                logger_.log(this,
-                    "Failed to compile XPath expression: " + refer_, Level.ERR);
-                throw new BuildException(e);
+                throw new BuildException(
+                    "Failed to compile XPath expression: " + refer_, e, getLocation());
             }
 
         } else if (mapper_ == null) {
@@ -252,9 +249,8 @@ public final class Output extends Sink {
             // neither does reference to the source document contents,
             // neither do file mappers.
             // -> No clue to decide the output path.
-            logger_.log(this,
-                "Neither \"dest\", \"refer\" nor file mappers are set", Level.ERR);
-            throw new BuildException();
+            throw new BuildException(
+                "Neither \"dest\", \"refer\" nor file mappers are set", getLocation());
         }
 
         if (referents_ == null) {
@@ -350,8 +346,7 @@ public final class Output extends Sink {
                 Collections.singleton(destDir_.resolve(referredContents.get(0)));
         }
         if (dests.isEmpty()) {
-            logger_.log(this, "Cannot decide the output file path", Level.ERR);
-            throw new NonfatalBuildException();
+            throw new NonfatalBuildException("Cannot decide the output file path", getLocation());
         }
 
         if (!force_ && !isOrigSrcNewer(finder, dests)) {
@@ -443,10 +438,8 @@ public final class Output extends Sink {
                             try {
                                 Files.createDirectories(parent);
                             } catch (IOException e) {
-                                logger_.log(this,
-                                    "Failed to create directory " + parent, Level.WARN);
-                                logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                                throw new NonfatalBuildException(e).setLogged();
+                                throw new NonfatalBuildException(
+                                    "Failed to create directory " + parent, e, getLocation());
                             }
                         }
                     }
@@ -456,9 +449,8 @@ public final class Output extends Sink {
                             StandardOpenOption.TRUNCATE_EXISTING)) {
                         channel.write(ByteBuffer.wrap(out.buffer(), 0, out.size()));
                     } catch (IOException e) {
-                        logger_.log(this, "Failed to create " + absolute, Level.WARN);
-                        logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                        throw new NonfatalBuildException(e).setLogged();
+                        throw new NonfatalBuildException(
+                            "Failed to create " + absolute, e, getLocation());
                     }
                     countInBundle_.incrementAndGet();
                 }
@@ -484,9 +476,7 @@ public final class Output extends Sink {
             }
             return true;
         } catch (IOException e) {
-            logger_.log(this, "Failed to read " + file, Level.WARN);
-            logger_.log(this, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-            throw new NonfatalBuildException(e).setLogged();
+            throw new NonfatalBuildException("Failed to read " + file, e, getLocation());
         } finally {
             Pool.BYTES.release(bytes);
         }

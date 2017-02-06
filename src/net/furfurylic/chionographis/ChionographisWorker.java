@@ -203,10 +203,7 @@ final class ChionographisWorker {
     }
 
     private void logCause(Exception e) {
-        if (!(e instanceof NonfatalBuildException) ||
-            !((NonfatalBuildException) e).isLogged()) {
-            logger_.log(null, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-        }
+        logger_.log(null, e, "  Cause: ", Level.INFO, Level.VERBOSE);
     }
 
     private void addMetaInformation(ProcessingInstructionPost consumer) throws SAXException {

@@ -219,7 +219,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty instruction of meta-information processing instruction.
      */
     public Meta createMeta() {
-        Meta meta = new Meta(logger_);
+        Meta meta = new Meta();
         metas_.add(meta);
         return meta;
     }
@@ -241,7 +241,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        Namespace namespace = new Namespace(logger_);
+        Namespace namespace = new Namespace();
         namespaces_.add(namespace);
         return namespace;
     }
@@ -306,12 +306,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         } else {
             try {
                 doExecute();
-            } catch (NonfatalBuildException e) {
-                if (e.isLogged()) {
-                    logger_.log(this, "Exiting with an error", Level.ERR);
-                } else {
-                    logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
-                }
             } catch (RuntimeException e) {
                 logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
             }
@@ -334,8 +328,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         if (sinks_.isEmpty()) {
-            logger_.log(this, "No sinks configured", Level.ERR);
-            throw new BuildException();
+            throw new BuildException("No sinks configured", getLocation());
         }
 
         // Arrange various directories.
@@ -500,8 +493,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
             e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
             k -> {
-                logger_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
-                throw new BuildException();
+                throw new BuildException("Namespace prefix " + k + " added twice", getLocation());
             });
         return new PrefixMap(namespaceMap);
     }
