@@ -154,18 +154,15 @@ public final class Snip extends Filter {
                 try {
                     expr_ = xpath.compile(select_);
                 } catch (XPathException e) {
-                    logger().log(this,
-                        "Failed to compile the XPath expression: " + select_, Level.ERR);
-                    throw new BuildException(e);
+                    throw new BuildException(
+                        "Failed to compile the XPath expression: " + select_, e, getLocation());
                 }
             }
             try {
                 nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
             } catch (XPathExpressionException e) {
-                logger().log(this,
-                    "Failed to apply the XPath expression: " + select_, Level.ERR);
-                logger().log(this, e, "  Cause: ", Level.ERR, Level.VERBOSE);
-                throw new NonfatalBuildException(e).setLogged();
+                throw new NonfatalBuildException(
+                    "Failed to apply the XPath expression: " + select_, e, getLocation());
             }
             return nodes;
         } finally {
@@ -220,7 +217,8 @@ public final class Snip extends Filter {
         private String origSrcFileName_;
         private LongFunction<Resource> finder_;
 
-        public SnipDOMResult(int origSrcIndex, String origSrcFileName, LongFunction<Resource> finder) {
+        public SnipDOMResult(
+                int origSrcIndex, String origSrcFileName, LongFunction<Resource> finder) {
             super();
             origSrcIndex_ = origSrcIndex;
             origSrcFileName_ = origSrcFileName;

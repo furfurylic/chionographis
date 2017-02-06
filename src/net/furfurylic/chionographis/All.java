@@ -98,8 +98,7 @@ public final class All extends Filter {
                 String prefix = root_.substring(0, indexOfColon);
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
                 if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
-                    logger().log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
-                    throw new BuildException();
+                    throw new BuildException("Unbound namespace prefix: " + prefix, getLocation());
                 }
                 String localName = root_.substring(indexOfColon + 1);
                 rootQ_ = new QName(namespaceURI, localName, prefix);
@@ -190,8 +189,7 @@ public final class All extends Filter {
     void abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        logger().log(this, "One of the sources is damaged; must give up all", Level.ERR);
-        throw new BuildException();
+        throw new BuildException("One of the sources is damaged; must give up all", getLocation());
     }
 
     @Override
@@ -207,7 +205,11 @@ public final class All extends Filter {
             referredContents = Collections.emptyList();
         }
         LongFunction<Resource> finder = (long lastModified) ->
-            finders_.getList().stream().map(fn -> fn.apply(lastModified)).filter(f -> f != null).findAny().orElse(null);
+            finders_.getList().stream()
+                              .map(fn -> fn.apply(lastModified))
+                              .filter(f -> f != null)
+                              .findAny()
+                              .orElse(null);
         Result result = sink().startOne(-1, null, finder, referredContents);
         if (result != null) {
             // Send fragment to sink

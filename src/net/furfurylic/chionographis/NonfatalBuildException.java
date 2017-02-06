@@ -8,6 +8,7 @@
 package net.furfurylic.chionographis;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Location;
 
 /**
  * An exception class which signals nonfatal errors.
@@ -21,12 +22,7 @@ import org.apache.tools.ant.BuildException;
  */
 class NonfatalBuildException extends BuildException {
 
-    private static final long serialVersionUID = 143744476588846591L;
-
-    /**
-     * Whether the cause exception of the exception is reported through the logger already or not.
-     */
-    private boolean isLogged_;
+    private static final long serialVersionUID = -3814186559367393576L;
 
     public NonfatalBuildException() {
     }
@@ -43,29 +39,16 @@ class NonfatalBuildException extends BuildException {
         super(cause);
     }
 
-    /**
-     * Sets the flag of whether the cause exception of this exception is reported already to
-     * {@code true}.
-     *
-     * <p>This flag cannot be set to {@code false} once it has been set to {@code true}.</p>
-     *
-     * @return
-     *      {@code this}
-     */
-    public NonfatalBuildException setLogged() {
-        isLogged_ = (getCause() != null);
-        return this;
+    public NonfatalBuildException(String message, Location location) {
+        super(message, location);
     }
 
-    /**
-     * Tells whether the cause exception of this exception is reported already.
-     *
-     * @return
-     *      {@code true} if the cause exception of this exception is reported already;
-     *      {@code false} otherwise.
-     */
-    public boolean isLogged() {
-        return isLogged_;
+    public NonfatalBuildException(String msg, Throwable cause, Location location) {
+        super(msg, cause, location);
+    }
+
+    public NonfatalBuildException(Throwable cause, Location location) {
+        super(cause, location);
     }
 
     @Override
