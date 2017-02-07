@@ -34,6 +34,7 @@ import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.Location;
 import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
@@ -78,7 +79,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void init() {
-        sinks_ = new Sinks();
+        sinks_ = new Sinks(getLocation());
         logger_ = new ChionographisLogger();
     }
 
@@ -379,7 +380,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
             failOnNonfatalError_, srcURIs, srcFileNames, finders,
-            sinks_, createEntityResolver(), logger_, createMetaFuncs());
+            sinks_, createEntityResolver(), logger_, createMetaFuncs(), getLocation());
 
         // This report is placed here in order to appear after all preparation passed in peace.
         logSrcFound.run();
@@ -518,6 +519,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private static final class ChionographisWorkerFactory {
+        private Location location_;
         private boolean failOnNonfatalError_;
         private URI[] uris_;
         private String[] fileNames_;
@@ -532,7 +534,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 boolean failOnNonfatalError,
                 URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver, Logger logger,
-                List<Map.Entry<String, Function<URI, String>>> metaFuncs) {
+                List<Map.Entry<String, Function<URI, String>>> metaFuncs, Location location) {
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
@@ -548,7 +550,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             return new ChionographisWorker(failOnNonfatalError_, index,
                 uris_[index], fileNames_[index], finders_[index],
                 sink_, logger_, metaFuncs_, xfer_,
-                () -> isOK_)::run;
+                () -> isOK_, location_)::run;
         }
 
         public IntSupplier convertToRuiner(IntSupplier worker) {

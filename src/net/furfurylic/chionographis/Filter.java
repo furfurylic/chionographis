@@ -35,7 +35,7 @@ abstract class Filter extends Sink implements Driver {
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
     Filter(Logger logger, Function<String, String> propertyExpander) {
-        sinks_ = new Sinks();
+        sinks_ = new Sinks(getLocation());
         logger_ = logger;
         propertyExpander_ = propertyExpander;
     }
@@ -136,4 +136,5 @@ abstract class Filter extends Sink implements Driver {
      *      whether the task executes in the dry run mode.
      */
     abstract void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun);
+
 }
