@@ -31,6 +31,7 @@ import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Location;
 import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Node;
 import org.xml.sax.Attributes;
@@ -42,8 +43,9 @@ import org.xml.sax.ext.LexicalHandler;
 /**
  * Represents a composite of {@code Sink} objects.
  */
-final class Sinks extends Sink/* implements Logger*/ {
+final class Sinks extends Sink {
 
+    private Location location_;
     private List<Sink> sinks_;
 
     /**
@@ -64,8 +66,12 @@ final class Sinks extends Sink/* implements Logger*/ {
 
     /**
      * Sole constructor.
+     *
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      */
-    public Sinks() {
+    public Sinks(Location location) {
+        location_ = location;
         sinks_ = new ArrayList<>();
     }
 
@@ -188,7 +194,7 @@ final class Sinks extends Sink/* implements Logger*/ {
     Result startOne(int origSrcIndex, String origSrcFileName,
             LongFunction<Resource> finder, List<String> referredContents) {
         Assemblage<Sink> activeSinks = new Assemblage<>();
-        CompositeResultBuilder builder = new CompositeResultBuilder();
+        CompositeResultBuilder builder = new CompositeResultBuilder(location_);
         int j = 0;
         try {
             int i = 0;
@@ -378,10 +384,12 @@ final class Sinks extends Sink/* implements Logger*/ {
 
     private static class CompositeDOMResult extends DOMResult implements CompositeResult {
 
+        private Location location_;
         private Results results_;
 
-        public CompositeDOMResult(Node node, List<Result> results) {
+        public CompositeDOMResult(Node node, List<Result> results, Location location) {
             super(node);
+            location_ = location;
             results_ = new Results(results) {
                 @Override
                 public void finish(List<Sink> sinks) {
@@ -403,7 +411,7 @@ final class Sinks extends Sink/* implements Logger*/ {
                     try {
                         while (i < sinks.size()) {
                             if (i != j) {
-                                xfer.transfer(source, rs.get(i), false);
+                                xfer.transfer(source, rs.get(i), false, location_);
                                 ++i;
                                 sinks.get(i - 1).finishOne(rs.get(i - 1));
                             } else {
@@ -420,7 +428,7 @@ final class Sinks extends Sink/* implements Logger*/ {
                     }
 
                     // For the index j, send the result by move
-                    xfer.transfer(source, rs.get(j), true);
+                    xfer.transfer(source, rs.get(j), true, location_);
                     sinks.get(j).finishOne(rs.get(j));
                 }
             };
@@ -434,9 +442,11 @@ final class Sinks extends Sink/* implements Logger*/ {
 
     private static final class CompositeResultBuilder {
 
+        private Location location_;
         private List<Result> results_ = new ArrayList<>();
 
-        public CompositeResultBuilder() {
+        public CompositeResultBuilder(Location location) {
+            location_ = location;
         }
 
         public void add(Result result) {
@@ -452,7 +462,8 @@ final class Sinks extends Sink/* implements Logger*/ {
                 return results_.get(0);
             }
             if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
-                return new CompositeDOMResult(XMLTransfer.getDefault().newDocument(), results_);
+                return new CompositeDOMResult(
+                        XMLTransfer.getDefault().newDocument(location_), results_, location_);
             }
 
             try {

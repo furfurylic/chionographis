@@ -171,7 +171,7 @@ public final class Snip extends Filter {
     }
 
     private Document newFragmentDocument(Node node) {
-        Document document = XMLTransfer.getDefault().newDocument();
+        Document document = XMLTransfer.getDefault().newDocument(getLocation());
         document.appendChild(document.adoptNode(node));
         return document;
     }
@@ -193,7 +193,7 @@ public final class Snip extends Filter {
             result.finder(), referredContents);
         if (rr != null) {
             // Send fragment to sink
-            XMLTransfer.getDefault().transfer(new DOMSource(document), rr);
+            XMLTransfer.getDefault().transfer(new DOMSource(document), rr, getLocation());
             // Finish sink
             sink().finishOne(rr);
         }
