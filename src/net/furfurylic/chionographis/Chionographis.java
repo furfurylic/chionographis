@@ -581,15 +581,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         @Override
         public void log(Object issuer, Throwable ex, String heading,
                 Level headingLevel, Level bodyLevel) {
-            // If failOnNonfatalError_, exceptions reported other than this task is redundant
-            // (those exceptions are likely to be reported by Ant after failing).
-            if (!failOnNonfatalError_ || (issuer == null) || (issuer == Chionographis.this)) {
-                logEx(issuer, ex, heading, headingLevel, bodyLevel);
-            }
-        }
-
-        private void logEx(Object issuer, Throwable ex, String heading,
-                Level headingLevel, Level bodyLevel) {
             String indent;
             String trimmedHead;
             {
