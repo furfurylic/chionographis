@@ -12,7 +12,7 @@ package net.furfurylic.chionographis;
  */
 interface Logger {
 
-    /** The enumrated value of the priority of the log entries. */
+    /** The enumerated value of the priority of the log entries. */
     enum Level {
         /**
          * ERR log priority. Logging with this priority generally means an unrecoverable case.
@@ -34,7 +34,8 @@ interface Logger {
      * Logs a message with the given priority.
      *
      * @param issuer
-     *      the issuer object of this log entry, which shall not be {@code null}.
+     *      the issuer object of this log entry. If {@code null} is specified, then the
+     *      {@linkplain Chionographis task} will be used instead.
      * @param message
      *      the message to be logged, which shall not be {@code null}.
      * @param level
@@ -46,7 +47,8 @@ interface Logger {
      * Logs a exception with the given priority.
      *
      * @param issuer
-     *      the issuer object of this log entry, which shall not be {@code null}.
+     *      the issuer object of this log entry. If {@code null} is specified, then the
+     *      {@linkplain Chionographis task} will be used instead.
      * @param ex
      *      the exception object to be logged, which shall not be {@code null}.
      * @param heading

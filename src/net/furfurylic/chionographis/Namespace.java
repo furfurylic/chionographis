@@ -11,29 +11,22 @@ import java.util.AbstractMap;
 import java.util.Map;
 
 import org.apache.tools.ant.BuildException;
-
-import net.furfurylic.chionographis.Logger.Level;
+import org.apache.tools.ant.ProjectComponent;
 
 /**
  * This class represents one prefix-namespace URI mapping entry.
  *
  * @see Chionographis#createNamespace()
  */
-public final class Namespace {
-
-    private Logger logger_;
+public final class Namespace extends ProjectComponent {
 
     private String prefix_ = null;
     private String namespaceURI_ = null;
 
     /**
      * Sole constructor.
-     *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      */
-    Namespace(Logger logger) {
-        logger_ = logger;
+    Namespace() {
     }
 
     /**
@@ -47,9 +40,10 @@ public final class Namespace {
      */
     public void setPrefix(String prefix) {
         if (prefix.isEmpty()) {
-            throw new BuildException("Empty namespace prefixes are not acceptable");
+            throw new BuildException(
+                "Empty namespace prefixes are not acceptable", getLocation());
         } else if ((prefix.length() >= 3) && prefix.substring(0, 3).equalsIgnoreCase("xml")) {
-            throw new BuildException("Bad namespace prefix: " + prefix);
+            throw new BuildException("Bad namespace prefix: " + prefix, getLocation());
         } else {
             prefix_ = prefix;
         }
@@ -82,13 +76,11 @@ public final class Namespace {
             if (namespaceURI_ != null) {
                 message += ": URI=" + namespaceURI_;
             }
-            logger_.log(this, message, Level.ERR);
-            throw new BuildException();
+            throw new BuildException(message, getLocation());
         }
         if (namespaceURI_ == null) {
             String message = "Incomplete namespace prefix mapping found: prefix=" + prefix_;
-            logger_.log(this, message, Level.ERR);
-            throw new BuildException();
+            throw new BuildException(message, getLocation());
         }
 
         return new AbstractMap.SimpleImmutableEntry<String, String>(prefix_, namespaceURI_);

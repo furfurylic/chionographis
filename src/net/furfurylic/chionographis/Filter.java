@@ -14,8 +14,6 @@ import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
 
-import net.furfurylic.chionographis.Logger.Level;
-
 /**
  * An abstract base class for an <i>filter</i>, which is a <i>{@linkplain Driver}</i> and
  * a <i>{@linkplain Sink}</i> at once.
@@ -37,7 +35,7 @@ abstract class Filter extends Sink implements Driver {
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
     Filter(Logger logger, Function<String, String> propertyExpander) {
-        sinks_ = new Sinks();
+        sinks_ = new Sinks(getLocation());
         logger_ = logger;
         propertyExpander_ = propertyExpander;
     }
@@ -120,8 +118,7 @@ abstract class Filter extends Sink implements Driver {
     final void init(File baseDir, NamespaceContext namespaceContext,
             boolean force, boolean dryRun) {
         if (sinks_.isEmpty()) {
-            logger_.log(this, "No sinks configured", Level.ERR);
-            throw new BuildException();
+            throw new BuildException("No sinks configured", getLocation());
         }
         force_ = force_ || force;
         doInit(baseDir, namespaceContext, dryRun);
@@ -139,4 +136,5 @@ abstract class Filter extends Sink implements Driver {
      *      whether the task executes in the dry run mode.
      */
     abstract void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun);
+
 }

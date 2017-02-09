@@ -34,6 +34,7 @@ import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.Location;
 import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
@@ -78,7 +79,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public void init() {
-        sinks_ = new Sinks();
+        sinks_ = new Sinks(getLocation());
         logger_ = new ChionographisLogger();
     }
 
@@ -219,7 +220,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty instruction of meta-information processing instruction.
      */
     public Meta createMeta() {
-        Meta meta = new Meta(logger_);
+        Meta meta = new Meta();
         metas_.add(meta);
         return meta;
     }
@@ -241,7 +242,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      * @see Param#setName(String)
      */
     public Namespace createNamespace() {
-        Namespace namespace = new Namespace(logger_);
+        Namespace namespace = new Namespace();
         namespaces_.add(namespace);
         return namespace;
     }
@@ -306,12 +307,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         } else {
             try {
                 doExecute();
-            } catch (NonfatalBuildException e) {
-                if (e.isLogged()) {
-                    logger_.log(this, "Exiting with an error", Level.ERR);
-                } else {
-                    logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
-                }
             } catch (RuntimeException e) {
                 logger_.log(this, e, "Exiting with an error: ", Level.ERR, Level.VERBOSE);
             }
@@ -334,8 +329,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         }
 
         if (sinks_.isEmpty()) {
-            logger_.log(this, "No sinks configured", Level.ERR);
-            throw new BuildException();
+            throw new BuildException("No sinks configured", getLocation());
         }
 
         // Arrange various directories.
@@ -386,7 +380,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
             failOnNonfatalError_, srcURIs, srcFileNames, finders,
-            sinks_, createEntityResolver(), logger_, createMetaFuncs());
+            sinks_, createEntityResolver(), logger_, createMetaFuncs(), getLocation());
 
         // This report is placed here in order to appear after all preparation passed in peace.
         logSrcFound.run();
@@ -499,10 +493,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private NamespaceContext createNamespaceContext() {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
             e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
-            k -> {
-                logger_.log(this, "Namespace prefix " + k + " added twice", Level.ERR);
-                throw new BuildException();
-            });
+            k -> new BuildException("Namespace prefix " + k + " added twice", getLocation()));
         return new PrefixMap(namespaceMap);
     }
 
@@ -526,6 +517,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private static final class ChionographisWorkerFactory {
+        private Location location_;
         private boolean failOnNonfatalError_;
         private URI[] uris_;
         private String[] fileNames_;
@@ -540,7 +532,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 boolean failOnNonfatalError,
                 URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver, Logger logger,
-                List<Map.Entry<String, Function<URI, String>>> metaFuncs) {
+                List<Map.Entry<String, Function<URI, String>>> metaFuncs, Location location) {
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
@@ -556,7 +548,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             return new ChionographisWorker(failOnNonfatalError_, index,
                 uris_[index], fileNames_[index], finders_[index],
                 sink_, logger_, metaFuncs_, xfer_,
-                () -> isOK_)::run;
+                () -> isOK_, location_)::run;
         }
 
         public IntSupplier convertToRuiner(IntSupplier worker) {
@@ -586,15 +578,6 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         @Override
         public void log(Object issuer, Throwable ex, String heading,
-                Level headingLevel, Level bodyLevel) {
-            // If failOnNonfatalError_, exceptions reported other than this task is redundant
-            // (those exceptions are likely to be reported by Ant after failing).
-            if (!failOnNonfatalError_ || (issuer == null) || (issuer == Chionographis.this)) {
-                logEx(issuer, ex, heading, headingLevel, bodyLevel);
-            }
-        }
-
-        private void logEx(Object issuer, Throwable ex, String heading,
                 Level headingLevel, Level bodyLevel) {
             String indent;
             String trimmedHead;

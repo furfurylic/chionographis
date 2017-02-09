@@ -16,13 +16,14 @@ import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
 import javax.xml.xpath.XPathExpression;
 
+import org.apache.tools.ant.ProjectComponent;
 import org.apache.tools.ant.types.Resource;
 
 /**
  * A <i>sink</i> object is a destination of processed documents.
  * Objects which supplies documents to sinks are called <i>{@linkplain Driver drivers}</i>.
  */
-public abstract class Sink {
+public abstract class Sink extends ProjectComponent {
 
     /*
      * This class has no instance fields, but is not an interface due to prevent

@@ -15,8 +15,7 @@ import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
-
-import net.furfurylic.chionographis.Logger.Level;
+import org.apache.tools.ant.ProjectComponent;
 
 /**
  * An object of this class represents one stylesheet parameter applied to the transformation
@@ -24,9 +23,8 @@ import net.furfurylic.chionographis.Logger.Level;
  *
  * @see Transform#createParam()
  */
-public final class Param {
+public final class Param extends ProjectComponent {
 
-    private Logger logger_;
     private Function<String, String> expander_;
 
     private String name_ = null;
@@ -36,13 +34,10 @@ public final class Param {
     /**
      * Sole constructor.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Param(Logger logger, Function<String, String> expander) {
-        logger_ = logger;
+    Param(Function<String, String> expander) {
         expander_ = expander;
     }
 
@@ -63,7 +58,7 @@ public final class Param {
     public void setName(String name) {
         if (name.isEmpty()) {
             throw new BuildException(
-                "Stylesheet parameters with empty names are not acceptable");
+                "Stylesheet parameters with empty names are not acceptable", getLocation());
         }
         name_ = name;
     }
@@ -96,7 +91,7 @@ public final class Param {
             try {
                 value_ = expander_.apply(value);
             } catch (BuildException e) {
-                throw new BuildException("Property expansion failed: " + value, e);
+                throw new BuildException("Property expansion failed: " + value, e, getLocation());
             }
         } else {
             value_ = value;
@@ -120,9 +115,8 @@ public final class Param {
      */
     Map.Entry<String, Object> yield(NamespaceContext namespaceContext) {
         if (name_ == null) {
-            String message = "Incomplete stylesheet parameter found: value=" + value_;
-            logger_.log(this, message, Level.ERR);
-            throw new BuildException();
+            throw new BuildException(
+                "Incomplete stylesheet parameter found: value=" + value_, getLocation());
         }
         Object value = (value_ == null) ? "" : value_;
 
@@ -133,8 +127,8 @@ public final class Param {
                 String prefix = name.substring(0, indexOfColon);
                 String namespaceURI = namespaceContext.getNamespaceURI(prefix);
                 if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
-                    logger_.log(this, "Unbound namespace prefix: " + prefix, Level.ERR);
-                    throw new BuildException();
+                    throw new BuildException(
+                        "Unbound namespace prefix: " + prefix, getLocation());
                 }
                 String localName = name.substring(indexOfColon + 1);
                 name = '{' + namespaceURI + '}' + localName;

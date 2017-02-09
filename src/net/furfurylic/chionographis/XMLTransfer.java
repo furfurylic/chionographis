@@ -8,9 +8,9 @@
 package net.furfurylic.chionographis;
 
 import java.io.IOException;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,6 +33,7 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Location;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.ls.DOMImplementationLS;
@@ -53,9 +54,9 @@ import org.xml.sax.ext.LexicalHandler;
  */
 final class XMLTransfer {
 
-    private ThreadLocal<Supplier<XMLReader>> reader_;
-    private ThreadLocal<Supplier<DocumentBuilder>> builder_;
-    private ThreadLocal<Supplier<Transformer>> identity_;
+    private ThreadLocal<Function<Location, XMLReader>> reader_;
+    private ThreadLocal<Function<Location, DocumentBuilder>> builder_;
+    private ThreadLocal<Function<Location, Transformer>> identity_;
 
     private static final XMLTransfer DEFAULT = new XMLTransfer();
 
@@ -87,11 +88,11 @@ final class XMLTransfer {
             ((uriResolver == null) && (entityResolver instanceof URIResolver)) ?
                 ((URIResolver) entityResolver) : uriResolver;
         reader_ = ThreadLocal.withInitial(
-            () -> createXMLReaderSupplier(usedEntityResolver));
+            () -> createXMLReaderCreator(usedEntityResolver));
         builder_ = ThreadLocal.withInitial(
-            () -> createDocumentBuilderSupplier(usedEntityResolver));
+            () -> createDocumentBuilderCreator(usedEntityResolver));
         identity_ = ThreadLocal.withInitial(
-            () -> createIdentityTransformerSupplier(usedURIResolver));
+            () -> createIdentityTransformerCreator(usedURIResolver));
     }
 
     /**
@@ -102,7 +103,7 @@ final class XMLTransfer {
     }
 
     /**
-     * Sends a document from a source to a result. Note that this method is destuctive
+     * Sends a document from a source to a result. Note that this method is destructive
      * to the source.
      *
      * <p>If the source is a {@code SAXSource} object and the {@code XMLReader} is absent,
@@ -117,25 +118,27 @@ final class XMLTransfer {
      *      a TrAX {@code Source} object, which must not be {@code null}.
      * @param result
      *      a TrAX {@code Result} object, which must not be {@code null}.
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      *
      * @throws NonfatalBuildException
      *      if a recoverable error occurs.
      * @throws BuildException
      *      if a serious configuration problem occurs.
      */
-    public void transfer(Source source, Result result) {
+    public void transfer(Source source, Result result, Location location) {
         try {
             if (source instanceof SAXSource) {
                 SAXSource saxSource = (SAXSource) source;
                 if (result instanceof SAXResult) {
-                    transferSAX2SAX(saxSource, (SAXResult) result);
+                    transferSAX2SAX(saxSource, (SAXResult) result, location);
                     return;
                 } else {
-                    fillUpSAXSource(saxSource);
+                    fillUpSAXSource(saxSource, location);
                     // Fall through
                 }
             } else if (source instanceof DOMSource) {
-                transfer((DOMSource) source, result, true);
+                transfer((DOMSource) source, result, true, location);
                 return;
             } else if (source instanceof StreamSource) {
                 if (result instanceof SAXResult) {
@@ -144,13 +147,13 @@ final class XMLTransfer {
                     if (saxSource.getSystemId() == null) {
                         saxSource.setSystemId(source.getSystemId());
                     }
-                    transferSAX2SAX(saxSource, (SAXResult) result);
+                    transferSAX2SAX(saxSource, (SAXResult) result, location);
                     return;
                 } else if (result instanceof DOMResult){
                     InputSource input = SAXSource.sourceToInputSource(source);
-                    Document document = builder_.get().get().parse(input);
+                    Document document = builder_.get().apply(location).parse(input);
                     transferDOM2DOM(new DOMSource(document, source.getSystemId()),
-                        (DOMResult) result, true);
+                        (DOMResult) result, true, location);
                     return;
                 } else {
                     // Fall through
@@ -159,19 +162,19 @@ final class XMLTransfer {
                 // Fall through
             }
 
-            identity_.get().get().transform(source, result);
+            identity_.get().apply(location).transform(source, result);
             copySystemID(source, result);
 
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
-            throw new BuildException(e);
+            throw new BuildException(e, location);
         } catch (IOException | SAXException | TransformerException e) {
-            throw new NonfatalBuildException(e);
+            throw new NonfatalBuildException(e, location);
         }
     }
 
     /**
      * Sends a document from a TrAX {@code DOMSource} to a {@code DOMResult}.
-     * Note that this method is destuctive to the source.
+     * Note that this method is destructive to the source.
      *
      * <p>If {@code adopts} is {@code true} and {@code result} is a {@code DOMResult} object,
      * this method removes away the child nodes of the {@code source}'s node,
@@ -184,22 +187,24 @@ final class XMLTransfer {
      *      a TrAX {@code DOMResult} object, which must not be {@code null}.
      * @param adopts
      *      {@code true} if nodes are moved; {@code false} otherwise, that is, they are copied.
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      *
      * @throws NonfatalBuildException
      *      if a recoverable error occurs.
      * @throws BuildException
      *      if a serious configuration problem occurs.
      */
-    public void transfer(DOMSource source, Result result, boolean adopts) {
+    public void transfer(DOMSource source, Result result, boolean adopts, Location location) {
         if (result instanceof DOMResult) {
-            transferDOM2DOM(source, (DOMResult) result, adopts);
+            transferDOM2DOM(source, (DOMResult) result, adopts, location);
             return;
         }
 
         if (result instanceof StreamResult) {
             StreamResult streamResult = (StreamResult) result;
             DOMImplementationLS ls =
-                (DOMImplementationLS) builder_.get().get().getDOMImplementation();
+                (DOMImplementationLS) builder_.get().apply(location).getDOMImplementation();
             LSOutput output = ls.createLSOutput();
             output.setByteStream(streamResult.getOutputStream());
             output.setCharacterStream(streamResult.getWriter());
@@ -207,9 +212,9 @@ final class XMLTransfer {
             ls.createLSSerializer().write(source.getNode(), output);
         } else {
             try {
-                identity_.get().get().transform(source, result);
+                identity_.get().apply(location).transform(source, result);
             } catch (TransformerException e) {
-                throw new NonfatalBuildException(e);
+                throw new NonfatalBuildException(e, location);
             }
         }
         copySystemID(source, result);
@@ -220,6 +225,8 @@ final class XMLTransfer {
      *
      * @param source
      *      a TrAX {@code StreamSource} object to be read,which must not be {@code null}.
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      *
      * @return
      *      the resulted DOM document.
@@ -229,16 +236,19 @@ final class XMLTransfer {
      * @throws BuildException
      *      if a serious configuration problem occurs.
      */
-    public Document parse(StreamSource source) {
+    public Document parse(StreamSource source, Location location) {
         try {
-            return builder_.get().get().parse(SAXSource.sourceToInputSource(source));
+            return builder_.get().apply(location).parse(SAXSource.sourceToInputSource(source));
         } catch (IOException | SAXException e) {
-            throw new NonfatalBuildException(e);
+            throw new NonfatalBuildException(e, location);
         }
     }
 
     /**
      * Creates a new empty document.
+     *
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      *
      * @return
      *      the resulted DOM document.
@@ -246,17 +256,17 @@ final class XMLTransfer {
      * @throws BuildException
      *      if a serious configuration problem occurs.
      */
-    public Document newDocument() {
-        return builder_.get().get().newDocument();
+    public Document newDocument(Location location) {
+        return builder_.get().apply(location).newDocument();
     }
 
-    private void fillUpSAXSource(SAXSource saxSource) {
+    private void fillUpSAXSource(SAXSource saxSource, Location location) {
         if (saxSource.getXMLReader() == null) {
-            saxSource.setXMLReader(reader_.get().get());
+            saxSource.setXMLReader(reader_.get().apply(location));
         } else if (saxSource.getXMLReader() instanceof XMLFilter) {
             XMLFilter filter = (XMLFilter) saxSource.getXMLReader();
             if (filter.getParent() == null) {
-                filter.setParent(reader_.get().get());
+                filter.setParent(reader_.get().apply(location));
             }
         }
         InputSource input = saxSource.getInputSource();
@@ -279,15 +289,16 @@ final class XMLTransfer {
         }
     }
 
-    private void transferSAX2SAX(SAXSource saxSource, SAXResult saxResult)
+    private void transferSAX2SAX(SAXSource saxSource, SAXResult saxResult, Location location)
             throws SAXException, IOException {
-        fillUpSAXSource(saxSource);
+        fillUpSAXSource(saxSource, location);
         setHandlers(saxSource.getXMLReader(), saxResult);
         saxSource.getXMLReader().parse(saxSource.getInputSource());
         copySystemID(saxSource, saxResult);
     }
 
-    private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts) {
+    private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts,
+            Location location) {
         if (result.getNode() == null) {
             if (adopts) {
                 result.setNode(source.getNode());
@@ -295,7 +306,7 @@ final class XMLTransfer {
                 copySystemID(source, result);
                 return;
             } else {
-                result.setNode(newDocument());
+                result.setNode(newDocument(location));
             }
         }
 
@@ -335,19 +346,19 @@ final class XMLTransfer {
         }
     }
 
-    private static Supplier<XMLReader> createXMLReaderSupplier(EntityResolver resolver) {
-        Supplier<XMLReader> reader = new One<XMLReader, SAXParser>(
-            () -> {
+    private static Function<Location, XMLReader> createXMLReaderCreator(EntityResolver resolver) {
+        Function<Location, XMLReader> reader = new One<XMLReader, SAXParser>(
+            l -> {
                 SAXParserFactory pfac = SAXParserFactory.newInstance();
                 pfac.setNamespaceAware(true);
                 try {
                     pfac.setFeature("http://xml.org/sax/features/namespace-prefixes", true);
                     return pfac.newSAXParser();
                 } catch (ParserConfigurationException | SAXException e) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, l);
                 }
             },
-            p -> {
+            (p, l) -> {
                 try {
                     p.reset();
                     XMLReader xmlReader = p.getXMLReader();
@@ -356,25 +367,25 @@ final class XMLTransfer {
                     }
                     return xmlReader;
                 } catch (SAXException e) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, l);
                 }
             });
         return reader;
     }
 
-    private static Supplier<DocumentBuilder> createDocumentBuilderSupplier(
+    private static Function<Location, DocumentBuilder> createDocumentBuilderCreator(
             EntityResolver resolver) {
-        Supplier<DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
-            () -> {
+        Function<Location, DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
+            l -> {
                 try {
                     DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
                     dbfac.setNamespaceAware(true);
                     return dbfac.newDocumentBuilder();
                 } catch (ParserConfigurationException e) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, l);
                 }
             },
-            b -> {
+            (b, l) -> {
                 b.reset();
                 if (resolver != null) {
                     b.setEntityResolver(resolver);
@@ -384,9 +395,10 @@ final class XMLTransfer {
         return builder;
     }
 
-    private static Supplier<Transformer> createIdentityTransformerSupplier(URIResolver resolver) {
-        Supplier<Transformer> transformer = new One<Transformer, Transformer>(
-            () -> {
+    private static Function<Location, Transformer> createIdentityTransformerCreator(
+            URIResolver resolver) {
+        Function<Location, Transformer> transformer = new One<Transformer, Transformer>(
+            l -> {
                 try {
                     TransformerFactory tfac = TransformerFactory.newInstance();
                     Transformer transform = tfac.newTransformer();
@@ -395,10 +407,10 @@ final class XMLTransfer {
                     }
                     return transform;
                 } catch (TransformerConfigurationException e) {
-                    throw new BuildException(e);
+                    throw new BuildException(e, l);
                 }
             },
-            t -> {
+            (t, l) -> {
                 t.reset();
                 t.setOutputProperty(OutputKeys.METHOD, "xml");
                 return t;
@@ -406,22 +418,22 @@ final class XMLTransfer {
         return transformer;
     }
 
-    private static final class One<T, U> implements Supplier<T> {
-        private Supplier<U> factory_;
-        private Function<U, T> resetter_;
+    private static final class One<T, U> implements Function<Location, T> {
+        private Function<Location, U> factory_;
+        private BiFunction<U, Location, T> resetter_;
         private U one_;
 
-        public One(Supplier<U> factory, Function<U, T> resetter) {
+        public One(Function<Location, U> factory, BiFunction<U, Location, T> resetter) {
             factory_ = factory;
             resetter_ = resetter;
         }
 
         @Override
-        public T get() {
+        public T apply(Location location) {
             if (one_ == null) {
-                one_ = factory_.get();
+                one_ = factory_.apply(location);
             }
-            return resetter_.apply(one_);
+            return resetter_.apply(one_, location);
         }
     }
 }
