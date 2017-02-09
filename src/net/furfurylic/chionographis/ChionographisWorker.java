@@ -23,7 +23,9 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Location;
 import org.apache.tools.ant.types.Resource;
+import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
@@ -40,6 +42,7 @@ import net.furfurylic.chionographis.Logger.Level;
  */
 final class ChionographisWorker {
 
+    private Location location_;
     private boolean failOnNonfatalError_;
 
     private int index_;
@@ -80,13 +83,16 @@ final class ChionographisWorker {
      *      an object which transfers XML documents.
      * @param isOK
      *      a function which tells whether the execution is go (1) or no-go (0).
+     * @param location
+     *      the location embedded into exceptions thrown, which can be {@code null}.
      */
     public ChionographisWorker(
             boolean failOnNonfatalError,
             int index, URI uri, String fileName, LongFunction<Resource> finder,
             Sink sink, Logger logger,
             List<Map.Entry<String, Function<URI, String>>> metaFuncs, XMLTransfer xfer,
-            IntSupplier isOK) {
+            IntSupplier isOK, Location location) {
+        location_ = location;
         failOnNonfatalError_ = failOnNonfatalError;
         index_ = index;
         uri_ = uri;
@@ -119,7 +125,7 @@ final class ChionographisWorker {
             List<String> referredContents;
             Source source;
             if (!referents.isEmpty()) {
-                Document document = xfer_.parse(new StreamSource(systemID));
+                Document document = xfer_.parse(new StreamSource(systemID), location_);
 
                 if (!metaFuncs_.isEmpty()) {
                     DocumentFragment metas = document.createDocumentFragment();
@@ -155,61 +161,51 @@ final class ChionographisWorker {
                 return 1;
             }
 
+            boolean toFinish = false;
             try {
-                xfer_.transfer(source, result);
-            } catch (NonfatalBuildException e) {
-                logger_.log(null, "Aborting processing " + systemID, Level.WARN);
-                if (!failOnNonfatalError_) {
-                    logCause(e);
-                }
-                try {
+                xfer_.transfer(source, result, location_);
+                toFinish = true;
+            } catch (DOMException | NonfatalBuildException e) {
+                return handleRecoverableFailure(e);
+            } finally {
+                if (!toFinish) {
+                    // sink_.startOne() succeeded but we can't proceed to sink_.finishOne()
+                    // -> we shall try to call sink_.abort()
+                    logger_.log(null, "Aborting processing " + systemID, Level.WARN);
                     sink_.abortOne(result);
-                } catch (NonfatalBuildException ex) {
-                    throw new BuildException(ex);
-                } catch (BuildException ex) {
-                    throw ex;
-                } catch (Exception ex) {
-                    throw new BuildException(e);
-                }
-                if (failOnNonfatalError_) {
-                    throw new BuildException(e);
-                } else {
-                    return 0;
                 }
             }
+
             if (isOK_.getAsInt() == 0) {
+                logger_.log(null, "Aborting processing " + systemID, Level.VERBOSE);
+                sink_.abortOne(result);
                 return 0;
-            }
-
-            sink_.finishOne(result);
-            return 1;
-
-        } catch (Exception e) {
-            if ((e instanceof BuildException) && !(e instanceof NonfatalBuildException)) {
-                throw (BuildException) e;
-            }
-            logger_.log(null, "Failed to process " + systemID, Level.WARN);
-            if (failOnNonfatalError_) {
-                if (e instanceof RuntimeException) {
-                    throw (RuntimeException) e;
-                } else {
-                    throw new BuildException(e);
-                }
             } else {
-                logCause(e);
-                return 0;
+                sink_.finishOne(result);
+                return 1;
             }
+
+        } catch (DOMException | NonfatalBuildException e) {
+            // sink_.startOne() has not been called yet or sink_.finishOne() has failed
+            // -> we need not try to call sink_.abort()
+            logger_.log(null, "Failed to process " + systemID, Level.WARN);
+            return handleRecoverableFailure(e);
         }
     }
 
-    private void logCause(Exception e) {
-        if (!(e instanceof NonfatalBuildException) ||
-            !((NonfatalBuildException) e).isLogged()) {
+    private int handleRecoverableFailure(RuntimeException e) {
+        if (failOnNonfatalError_) {
+            throw new BuildException(
+                "Nonfatal error occurred and \"failOnNonfatalError\" specified", e, location_);
+        } else {
             logger_.log(null, e, "  Cause: ", Level.INFO, Level.VERBOSE);
+                // "Aborting processing" or "Failed to process" shall precede this
+            return 0;
         }
     }
 
-    private void addMetaInformation(ProcessingInstructionPost consumer) throws SAXException {
+    private <X extends Throwable> void addMetaInformation(ProcessingInstructionPost<X> consumer)
+            throws X {
         for (Map.Entry<String, Function<URI, String>> metaFunc : metaFuncs_) {
             String target = metaFunc.getKey();
             String data = metaFunc.getValue().apply(uri_);
@@ -221,20 +217,20 @@ final class ChionographisWorker {
     }
 
     @FunctionalInterface
-    interface ProcessingInstructionPost {
-        void processingInstrcution(String target, String data) throws SAXException;
+    private static interface ProcessingInstructionPost<X extends Throwable> {
+        void processingInstrcution(String target, String data) throws X;
     }
 
     @FunctionalInterface
-    interface ProcessingInstructionAdder {
-        void add(ProcessingInstructionPost post) throws SAXException;
+    private static interface ProcessingInstructionAdder<X extends Throwable> {
+        void add(ProcessingInstructionPost<X> post) throws X;
     }
 
     private static final class MetaFilter extends XMLFilterImpl {
 
-        private ProcessingInstructionAdder adder_;
+        private ProcessingInstructionAdder<SAXException> adder_;
 
-        public MetaFilter(XMLReader parent, ProcessingInstructionAdder adder) {
+        public MetaFilter(XMLReader parent, ProcessingInstructionAdder<SAXException> adder) {
             super(parent);
             adder_ = adder;
         }

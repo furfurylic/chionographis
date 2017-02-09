@@ -15,14 +15,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.tools.ant.BuildException;
-
-import net.furfurylic.chionographis.Logger.Level;
+import org.apache.tools.ant.ProjectComponent;
 
 /**
  * A class to instruct the <i>{@linkplain Chionographis}</i> driver to add
  * a processing instruction which includes meta-information of the original source.
  */
-public final class Meta {
+public final class Meta extends ProjectComponent {
 
     /**
      * This type defines the set of usable original source meta-information types.
@@ -91,19 +90,13 @@ public final class Meta {
         }
     }
 
-    private Logger logger_;
-
     private Type type_ = null;
     private String name_ = null;
 
     /**
      * Sole constructor.
-     *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      */
-    Meta(Logger logger) {
-        logger_ = logger;
+    Meta() {
     }
 
     /**
@@ -117,12 +110,13 @@ public final class Meta {
      */
     public void setType(String type) {
         if (type.isEmpty()) {
-            throw new BuildException("Empty meta-information type is not acceptable");
+            throw new BuildException(
+                "Empty meta-information type is not acceptable", getLocation());
         } else {
             try {
                 type_ = Type.valueOf(type.toUpperCase().replace('-', '_'));
             } catch (IllegalArgumentException e) {
-                throw new BuildException("Bad meta-information type: " + type);
+                throw new BuildException("Bad meta-information type: " + type, getLocation());
             }
         }
     }
@@ -138,9 +132,10 @@ public final class Meta {
      */
     public void setName(String name) {
         if (name.isEmpty()) {
-            throw new BuildException("Empty meta-information name is not acceptable");
+            throw new BuildException(
+                "Empty meta-information name is not acceptable", getLocation());
         } else if (name.equalsIgnoreCase("xml")) {
-            new BuildException("Bad meta-information name: " + name);
+            new BuildException("Bad meta-information name: " + name, getLocation());
         } else {
             name_ = name;
         }
@@ -163,8 +158,7 @@ public final class Meta {
             if (name_ != null) {
                 message += ": name=" + name_;
             }
-            logger_.log(this, message, Level.ERR);
-            throw new BuildException();
+            throw new BuildException(message, getLocation());
         }
 
         String name = name_;
