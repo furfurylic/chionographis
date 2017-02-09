@@ -212,10 +212,8 @@ public final class Transform extends Filter {
         return params_.toMap(p -> p.yield(namespaceContext),
             e -> logger().log(this,
                     "Adding a stylesheet parameter: " + e, Level.DEBUG),
-            k -> {
-                throw new BuildException(
-                    "Stylesheet parameter named " + k + " added twice", getLocation());
-            });
+            k -> new BuildException(
+                    "Stylesheet parameter named " + k + " added twice", getLocation()));
     }
 
     @Override

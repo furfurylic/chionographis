@@ -75,10 +75,9 @@ final class Assemblage<T> {
      *      a function which make a key-value pair from an element of this collection.
      * @param logAdded
      *      a logger called just after an key-value pair is stored to the resulting map.
-     * @param logTwice
-     *      a logger called when duplicated keys are found.
-     *      It is recommended that this logger exits with an appropriate exception to signal
-     *      this error. This method will fail just after this logger normally returns, however.
+     * @param generateTwiceEx
+     *      a function called when duplicated keys are found.
+     *      Its return value is an exception, which will be thrown by this function immediately.
      *
      * @return
      *      the resulting map, which is not {@code null}.
@@ -87,7 +86,8 @@ final class Assemblage<T> {
      *      if duplicated keys are detected.
      */
     public <K, V> Map<K, V> toMap(Function<? super T, Map.Entry<K, V>> yield,
-            Consumer<Map.Entry<K, V>> logAdded, Consumer<K> logTwice) {
+            Consumer<Map.Entry<K, V>> logAdded,
+            Function<K, ? extends BuildException> generateTwiceEx) {
         if (ts_.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -103,8 +103,7 @@ final class Assemblage<T> {
         for (T t : ts_) {
             Map.Entry<K, V> entry = yield.apply(t);
             if (map.put(entry.getKey(), entry.getValue()) != null) {
-                logTwice.accept(entry.getKey());
-                throw new BuildException();
+                throw generateTwiceEx.apply(entry.getKey());
             }
             logAdded.accept(entry);
         }

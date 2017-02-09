@@ -493,9 +493,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private NamespaceContext createNamespaceContext() {
         Map<String, String> namespaceMap = namespaces_.toMap(Namespace::yield,
             e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
-            k -> {
-                throw new BuildException("Namespace prefix " + k + " added twice", getLocation());
-            });
+            k -> new BuildException("Namespace prefix " + k + " added twice", getLocation()));
         return new PrefixMap(namespaceMap);
     }
 
