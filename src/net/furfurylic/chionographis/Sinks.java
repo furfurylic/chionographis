@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
@@ -46,7 +47,7 @@ import org.xml.sax.ext.LexicalHandler;
 final class Sinks extends Sink {
 
     private Location location_;
-    private List<Sink> sinks_;
+    private Assemblage<Sink> sinks_ = new Assemblage<>();
 
     /**
      * {@code includes_[i][j]} tells whether {@code sinks_.get(i)} wants the source indexed by
@@ -72,7 +73,10 @@ final class Sinks extends Sink {
      */
     public Sinks(Location location) {
         location_ = location;
-        sinks_ = new ArrayList<>();
+    }
+
+    private List<Sink> sinks() {
+        return sinks_.getList();
     }
 
     /**
@@ -147,12 +151,12 @@ final class Sinks extends Sink {
 
     @Override
     void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
-        sinks_.stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
+        sinks().stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
     }
 
     @Override
     List<XPathExpression> referents() {
-        return sinks_.stream()
+        return sinks().stream()
                       .map(s -> s.referents())
                       .flatMap(List::stream)
                       .collect(Collectors.toList());
@@ -160,33 +164,36 @@ final class Sinks extends Sink {
 
     @Override
     boolean[] preexamineBundle(String[] origSrcFileNames, LongFunction<Resource>[] finders) {
-        includes_ = IntStream.range(0, sinks_.size())
-            .mapToObj(i -> sinks_.get(i))
-            .map(s -> s.preexamineBundle(origSrcFileNames, finders))
-            .toArray(boolean[][]::new);
+        includes_ = sinks().stream()
+                           .map(s -> s.preexamineBundle(origSrcFileNames, finders))
+                           .toArray(boolean[][]::new);
 
         boolean[] results = new boolean[includes_[0].length];
         IntStream.range(0, results.length)
-            .forEach(j -> results[j] = IntStream.range(0, includes_.length)
-                                            .anyMatch(i -> includes_[i][j]));
+                 .forEach(j -> results[j] = IntStream.range(0, includes_.length)
+                                                     .anyMatch(i -> includes_[i][j]));
         return results;
     }
 
     @Override
     void startBundle() {
-        if (includes_ == null) {
-            sinks_.stream().forEach(Sink::startBundle);
-        } else {
-            IntStream.range(0, includes_.length)
-            .filter(i -> IntStream.range(0, includes_[i].length)
-                            .anyMatch(j -> includes_[i][j]))
-            .mapToObj(i -> sinks_.get(i))
-            .forEach(Sink::startBundle);
-        }
+        forEachIncludedSink(Sink::startBundle);
         if (activeSinkMap_ == null) {
             activeSinkMap_ = new IdentityHashMap<>();
         } else {
             activeSinkMap_.clear();
+        }
+    }
+
+    private void forEachIncludedSink(Consumer<Sink> f) {
+        if (includes_ == null) {
+            sinks().stream().forEach(f);
+        } else {
+            IntStream.range(0, includes_.length)
+                     .filter(i -> IntStream.range(0, includes_[i].length)
+                                           .anyMatch(j -> includes_[i][j]))
+                     .mapToObj(i -> sinks().get(i))
+                     .forEach(f);
         }
     }
 
@@ -198,11 +205,11 @@ final class Sinks extends Sink {
         int j = 0;
         try {
             int i = 0;
-            for (; j < sinks_.size(); ++j) {
+            for (; j < sinks().size(); ++j) {
                 // Grab referred contents for this sink.
                 List<String> referredContentsOne =
-                    referredContents.subList(i, i + sinks_.get(j).referents().size());
-                i += sinks_.get(j).referents().size();
+                    referredContents.subList(i, i + sinks().get(j).referents().size());
+                i += sinks().get(j).referents().size();
                 // If the sink does not include sources at all, skip it.
                 if (includes_ != null) {
                     boolean[] includesOne = includes_[j];
@@ -211,11 +218,11 @@ final class Sinks extends Sink {
                     }
                 }
                 // Open the result of the sink.
-                Result result = sinks_.get(j).startOne(
+                Result result = sinks().get(j).startOne(
                     origSrcIndex, origSrcFileName, finder, referredContentsOne);
                 if (result != null) {
                     // First, we populate activeSinks.
-                    activeSinks.add(sinks_.get(j));
+                    activeSinks.add(sinks().get(j));
                     // Second, we populate builder.
                     builder.add(result);    // We don't assume if any exception thrown here
                                             // it is a recoverable situation.
@@ -285,15 +292,7 @@ final class Sinks extends Sink {
 
     @Override
     void finishBundle() {
-        if (includes_ == null) {
-            sinks_.stream().forEach(Sink::finishBundle);
-        } else {
-            IntStream.range(0, includes_.length)
-                     .filter(i -> IntStream.range(0, includes_[i].length)
-                                           .anyMatch(j -> includes_[i][j]))
-                     .mapToObj(i -> sinks_.get(i))
-                     .forEach(Sink::finishBundle);
-        }
+        forEachIncludedSink(Sink::finishBundle);
     }
 
     /** A collection of TrAX Results. */
