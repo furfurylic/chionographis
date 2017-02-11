@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -90,8 +89,8 @@ final class Sinks extends Sink {
      * @return
      *      a {@link Transform} filter object.
      */
-    public Transform createTransform(Function<String, String> expander) {
-        Transform sink = new Transform(expander);
+    public Transform createTransform() {
+        Transform sink = new Transform();
         sinks_.add(sink);
         return sink;
     }
@@ -105,8 +104,8 @@ final class Sinks extends Sink {
      * @return
      *      an {@link All} filter object.
      */
-    public All createAll(Function<String, String> expander) {
-        All sink = new All(expander);
+    public All createAll() {
+        All sink = new All();
         sinks_.add(sink);
         return sink;
     }
@@ -120,8 +119,8 @@ final class Sinks extends Sink {
      * @return
      *      a {@link Snip} filter object.
      */
-    public Snip createSnip(Function<String, String> expander) {
-        Snip sink = new Snip(expander);
+    public Snip createSnip() {
+        Snip sink = new Snip();
         sinks_.add(sink);
         return sink;
     }
