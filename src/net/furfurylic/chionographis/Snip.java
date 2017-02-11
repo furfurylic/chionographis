@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -58,8 +57,7 @@ public final class Snip extends Filter {
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Snip(Function<String, String> propertyExpander) {
-        super(propertyExpander);
+    Snip() {
     }
 
     /**

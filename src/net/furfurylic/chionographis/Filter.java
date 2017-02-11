@@ -8,7 +8,6 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.util.function.Function;
 
 import javax.xml.namespace.NamespaceContext;
 
@@ -22,19 +21,14 @@ abstract class Filter extends Sink implements Driver {
 
     private Sinks sinks_;
     private Logger logger_;
-    private Function<String, String> propertyExpander_;
 
     private boolean force_ = false;
 
     /**
      * Sole constructor.
-     *
-     * @param propertyExpander
-     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Filter(Function<String, String> propertyExpander) {
+    Filter() {
         sinks_ = new Sinks(getLocation());
-        propertyExpander_ = propertyExpander;
     }
 
     /**
@@ -58,21 +52,11 @@ abstract class Filter extends Sink implements Driver {
     }
 
     /**
-     * Returns a property expander, which expands Ant properties in a text.
-     *
-     * @return
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     */
-    final Function<String, String> propertyExpander() {
-        return propertyExpander_;
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(propertyExpander_);
+        return sinks_.createTransform();
     }
 
     /**
@@ -80,7 +64,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(propertyExpander_);
+        return sinks_.createAll();
     }
 
     /**
@@ -88,7 +72,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(propertyExpander_);
+        return sinks_.createSnip();
     }
 
     /**
