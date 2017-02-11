@@ -161,24 +161,21 @@ final class ChionographisWorker {
                 return 1;
             }
 
-            boolean toFinish = false;
             try {
                 xfer_.transfer(source, result, location_);
-                toFinish = true;
             } catch (DOMException | NonfatalBuildException e) {
+                // sink_.startOne() succeeded but we can't proceed to sink_.finishOne()
+                // -> we shall try to call sink_.abort()
+                abortOrThrow(systemID, result, e);
                 return handleRecoverableFailure(e);
-            } finally {
-                if (!toFinish) {
-                    // sink_.startOne() succeeded but we can't proceed to sink_.finishOne()
-                    // -> we shall try to call sink_.abort()
-                    logger_.log(null, "Aborting processing " + systemID, Level.WARN);
-                    sink_.abortOne(result);
-                }
+            } catch (RuntimeException e) {
+                // Same as above
+                abort(systemID, result, false);
+                throw e;
             }
 
             if (isOK_.getAsInt() == 0) {
-                logger_.log(null, "Aborting processing " + systemID, Level.VERBOSE);
-                sink_.abortOne(result);
+                abortOrThrow(systemID, result, null);
                 return 0;
             } else {
                 sink_.finishOne(result);
@@ -193,13 +190,26 @@ final class ChionographisWorker {
         }
     }
 
+    private Sink abort(String systemID, Result result, boolean isCollateral) {
+        logger_.log(null, "Aborting processing " + systemID,
+                    (isCollateral ? Level.VERBOSE : Level.WARN));
+        return sink_.abortOne(result);
+    }
+
+    private void abortOrThrow(String systemID, Result result, RuntimeException cause) {
+        if (abort(systemID, result, (cause == null)) != null) {
+            throw new BuildException(
+                "Failed to process at least one source to give up all", cause, location_);
+        }
+    }
+
     private int handleRecoverableFailure(RuntimeException e) {
         if (failOnNonfatalError_) {
             throw new BuildException(
                 "Nonfatal error occurred and \"failOnNonfatalError\" specified", e, location_);
         } else {
+            // "Aborting processing" or "Failed to process" shall precede this
             logger_.log(null, e, "  Cause: ", Level.INFO, Level.VERBOSE);
-                // "Aborting processing" or "Failed to process" shall precede this
             return 0;
         }
     }

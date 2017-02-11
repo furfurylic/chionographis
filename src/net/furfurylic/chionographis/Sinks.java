@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -45,6 +44,9 @@ import org.xml.sax.ext.LexicalHandler;
  * Represents a composite of {@code Sink} objects.
  */
 final class Sinks extends Sink {
+
+    private static final String ABORT_DOOMED =
+            "Failed to process at least one source to give up all";
 
     private Location location_;
     private Assemblage<Sink> sinks_ = new Assemblage<>();
@@ -232,13 +234,14 @@ final class Sinks extends Sink {
             // We shall abort already-started results.
             Result r = builder.newCompositeResult();
             if (r != null) {
-                try {
-                    abort(r, activeSinks.getList());
-                } catch (RuntimeException ex) {
-                    // e is more essential than ex for this abortion.
+                if (abort(r, activeSinks.getList()) != null) {
+                    throw new BuildException(ABORT_DOOMED, e, location_);
+                } else {
+                    throw e;
                 }
+            } else {
+                throw e;
             }
-            throw e;
         }
 
         Result r = builder.newCompositeResult();
@@ -264,29 +267,36 @@ final class Sinks extends Sink {
             activeSinks.get(0).finishOne(result);
         } else {
             assert result instanceof CompositeResult;
-            ((CompositeResult) result).results().finish(activeSinks);
+            try {
+                ((CompositeResult) result).results().finish(activeSinks);
+            } catch (BuildException e) {
+                if (e.getLocation() == null) {
+                    e.setLocation(location_);
+                }
+                throw e;
+            }
         }
     }
 
     @Override
-    void abortOne(Result result) {
+    Sink abortOne(Result result) {
         assert result != null;
         List<Sink> activeSinks;
         synchronized (activeSinkMap_) {
             activeSinks = activeSinkMap_.get(result);
             activeSinkMap_.remove(result);
         }
-        abort(result, activeSinks);
+        return abort(result, activeSinks);
     }
 
-    private static void abort(Result result, List<Sink> sinks) {
+    private static Sink abort(Result result, List<Sink> sinks) {
         assert sinks != null;
         assert !sinks.isEmpty();
         if (sinks.size() == 1) {
-            sinks.get(0).abortOne(result);
+            return sinks.get(0).abortOne(result);
         } else {
             assert result instanceof CompositeResult;
-            ((CompositeResult) result).results().abort(sinks);
+            return ((CompositeResult) result).results().abort(sinks);
         }
     }
 
@@ -316,33 +326,29 @@ final class Sinks extends Sink {
          *      if one of {@code sinks} throws a {@link RuntimeException}.
          *      This situation should be considered as unrecoverable.
          */
-        public final void abort(List<Sink> sinks) {
+        public final Sink abort(List<Sink> sinks) {
             assert sinks.size() == results_.size();
-            Optional<RuntimeException> ex =
-                IntStream.range(0, sinks.size())
-                         .mapToObj(i -> abortSinkSilent(sinks.get(i), results_.get(i)))
-                         .filter(e -> e != null)
-                         .reduce((e1, e2) -> (e2 instanceof NonfatalBuildException) ? e1 : e2);
-            if (ex.isPresent()) {
-                throw ex.get();
-            }
+            return abortRange(IntStream.range(0, sinks.size()), sinks);
         }
 
-        protected final void abortSilent(IntStream indices, List<Sink> sinks) {
-            indices.forEach(k -> abortSinkSilent(sinks.get(k), results_.get(k)));
+        protected final Sink abortRange(IntStream indices, List<Sink> sinks) {
+            return indices.mapToObj(i -> sinks.get(i).abortOne(results_.get(i)))
+                          .filter(e -> e != null)
+                          .reduce((e1, e2) -> e1)
+                          .orElse(null);
+        }
+
+        protected final void abortRangeAndThrow(IntStream indices, List<Sink> sinks,
+                RuntimeException cause) {
+            if (abortRange(indices, sinks) != null) {
+                throw new BuildException(ABORT_DOOMED, cause);
+            } else {
+                throw cause;
+            }
         }
 
         protected final List<Result> asList() {
             return results_;
-        }
-
-        private static RuntimeException abortSinkSilent(Sink sink, Result result) {
-            try {
-                sink.abortOne(result);
-                return null;
-            } catch (RuntimeException e) {
-                return e;
-            }
         }
     }
 
@@ -368,8 +374,7 @@ final class Sinks extends Sink {
                             ++i;
                         }
                     } catch (RuntimeException e) {
-                        abortSilent(IntStream.range(i + 1, sinks.size()), sinks);
-                        throw e;
+                        abortRangeAndThrow(IntStream.range(i + 1, sinks.size()), sinks, e);
                     }
                 }
             };
@@ -419,11 +424,10 @@ final class Sinks extends Sink {
                         }
                     } catch (RuntimeException e) {
                         // Sinks which have not been finished shall be aborted
-                        abortSilent(
+                        abortRangeAndThrow(
                             IntStream.concat(IntStream.range(i, sinks.size()), IntStream.of(j))
                                      .distinct(),
-                            sinks);
-                        throw e;
+                            sinks, e);
                     }
 
                     // For the index j, send the result by move

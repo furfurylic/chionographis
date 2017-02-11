@@ -177,8 +177,7 @@ public abstract class Sink extends ProjectComponent {
      * from being called happened. If {@link #finishOne(Result)} throws an exception, this method
      * will not be invoked.</p>
      *
-     * <p>Throwing an {@link org.apache.tools.ant.BuildException BuildException} from this method
-     * is a considered fatal situation (that is, the build process itself will be aborted).</p>
+     * <p>This method shall not throw any exceptions in normal situations.</p>
      *
      * <p>This method may be called simultaneously by multiple threads on one object.
      * It is not guaranteed that the thread which calls this method is identical to the one that
@@ -187,8 +186,12 @@ public abstract class Sink extends ProjectComponent {
      * @param result
      *      an TrAX {@code Result} object identical to what has been returned by
      *      {@link #startOne(int, String, LongFunction, List)} of this object.
+     *
+     * @return
+     *      a reference to a sink for which this aborting shall damage the current bundle and
+     *      prevent it from being finished, being {@code null} in ordinary cases.
      */
-    abstract void abortOne(Result result);
+    abstract Sink abortOne(Result result);
 
     abstract void finishBundle();
 }

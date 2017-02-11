@@ -483,9 +483,10 @@ public final class Output extends Sink {
     }
 
     @Override
-    void abortOne(Result result) {
+    Sink abortOne(Result result) {
         placeBackBuffer(
             (ExposingByteArrayOutputStream) ((StreamResult) result).getOutputStream());
+        return null;
     }
 
     private void placeBackBuffer(ExposingByteArrayOutputStream buffer) {
