@@ -44,13 +44,15 @@ public abstract class Sink extends ProjectComponent {
      *      which represents an absolute file path and is never {@code null}.
      * @param namespaceContext
      *      the namespace context used to resolve prefixes in the configurations of this object.
+     * @param logger
+     *      a logger, which shall not be {@code null}.
      * @param force
      *      whether the driver wants this object to process all inputs regardless
      *      if the output files are up to date or not.
      * @param dryRun
      *      whether the driver wants this object not to finalize its outputs onto external devices.
      */
-    abstract void init(File baseDir, NamespaceContext namespaceContext,
+    abstract void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
         boolean force, boolean dryRun);
 
     /**

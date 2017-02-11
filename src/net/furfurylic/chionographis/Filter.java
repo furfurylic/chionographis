@@ -29,14 +29,11 @@ abstract class Filter extends Sink implements Driver {
     /**
      * Sole constructor.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Filter(Logger logger, Function<String, String> propertyExpander) {
+    Filter(Function<String, String> propertyExpander) {
         sinks_ = new Sinks(getLocation());
-        logger_ = logger;
         propertyExpander_ = propertyExpander;
     }
 
@@ -75,7 +72,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(logger_, propertyExpander_);
+        return sinks_.createTransform(propertyExpander_);
     }
 
     /**
@@ -83,7 +80,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(logger_, propertyExpander_);
+        return sinks_.createAll(propertyExpander_);
     }
 
     /**
@@ -91,7 +88,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(logger_, propertyExpander_);
+        return sinks_.createSnip(propertyExpander_);
     }
 
     /**
@@ -99,7 +96,7 @@ abstract class Filter extends Sink implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput(logger_);
+        return sinks_.createOutput();
     }
 
     /**
@@ -115,11 +112,12 @@ abstract class Filter extends Sink implements Driver {
     }
 
     @Override
-    final void init(File baseDir, NamespaceContext namespaceContext,
+    final void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
             boolean force, boolean dryRun) {
         if (sinks_.isEmpty()) {
             throw new BuildException("No sinks configured", getLocation());
         }
+        logger_ = logger;
         force_ = force_ || force;
         doInit(baseDir, namespaceContext, dryRun);
     }
