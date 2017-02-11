@@ -87,10 +87,6 @@ public final class Depends extends AbstractSelectorContainer {
     public Depends() {
     }
 
-    Depends(Logger logger) {
-        logger_ = logger;
-    }
-
     /**
      * Sets the instruction for the case that the pointed resources do not exist.
      *
@@ -198,7 +194,7 @@ public final class Depends extends AbstractSelectorContainer {
      * @since 1.2
      */
     public Depends createDepends() {
-        Depends depends = new Depends(logger_);
+        Depends depends = new Depends();
         children_.add(depends);
         return depends;
     }
@@ -209,10 +205,10 @@ public final class Depends extends AbstractSelectorContainer {
      * @return
      *      a new {@link NewerSourceFinder} object.
      */
-    NewerSourceFinder detach() {
+    NewerSourceFinder detach(Logger logger) {
         dieOnCircularReference();
-        assert logger_ != null;
-        return detach(logger_);
+        logger_ = logger;
+        return doDetach(logger_);
     }
 
     @Override
@@ -256,7 +252,7 @@ public final class Depends extends AbstractSelectorContainer {
         return e;
     }
 
-    private NewerSourceFinder detach(Logger logger) {
+    private NewerSourceFinder doDetach(Logger logger) {
         if (isReference()) {
             if (absent_.isPresent() || (!resources_.isEmpty())
              || (baseDir_ != null) || (!children_.isEmpty())) {
@@ -268,7 +264,7 @@ public final class Depends extends AbstractSelectorContainer {
             Reference refid = getRefid();
             Object o = refid.getReferencedObject();
             if (o instanceof Depends) {
-                return ((Depends) o).detach(logger);
+                return ((Depends) o).doDetach(logger);
             } else {
                 throw new BuildException("Refid \"" + refid.getRefId() + "\" must refer an object"
                         + " whose type is " + Depends.class.getName(), getLocation());
@@ -279,7 +275,7 @@ public final class Depends extends AbstractSelectorContainer {
 
         NewerSourceFinder detachedChild = NewerSourceFinder.combine(
             children_.getList().stream()
-                               .map(x -> x.detach(logger))
+                               .map(x -> x.doDetach(logger))
                                .collect(Collectors.toList()));
 
         Iterable<Resource> sources = resources_.getList().isEmpty() ?

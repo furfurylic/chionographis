@@ -60,13 +60,11 @@ public final class All extends Filter {
     /**
      * Sole constructor.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    All(Logger logger, Function<String, String> propertyExpander) {
-        super(logger, propertyExpander);
+    All(Function<String, String> propertyExpander) {
+        super(propertyExpander);
     }
 
     /**
@@ -115,7 +113,7 @@ public final class All extends Filter {
             }
         }
 
-        sink().init(baseDir, namespaceContext, isForce(), dryRun);
+        sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
     }
 
     @Override

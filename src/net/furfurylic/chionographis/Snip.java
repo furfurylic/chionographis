@@ -55,13 +55,11 @@ public final class Snip extends Filter {
     /**
      * Sole constructor.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Snip(Logger logger, Function<String, String> propertyExpander) {
-        super(logger, propertyExpander);
+    Snip(Function<String, String> propertyExpander) {
+        super(propertyExpander);
     }
 
     /**
@@ -84,7 +82,7 @@ public final class Snip extends Filter {
      */
     @Override
     void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
-        sink().init(baseDir, namespaceContext, isForce(), dryRun);
+        sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
         namespaceContext_ = namespaceContext;
     }
 
