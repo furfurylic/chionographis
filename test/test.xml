@@ -1,6 +1,6 @@
 <project name="chinographis-test" basedir="." default="full">
 
-  <typedef resource="net/furfurylic/chionographis/tasks.properties"/>
+  <typedef resource="net/furfurylic/chionographis/types.properties"/>
 
   <target name="full">
     <antcall target="basic-mapper"/>
