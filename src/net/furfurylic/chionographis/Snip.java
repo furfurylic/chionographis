@@ -202,9 +202,10 @@ public final class Snip extends Filter {
     }
 
     @Override
-    void abortOne(Result result) {
+    Sink abortOne(Result result) {
         // sink().startOne(int, String) is not invoked yet,
         // so we can evade call sink().abortOne().
+        return null;
     }
 
     @Override
