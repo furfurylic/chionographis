@@ -1,7 +1,6 @@
 <project name="chinographis-test" basedir="." default="full">
 
-  <taskdef name="chionographis" classname="net.furfurylic.chionographis.Chionographis"/>
-  <typedef name="depends" classname="net.furfurylic.chionographis.Depends"/>
+  <typedef resource="net/furfurylic/chionographis/tasks.properties"/>
 
   <target name="full">
     <antcall target="basic-mapper"/>
