@@ -186,11 +186,11 @@ public final class All extends Filter {
     }
 
     @Override
-    void abortOne(Result result) {
+    Sink abortOne(Result result) {
         // This object collects all of the inputs into one result,
         // so aborting one ruins the whole result.
-        throw new BuildException(
-                "One of the sources is damaged; must give up all", getLocation());
+        logger().log(this, "One of the sources is damaged; must give up all", Level.VERBOSE);
+        return this;
     }
 
     @Override

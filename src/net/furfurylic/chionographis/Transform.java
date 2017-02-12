@@ -263,10 +263,11 @@ public final class Transform extends Filter {
     }
 
     @Override
-    void abortOne(Result result) {
+    Sink abortOne(Result result) {
         assert result != null;
         assert result instanceof Finisher;
         ((Finisher) result).abort();
+        return null;
     }
 
     @Override
