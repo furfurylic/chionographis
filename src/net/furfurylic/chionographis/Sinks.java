@@ -63,7 +63,7 @@ final class Sinks extends Sink {
      * A map which maps a TrAX Result object returned {@link #startOne(int, String, long, List)}
      * of this object to {@link Sink} objects responsive to it.
      *
-     * <p>This map is based on idenditity of the keys (that is, mapping by keys' identities).</p>
+     * <p>This map is based on identity of the keys (that is, mapping by keys' identities).</p>
      */
     private Map<Result, List<Sink>> activeSinkMap_;
 
@@ -84,16 +84,14 @@ final class Sinks extends Sink {
     /**
      * Adds a {@link Transform} filter into this composite.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
      *
      * @return
      *      a {@link Transform} filter object.
      */
-    public Transform createTransform(Logger logger, Function<String, String> expander) {
-        Transform sink = new Transform(logger, expander);
+    public Transform createTransform(Function<String, String> expander) {
+        Transform sink = new Transform(expander);
         sinks_.add(sink);
         return sink;
     }
@@ -101,16 +99,14 @@ final class Sinks extends Sink {
     /**
      * Adds an {@link All} filter into this composite.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
      *
      * @return
      *      an {@link All} filter object.
      */
-    public All createAll(Logger logger, Function<String, String> expander) {
-        All sink = new All(logger, expander);
+    public All createAll(Function<String, String> expander) {
+        All sink = new All(expander);
         sinks_.add(sink);
         return sink;
     }
@@ -118,16 +114,14 @@ final class Sinks extends Sink {
     /**
      * Adds a {@link Snip} filter into this composite.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      * @param expander
      *      an object which expands properties in a text, which shall not be {@code null}.
      *
      * @return
      *      a {@link Snip} filter object.
      */
-    public Snip createSnip(Logger logger, Function<String, String> expander) {
-        Snip sink = new Snip(logger, expander);
+    public Snip createSnip(Function<String, String> expander) {
+        Snip sink = new Snip(expander);
         sinks_.add(sink);
         return sink;
     }
@@ -135,14 +129,11 @@ final class Sinks extends Sink {
     /**
      * Adds an {@link Output} sink into this composite.
      *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
-     *
      * @return
      *      an {@link Output} sink object.
      */
-    public Output createOutput(Logger logger) {
-        Output sink = new Output(logger);
+    public Output createOutput() {
+        Output sink = new Output();
         sinks_.add(sink);
         return sink;
     }
@@ -152,8 +143,9 @@ final class Sinks extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
-        sinks().stream().forEach(s -> s.init(baseDir, namespaceContext, force, dryRun));
+    void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
+            boolean force, boolean dryRun) {
+        sinks().stream().forEach(s -> s.init(baseDir, namespaceContext, logger, force, dryRun));
     }
 
     @Override

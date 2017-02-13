@@ -74,12 +74,8 @@ public final class Output extends Sink {
 
     /**
      * Sole constructor.
-     *
-     * @param logger
-     *      a logger, which shall not be {@code null}.
      */
-    Output(Logger logger) {
-        logger_ = logger;
+    Output() {
     }
 
     /**
@@ -211,7 +207,10 @@ public final class Output extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, boolean force, boolean dryRun) {
+    void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
+            boolean force, boolean dryRun) {
+        logger_ = logger;
+
         // Configure destDir_ to be an absolute path.
         if (destDir_ == null) {
             destDir_ = baseDir.toPath();
