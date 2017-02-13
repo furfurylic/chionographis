@@ -257,7 +257,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty object which instructs dependency between resources to this task.
      */
     public Depends createDepends() {
-        Depends depends = new Depends(logger_);
+        Depends depends = new Depends();
         depends_.add(depends);
         return depends;
     }
@@ -267,7 +267,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(logger_, expander());
+        return sinks_.createTransform(expander());
     }
 
     /**
@@ -275,7 +275,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(logger_, expander());
+        return sinks_.createAll(expander());
     }
 
     /**
@@ -283,7 +283,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(logger_, expander());
+        return sinks_.createSnip(expander());
     }
 
     /**
@@ -291,7 +291,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Output createOutput() {
-        return sinks_.createOutput(logger_);
+        return sinks_.createOutput();
     }
 
     // TODO: Make this task able to accept soures other than files
@@ -356,7 +356,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                               .toArray(URI[]::new);
         LongFunction<Resource>[] finders = createNewerSourceFinders(srcURIs);
 
-        sinks_.init(baseDir_.toFile(), createNamespaceContext(), force_, dryRun);
+        sinks_.init(baseDir_.toFile(), createNamespaceContext(), logger_, force_, dryRun);
 
         // Tell whether destinations are older.
         boolean[] includes = (force_ || (finders == null)) ?
@@ -428,7 +428,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         NewerSourceFinder finder =
             NewerSourceFinder.combine(
                 depends_.getList().stream()
-                                  .map(d -> d.detach())
+                                  .map(d -> d.detach(logger_))
                                   .collect(Collectors.toList()));
         return Arrays.stream(srcURIs)
                      .map(u -> finder.close(new File(u)))
