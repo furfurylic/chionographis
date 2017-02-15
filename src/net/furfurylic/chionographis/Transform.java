@@ -75,8 +75,7 @@ public final class Transform extends Filter {
      * @param propertyExpander
      *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Transform(Function<String, String> propertyExpander) {
-        super(propertyExpander);
+    Transform() {
     }
 
     /**
@@ -153,7 +152,7 @@ public final class Transform extends Filter {
      *      an empty stylesheet parameter.
      */
     public Param createParam() {
-        Param param = new Param(propertyExpander());
+        Param param = new Param();
         params_.add(param);
         return param;
     }

@@ -13,7 +13,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
-import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 
@@ -59,12 +58,8 @@ public final class All extends Filter {
 
     /**
      * Sole constructor.
-     *
-     * @param propertyExpander
-     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    All(Function<String, String> propertyExpander) {
-        super(propertyExpander);
+    All() {
     }
 
     /**
