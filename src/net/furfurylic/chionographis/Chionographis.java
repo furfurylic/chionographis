@@ -35,7 +35,6 @@ import javax.xml.namespace.NamespaceContext;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.Location;
-import org.apache.tools.ant.PropertyHelper;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.apache.tools.ant.types.Resource;
@@ -81,10 +80,6 @@ public final class Chionographis extends MatchingTask implements Driver {
     public void init() {
         sinks_ = new Sinks(getLocation());
         logger_ = new ChionographisLogger();
-    }
-
-    private Function<String, String> expander() {
-        return PropertyHelper.getPropertyHelper(getProject())::replaceProperties;
     }
 
     /**
@@ -267,7 +262,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Transform createTransform() {
-        return sinks_.createTransform(expander());
+        return sinks_.createTransform();
     }
 
     /**
@@ -275,7 +270,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public All createAll() {
-        return sinks_.createAll(expander());
+        return sinks_.createAll();
     }
 
     /**
@@ -283,7 +278,7 @@ public final class Chionographis extends MatchingTask implements Driver {
      */
     @Override
     public Snip createSnip() {
-        return sinks_.createSnip(expander());
+        return sinks_.createSnip();
     }
 
     /**

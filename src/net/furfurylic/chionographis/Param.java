@@ -9,13 +9,13 @@ package net.furfurylic.chionographis;
 
 import java.util.AbstractMap;
 import java.util.Map;
-import java.util.function.Function;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.ProjectComponent;
+import org.apache.tools.ant.PropertyHelper;
 
 /**
  * An object of this class represents one stylesheet parameter applied to the transformation
@@ -25,20 +25,14 @@ import org.apache.tools.ant.ProjectComponent;
  */
 public final class Param extends ProjectComponent {
 
-    private Function<String, String> expander_;
-
     private String name_ = null;
     private boolean expand_ = false;
     private Object value_ = null;
 
     /**
      * Sole constructor.
-     *
-     * @param expander
-     *      an object which expands properties in a text, which shall not be {@code null}.
      */
-    Param(Function<String, String> expander) {
-        expander_ = expander;
+    Param() {
     }
 
     /**
@@ -89,7 +83,7 @@ public final class Param extends ProjectComponent {
     public void addText(String value) {
         if (expand_) {
             try {
-                value_ = expander_.apply(value);
+                value_ = PropertyHelper.getPropertyHelper(getProject()).replaceProperties(value);
             } catch (BuildException e) {
                 throw new BuildException("Property expansion failed: " + value, e, getLocation());
             }
