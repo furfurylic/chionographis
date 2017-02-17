@@ -50,7 +50,9 @@ import net.furfurylic.chionographis.Logger.Level;
  */
 public final class Snip extends Filter {
 
-    private String select_;
+    private String select_ = null;
+    private Doctype doctype_ = null;
+
     private NamespaceContext namespaceContext_;
     private XPathExpression expr_;
     private final ReentrantLock lock_ = new ReentrantLock();
@@ -80,10 +82,33 @@ public final class Snip extends Filter {
     }
 
     /**
+     * Creates a new {@link Doctype} object which instructs this filter to embed a document type
+     * declaration.
+     *
+     * @return
+     *      a new {@link Doctype} object
+     *
+     * @throws BuildException
+     *      if this invocation is not the first for this object.
+     *
+     * @since 1.2
+     */
+    public Doctype createDoctype() throws BuildException {
+        if (doctype_ != null) {
+            throw new BuildException("Document types given twice", getLocation());
+        }
+        doctype_ = new Doctype();
+        return doctype_;
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
     void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
+        if (doctype_ != null) {
+            doctype_.checkSanity();
+        }
         sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
         namespaceContext_ = namespaceContext;
     }
@@ -234,6 +259,10 @@ public final class Snip extends Filter {
         Result rr = sink().startOne(result.origSrcIndex(), result.origSrcFileName(),
             result.finder(), referredContents);
         if (rr != null) {
+            // Prepare DOCTYPE
+            if (doctype_ != null) {
+                doctype_.populateInto(document);
+            }
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(new DOMSource(document), rr, getLocation());
             // Finish sink
