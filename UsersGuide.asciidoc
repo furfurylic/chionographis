@@ -24,11 +24,17 @@ To use Chionographis, first you have to define the task:
 
 [source,xml]
 ----
-<taskdef name="chionographis"
-         classname="net.furfurylic.chionographis.Chionographis"/>
+<!-- Define a path which includes chionographis.jar -->
+<path id="chionographis">
+  <fileset file="./lib" includes="*.jar"/>
+</path>
+
+<!-- Define chionographis task with the path -->
+<typedef classpathref="chionographis"
+         resource="net/furfurylic/chionographis/types.properties"/>
 ----
 
-Then you can use the task:
+Then you can use _chionographis_ task:
 
 [source,xml]
 ----
@@ -60,11 +66,60 @@ Additionally, it might be noteworthy that:
  * this target recognizes whether the output files are up to date for the input files, and, if so, cuts out the file output process,
  * and if the runtime environment has multiple available processors, this target tries to take advantage of them to parallelize the reading and writing of the files.
 
-To run this target you can use the usual `ant` command, but you have to make Ant able to find 'chionographis.jar':
+== Defining the task and related types
+
+'chiongraphis.jar' exposes one task and one related type:
+
+[options="header"]
+|=================
+| Class | Description
+|+net.furfurylic.chionographis.Chionographis+|The core task.
+|+net.furfurylic.chionographis.Depends+|An optional helper type to instruct dependency between resources to the task.
+|=================
+
+You can define these task and type (hereinafter called types) with Ant's +<typedef>+ task:
+
+[source,xml]
+----
+<typedef name="chionographis"
+         classname="net.furfurylic.chionographis.Chionographis"/>
+<typedef name="depends"
+         classname="net.furfurylic.chionographis.Depends"/>
+----
+
+But 'chionographis.jar' contains 'net/furfurylic/chionographis/types.properties' as follows:
+
+[source,properties]
+----
+chionographis=net.furfurylic.chionographis.Chionographis
+depends=net.furfurylic.chionographis.Depends
+----
+
+Thus you can define types as follows if the names (+chionographis+ and +depends+) are OK for you:
+
+[source,xml]
+----
+<typedef resource="net/furfurylic/chionographis/types.properties"/>
+----
+
+So far, we supposed that 'chionographis.jar' was included into Ant's classpath
+whether by a command line option as follows or anything else:
 
 [source,sh]
 ----
-ant -lib the-directory-which-contains-chionographis.jar -f sample.xml flora-genera
+ant -lib ./lib/chionographis.jar flora-genera
+----
+
+Of course you can tell to Ant in the build file "you can find the types here" instead:
+
+[source,xml]
+----
+<path id="chionographis">
+  <fileset file="./lib" includes="*.jar"/>
+</path>
+
+<typedef classpathref="chionographis"
+         resource="net/furfurylic/chionographis/types.properties"/>
 ----
 
 == Drivers, sinks and filters
@@ -397,14 +452,14 @@ If you want to know the version of your 'chionographis.jar', execute the Main-Cl
 
 [source,sh]
 ----
-java -jar chionographis.jar
+java -jar ./lib/chionographis.jar
 ----
 
 Instead, you can be informed of it by executing _Chionographis_ task with "debug" logging level:
 
 [source,sh]
 ----
-ant -d -lib the-directory-which-contains-chionographis.jar target-name
+ant -d target-name
 ----
 
 [NOTE]

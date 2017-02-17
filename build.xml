@@ -26,6 +26,10 @@
       debuglevel="source,lines" includeantruntime="yes">
       <compilerarg value="-Xdiags:verbose"/>
     </javac>
+    <copy todir="release/classes">
+      <fileset dir="src" includes="**/*.properties"/>
+      <identitymapper/>
+    </copy>
   </target>
 
   <target name="-archive" depends="-rev">
