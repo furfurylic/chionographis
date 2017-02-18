@@ -11,7 +11,8 @@
     <antcall target="basic-not-up-to-date-by-depends-new"/>
     <antcall target="basic-up-to-date-by-depends-ignore"/>
     <antcall target="basic-complex-depends"/>
-    <antcall target="basic-depends-circularity"/>
+    <antcall target="basic-depends-resource-circularity"/>
+    <antcall target="basic-error-depends-circularity-by-nesting"/>
     <antcall target="basic-error-depends-fail"/>
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
@@ -429,7 +430,7 @@
     <delete dir="${dir.output}"/>
   </target>
 
-  <target name="basic-depends-circularity">
+  <target name="basic-depends-resource-circularity">
     <property name="test.prefix" value="basic"/>
     <property name="test.title" value="depends-circularity"/>
     <property name="test.name" value="${test.prefix}-${test.title}"/>
@@ -463,6 +464,34 @@
       file="${dir.output}/output1.xml" datetime="01/01/2001 00:01:20 AM"/>
     <assertfilelastmodified name="${test.name} - 2"
       file="${dir.output}/output2.xml" datetime="01/01/2001 00:01:20 AM"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <depends id="depends1-basic-error-depends-circularity-by-nesting">
+    <depends refid="depends2-basic-error-depends-circularity-by-nesting"/>
+  </depends>
+  <depends id="depends2-basic-error-depends-circularity-by-nesting">
+    <depends refid="depends1-basic-error-depends-circularity-by-nesting"/>
+  </depends>
+
+  <target name="basic-error-depends-circularity-by-nesting">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-circularity-by-nesting"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends refid="depends1-basic-error-depends-circularity-by-nesting"/>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
 
     <delete dir="${dir.output}"/>
   </target>
