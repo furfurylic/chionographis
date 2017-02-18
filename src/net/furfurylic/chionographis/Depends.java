@@ -255,12 +255,12 @@ public final class Depends extends AbstractSelectorContainer {
 
     private NewerSourceFinder doDetach(Logger logger) {
         if (isReference()) {
-            if (absent_.isPresent() || (!resources_.isEmpty())
-             || (baseDir_ != null) || (!children_.isEmpty())) {
+            if (absent_.isPresent() || (baseDir_ != null)) {
                 throw new BuildException(
                     "\"refid\" and other attributes can only be specified mutually exclusively",
                     getLocation());
             }
+            // Ant itself forbids child elements to exist when "refid" is specified
 
             Reference refid = getRefid();
             Object o = refid.getReferencedObject();
