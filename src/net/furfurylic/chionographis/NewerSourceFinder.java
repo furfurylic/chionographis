@@ -53,17 +53,24 @@ interface NewerSourceFinder {
      *      a collection of objects of this type, which is shallow-copied by this function.
      *
      * @return
-     *      the resulted object.
+     *      the resulted object, which shall not be {@code null}.
      */
     static NewerSourceFinder combine(Iterable<NewerSourceFinder> finders) {
         List<NewerSourceFinder> fs = StreamSupport.stream(finders.spliterator(), false)
                                                   .collect(Collectors.toList());
-        return (File file, long lastModified, NewerSourceFinder reentry) ->
-            fs.stream()
-              .map(f -> f.findAnyNewerSource(file, lastModified, reentry))
-              .filter(f -> f != null)
-              .findAny()
-              .orElse(null);
+        switch (fs.size()) {
+        case 0:
+            return OF_NONE;
+        case 1:
+            return fs.get(0);
+        default:
+            return (File file, long lastModified, NewerSourceFinder reentry) ->
+                fs.stream()
+                  .map(f -> f.findAnyNewerSource(file, lastModified, reentry))
+                  .filter(f -> f != null)
+                  .findAny()
+                  .orElse(null);
+        }
     }
 
     /**
