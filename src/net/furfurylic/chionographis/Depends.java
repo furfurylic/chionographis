@@ -249,7 +249,7 @@ public final class Depends extends AbstractSelectorContainer {
     }
 
     private BuildException setLocation(BuildException e) {
-        if (e.getLocation() == null) {
+        if ((e.getLocation() == null) || (e.getLocation().getFileName() == null)) {
             e.setLocation(getLocation());
         }
         return e;
