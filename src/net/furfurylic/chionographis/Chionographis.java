@@ -620,9 +620,9 @@ public final class Chionographis extends MatchingTask implements Driver {
                 ex.printStackTrace(out);
             }
             String result = writer.toString();
-            // Some exception classes (for example, Ant's BuildException)
-            // don't write the class name first, so we supplement it
-            if (!result.startsWith(ex.getClass().getName())) {
+            // Some exception classes don't write the class name first, so we supplement it,
+            // but Ant's BuildException is so common that we would like to omit it
+            if (!(ex instanceof BuildException) && !result.startsWith(ex.getClass().getName())) {
                 result = ex.getClass().getName() + ": " + result;
             }
             // StringWriter.close() has no effect so we don't close
