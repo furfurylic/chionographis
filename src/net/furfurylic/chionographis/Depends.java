@@ -10,10 +10,12 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Stack;
+import java.util.StringJoiner;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -285,45 +287,9 @@ public final class Depends extends AbstractSelectorContainer {
                                .map(x -> x.doDetach(logger))
                                .collect(Collectors.toList()));
 
-        Iterable<Resource> sources = resources_.getList().isEmpty() ?
+        Iterable<Resource> sources = resources_.isEmpty() ?
             null :
-            new Iterable<Resource>() {
-                @Override
-                public Iterator<Resource> iterator() {
-                    return new SerialIterator<>(createResourceIterableIterable());
-                }
-                @Override
-                public String toString() {
-                    switch (resources_.getList().size()) {
-                    case 0:
-                        assert false;
-                        return "";
-                    case 1:
-                        return stringValueOfResourceCollection(
-                            resources_.getList().iterator().next());
-                    default:
-                        return '['
-                              + String.join(
-                                    ", ",
-                                    () -> new TransformIterator<>(
-                                            resources_.getList().iterator(),
-                                            r -> stringValueOfResourceCollection(r)))
-                              + ']';
-                    }
-                }
-                private String stringValueOfResourceCollection(ResourceCollection r) {
-                    if (r instanceof FileSet) {
-                        return "fileset(dir=" + ((FileSet) r).getDir() + ")";
-                    } else if (r instanceof FileList) {
-                        FileList l = (FileList) r;
-                        return "filelist(dir=" + l.getDir(getProject()) +
-                               ", files=" + Arrays.asList(l.getFiles(getProject())) + ")";
-                    } else {
-                        String raw = String.valueOf(r);
-                        return raw.isEmpty() ? r.getClass().getName() : raw;
-                    }
-                }
-            };
+            new ResourceCollections(resources_.getList(), getProject());
 
         return new DetachedDepends(this, getLocation(),
             sources, selector, detachedChild, absent_.orElse(Absent.FAIL), logger);
@@ -351,14 +317,61 @@ public final class Depends extends AbstractSelectorContainer {
                             baseDir_, FILE_UTILS.removeLeadingPath(baseDir_, target), target);
     }
 
-    @SuppressWarnings("unchecked")
-    private Iterable<Iterable<Resource>> createResourceIterableIterable() {
-        // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Collection>
-        if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
-            return (List<Iterable<Resource>>) (Object) resources_.getList();
-        } else {
-            return () -> new TransformIterator<>(
-                resources_.getList().iterator(), r -> () -> r.iterator());
+    private static final class ResourceCollections implements Iterable<Resource> {
+        private Collection<ResourceCollection> resources_;
+        private Project project_;
+
+        ResourceCollections(Collection<ResourceCollection> resources, Project project) {
+            resources_ = resources;
+            project_ = project;
+        }
+
+        @Override
+        public Iterator<Resource> iterator() {
+            return new SerialIterator<>(createResourceIterableIterable());
+        }
+
+        @SuppressWarnings("unchecked")
+        private Iterable<Iterable<Resource>> createResourceIterableIterable() {
+            // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Collection>
+            if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
+                return (Collection<Iterable<Resource>>) (Object) resources_;
+            } else {
+                return () -> new TransformIterator<>(
+                    resources_.iterator(), r -> () -> r.iterator());
+            }
+        }
+
+        @Override
+        public String toString() {
+            switch (resources_.size()) {
+            case 0:
+                assert false;
+                return "";
+            case 1:
+                return stringValueOfResourceCollection(resources_.iterator().next());
+            default:
+                {
+                    StringJoiner joiner = new StringJoiner(", ", "[", "]");
+                    resources_.stream()
+                              .map(this::stringValueOfResourceCollection)
+                              .forEach(joiner::add);
+                    return joiner.toString();
+                }
+            }
+        }
+
+        private String stringValueOfResourceCollection(ResourceCollection r) {
+            if (r instanceof FileSet) {
+                return "fileset(dir=" + ((FileSet) r).getDir() + ')';
+            } else if (r instanceof FileList) {
+                FileList l = (FileList) r;
+                return "filelist(dir=" + l.getDir(project_) +
+                       ", files=" + Arrays.asList(l.getFiles(project_)) + ')';
+            } else {
+                String raw = String.valueOf(r);
+                return raw.isEmpty() ? r.getClass().getName() : raw;
+            }
         }
     }
 
