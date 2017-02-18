@@ -59,8 +59,6 @@ public final class Depends extends AbstractSelectorContainer {
 
     private static final FileUtils FILE_UTILS = FileUtils.getFileUtils();
 
-    private Logger logger_;
-
     /** Instructions for the case of the pointed resources do not exist. */
     public enum Absent {
         /** Instructs that the task shall be fail. */
@@ -210,8 +208,7 @@ public final class Depends extends AbstractSelectorContainer {
      */
     NewerSourceFinder detach(Logger logger) {
         dieOnCircularReference();
-        logger_ = logger;
-        return doDetach(logger_);
+        return doDetach(logger);
     }
 
     @Override
