@@ -196,6 +196,7 @@ public final class Depends extends AbstractSelectorContainer {
     public Depends createDepends() {
         Depends depends = new Depends();
         children_.add(depends);
+        setChecked(false);
         return depends;
     }
 
