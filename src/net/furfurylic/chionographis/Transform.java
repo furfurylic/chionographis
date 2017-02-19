@@ -31,6 +31,7 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.URIResolver;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
@@ -42,6 +43,7 @@ import javax.xml.xpath.XPathExpression;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
+import org.apache.tools.ant.types.XMLCatalog;
 import org.apache.tools.ant.types.resources.URLResource;
 
 import net.furfurylic.chionographis.Logger.Level;
@@ -55,9 +57,10 @@ public final class Transform extends Filter {
 
     private final ReentrantLock LOCK = new ReentrantLock();
     private SAXTransformerFactory tfac_ = null;
+    private URIResolver resolver_ = null;
 
     private String style_ = null;
-    private boolean usesCache_ = true;
+    private YesNo usesCache_ = YesNo.DEFAULT;
     private Optional<Assoc> assoc_ = Optional.empty();
     private Assemblage<Param> params_ = new Assemblage<>();
     private Depends depends_ = null;
@@ -111,11 +114,15 @@ public final class Transform extends Filter {
      * <li>and external parsed entities referred by documents above.</li>
      * </ul>
      *
+     * <p>When this attribute is set to {@code true} explicitly, {@linkplain
+     * Chionographis#addXMLCatalog(XMLCatalog) XML catalogs} will not be used in the
+     * transformation process.</p>
+     *
      * @param cache
      *      {@code true} if cached; {@code false} otherwise.
      */
     public void setCache(boolean cache) {
-        usesCache_ = cache;
+        usesCache_ = YesNo.valueOf(cache);
     }
 
     /**
@@ -202,7 +209,7 @@ public final class Transform extends Filter {
             stylesheetLocation_ = null;
         }
 
-        sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
+        sink().init(baseDir, namespaceContext, xmlHelper(), logger(), isForce(), dryRun);
     }
 
     private Map<String, Object> createParamMap(NamespaceContext namespaceContext) {
@@ -650,9 +657,7 @@ public final class Transform extends Filter {
         for (Map.Entry<String, Object> param : paramMap_.entrySet()) {
             transformer.setParameter(param.getKey(), param.getValue());
         }
-        if (usesCache_) {
-            transformer.setURIResolver(newURIResolver());
-        }
+        transformer.setURIResolver(renewedURIResolver());
         return transformer;
     }
 
@@ -661,18 +666,30 @@ public final class Transform extends Filter {
         try {
             if (tfac_ == null) {
                 tfac_ = (SAXTransformerFactory) TransformerFactory.newInstance();
-                if (usesCache_) {
-                    tfac_.setURIResolver(newURIResolver());
+                resolver_ = xmlHelper().fallbackURIResolver();
+                if ((usesCache_ == YesNo.YES)
+                 || ((usesCache_ == YesNo.DEFAULT) && (resolver_ == null))) {
+                    resolver_ = new CachingResolver(
+                        r -> logger().log(this, "Caching " + r, Level.DEBUG),
+                        r -> logger().log(this, "Reusing " + r, Level.DEBUG));
                 }
+                tfac_.setURIResolver(renewedURIResolver());
             }
         } finally {
             LOCK.unlock();
         }
     }
 
-    private CachingResolver newURIResolver() {
-        return new CachingResolver(
-            r -> logger().log(this, "Caching " + r, Level.DEBUG),
-            r -> logger().log(this, "Reusing " + r, Level.DEBUG));
+    /**
+     * Creates a new {@link URIResolver} which wraps {@link #resolver_}.
+     *
+     * To create a new resolver for each transformation may be required to avoid errors
+     * in some XSLT processors.
+     *
+     * @return
+     *      a new resolver which wraps {@link #resolver_}, which may be {@code null}.
+     */
+    private URIResolver renewedURIResolver() {
+        return (resolver_ != null) ? (h, b) -> resolver_.resolve(h, b) : null;
     }
 }
