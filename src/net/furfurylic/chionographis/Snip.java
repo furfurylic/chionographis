@@ -109,7 +109,7 @@ public final class Snip extends Filter {
         if (doctype_ != null) {
             doctype_.checkSanity();
         }
-        sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
+        sink().init(baseDir, namespaceContext, xmlHelper(), logger(), isForce(), dryRun);
         namespaceContext_ = namespaceContext;
     }
 
@@ -238,7 +238,7 @@ public final class Snip extends Filter {
     }
 
     private Document newFragmentDocument(Node node) {
-        Document document = XMLTransfer.getDefault().newDocument(getLocation());
+        Document document = xmlHelper().transfer().newDocument(getLocation());
         document.appendChild(document.adoptNode(node));
         return document;
     }
@@ -264,7 +264,7 @@ public final class Snip extends Filter {
                 doctype_.populateInto(document);
             }
             // Send fragment to sink
-            XMLTransfer.getDefault().transfer(new DOMSource(document), rr, getLocation());
+            xmlHelper().transfer().transfer(new DOMSource(document), rr, getLocation());
             // Finish sink
             sink().finishOne(rr);
         }

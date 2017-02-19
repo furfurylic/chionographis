@@ -20,6 +20,7 @@ import org.apache.tools.ant.BuildException;
 abstract class Filter extends Sink implements Driver {
 
     private Sinks sinks_;
+    private XMLHelper xmlHelper_;
     private Logger logger_;
 
     private boolean force_ = false;
@@ -39,6 +40,10 @@ abstract class Filter extends Sink implements Driver {
      */
     final Sink sink() {
         return sinks_;
+    }
+
+    final XMLHelper xmlHelper() {
+        return xmlHelper_;
     }
 
     /**
@@ -96,11 +101,12 @@ abstract class Filter extends Sink implements Driver {
     }
 
     @Override
-    final void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
-            boolean force, boolean dryRun) {
+    final void init(File baseDir, NamespaceContext namespaceContext, XMLHelper xmlHelper,
+            Logger logger, boolean force, boolean dryRun) {
         if (sinks_.isEmpty()) {
             throw new BuildException("No sinks configured", getLocation());
         }
+        xmlHelper_ = xmlHelper;
         logger_ = logger;
         force_ = force_ || force;
         doInit(baseDir, namespaceContext, dryRun);
