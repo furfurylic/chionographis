@@ -41,9 +41,9 @@ Then you can use _chionographis_ task:
 <target name="flora-genera">
   <chionographis srcdir="flora" includes="*.xml">
     <all root="flora">
-      <transform style="flora/to-genera.xsl">
+      <transform style="flora/styles/to-genera.xsl">
         <snip select="/genera/genus">
-          <output destdir="flora-genera" refer="/genus/@name">
+          <output destdir="flora/genera" refer="/genus/@name">
             <globmapper from="*" to="*.xml"/>
           </output>
         </snip>
@@ -57,7 +57,7 @@ This target does following:
 
  . first reads and parses all files with '.xml' extension in 'flora' directory,
  . then collects all parsed documents into a new document whose document element is +<flora>...</flora>+,
- . then transforms this document with XSLT stylesheet 'flora/to-genera.xsl',
+ . then transforms this document with XSLT stylesheet 'flora/styles/to-genera.xsl',
  . then finds all fragments from the resulted document which matches XPath criterion +/genera/genus+,
  . finally writes each fragment to a file whose path is 'flora-genera/XXX.xml', where +XXX+ is the string value of XPath expression +/genus/@name+ of each fragment document (that is, +XXX+ of the document element +<genus name="XXX">...</genus>+).
 
@@ -105,7 +105,7 @@ Thus you can define types as follows if the names (+chionographis+ and +depends+
 So far, we supposed that 'chionographis.jar' was included into Ant's classpath
 whether by a command line option as follows or anything else:
 
-[source,sh]
+[source,shell]
 ----
 ant -lib ./lib/chionographis.jar flora-genera
 ----
@@ -141,13 +141,14 @@ Chionographis has five actors synopsized below:
 [options="header", cols="3,2,10"]
 |=================
 | Actor | Category | Synopsis
-| Chionographis |Driver|Reads XML documents from external sources (called _original_ sources) and passes them to its sinks.
-| Transform |Filter|Receives XML documents from its driver, transforms them by an XSLT stylesheet, and passes them to its sinks.
-| All |Filter|Receives XML documents from its driver, collects all of them into a new XML documents, and passes it to its sinks.
-| Snip |Filter|Receives XML documents from its driver, extracts all document fragments matching an XPath expression, and passes them to its sinks with each fragment being one document.
-| Output |Sink|Receives XML documents from its driver and writes them into files.
+| <<actors.chionographis, Chionographis>> |Driver|Reads XML documents from external sources (called _original_ sources) and passes them to its sinks.
+| <<actors.transform, Transform>> |Filter|Receives XML documents from its driver, transforms them by an XSLT stylesheet, and passes them to its sinks.
+| <<actors.all, All>> |Filter|Receives XML documents from its driver, collects all of them into a new XML documents, and passes it to its sinks.
+| <<actors.snip, Snip>> |Filter|Receives XML documents from its driver, extracts all document fragments matching an XPath expression, and passes them to its sinks with each fragment being one document.
+| <<actors.output, Output>> |Sink|Receives XML documents from its driver and writes them into files.
 |=================
 
+[[actors.chionographis]]
 === Chionographis driver
 
 A _Chionographis_ driver reads external XML documents from files and emits them into sinks it has.
@@ -185,13 +186,22 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
+
 |meta|An instruction that the driver shall put a processing instruction (PI) which includes the meta-information of the original source document. The PIs shall be put as the first children of the document element. If there are multiple PIs to be put, their document order shall be the same as the order of these elements. | No; can be appear arbitrary number of times
+
 |namespace|A pair of a namespace prefix and a namespace name which is mapped from the prefix. This mapping is used by descentant _Transform_, _All_ and _Snip_ drivers.| No; can be appear arbitrary number of times
-|depends|Resources depended by this task additionally. The resources are used only to decide whether the corresponding output files are up to date.| No; can be appear arbitrary number of times
+
+|depends|Dependency between resources applied to the orignal source documents. This information are used only to decide whether the corresponding outputs are up to date. +
+For details, see <<dependency.depends, "Depends element">> section. | No; can be appear arbitrary number of times
+
 |transform|A _Transform_ sink. .4+| No; at least one sink required
+
 |all|An _All_ sink.
+
 |snip|A _Snip_ sink.
+
 |output|An _Output_ sink.
+
 |Other _MatchingTask_'s nested elements|Please consult Ant's document.|No
 |=================
 
@@ -207,7 +217,6 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 When +uri+, the data shall be the absolute URI of the original source. +
 When +file-name+, the data shall be the last part of the path of the URI. +
 When +file-title+, the data shall be the substring of the file name before its last period (+.+).| Yes
-
 |=================
 
 ===== Namespace element's attributes
@@ -219,20 +228,8 @@ When +file-title+, the data shall be the substring of the file name before its l
 |uri|The namespace name (URI) mapped from the prefix. | Yes
 |=================
 
-===== Depends element's attributes and child elements
 
-[options="header", cols="1,3,1"]
-|=================
-| Attribute / Nested element | Description | Required
-|Attribute: absent|An instruction how depended resources which do not exist are treated. +
-When +fail+, the execution will terminate with an error. +
-When +new+, the absent depended resources are regarded ``very new'', so that the corresponding output files are regarded as not up to date. +
-When +ignore+, the absent depended resources are silently ignored.| No; defaults to +fail+
-|Element: _resource collection_|The depended resources represented by an Ant resource collection such as a _fileset_. | Yes
-
-|=================
-
-
+[[actors.transform]]
 === Transform filter
 
 A _Transform_ filter receives XML documents, and apply transformation by an XSLT stylesheet,
@@ -258,13 +255,20 @@ generates output XML documents one per one input document and pass them to sinks
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
+
 |assoc|A narrowing information of the search of the associated stylesheet.| No; at most one can be specified
+
 |param|A key-value pair of stylesheet parameter. As of now, only string parameter values are supported.| No; can be appear arbitrary number of times
-|depends|Resources depended by this filter additionally. The resources are used only to decide whether the corresponding output files are up to date. +
-The way to configure this element is the same as that to configure one that appears in _Chionographis_ driver. So please see the _Chionographis_ driver's explanation for details.| No; can be appear arbitrary number of times
+
+|depends|Dependency between resources applied to the stylesheet. This information are used only to decide whether the corresponding outputs are up to date. +
+For details, see <<dependency.depends, "Depends element">> section.| No; can be appear arbitrary number of times
+
 |transform|A _Transform_ sink. .4+| No; at least one sink required
+
 |all|An _All_ sink.
+
 |snip|A _Snip_ sink.
+
 |output|An _Output_ sink.
 |=================
 
@@ -288,7 +292,9 @@ _style_ and _assoc_ can be specified exclusively.
 | Attribute / Element contents | Description | Required
 
 |name|The name of the stylesheet parameter. +
-Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+. In the first form, the name doesn't belong to any namespace. In the second form, the name belongs to a namespace whose name is mapped from prefix using the _Chionographis_'s child _namespace_ elements.| Yes
+Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+.
+In the first form, the name doesn't belong to any namespace.
+In the second form, the name belongs to a namespace whose name is mapped from prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
 |expand|Whether Ant properties in this element's contents are expanded. | No; defaults to +no+
 
@@ -296,6 +302,7 @@ Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName
 |=================
 
 
+[[actors.all]]
 === All filter
 
 An _All_ filter receives XML documents, collects all of their document elements,
@@ -314,9 +321,12 @@ If the order is significant, you should sort the elements by a descendant _Trans
 | Attribute | Description | Required
 
 |root|The name of the document element of the resulted document. +
-Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+. In the first form, the name doesn't belong to any namespace. In the second form, the name belongs to a namespace whose name is mapped from the prefix using the _Chionographis_'s child _namespace_ elements.| Yes
+Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+.
+In the first form, the name doesn't belong to any namespace.
+In the second form, the name belongs to a namespace whose name is mapped from the prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
-|force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+; see note
+|force|Whether this filter proceed to process even if existing output files seem new enough.
+The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+; see note
 |=================
 
 [NOTE]
@@ -339,6 +349,7 @@ documents are added or removed.
 |=================
 
 
+[[actors.snip]]
 === Snip filter
 
 A _Snip_ filter receives XML documents, generates document fragments pointed by an XPath criterion from them,
@@ -368,22 +379,10 @@ It can include names which belong some namespaces only when the namespaces are d
 |=================
 
 
+[[actors.output]]
 === Output sink
 
 An _Ouput_ sink receives XML documents and writes them into filesystem files.
-
-By default, this sink tries to avoid overwriting existing up-to-date files.
-Whether a destination file is up to date or not is decided by comparing its last
-modification time with the ones of the original source files and the ones of the
-stylesheet files.
-
-As of now, last modification times of external entities,
-included or imported stylesheet files,
-and document files read through XSLT +document()+ functions are not reflected on
-the decision. In addition, if the stylesheets are not files
-(that is, they have URIs with schemes other than +file+),
-their last modified times are regarded _very new_,
-so the destination files are always overwritten.
 
 ==== Attributes
 
@@ -416,20 +415,113 @@ The XPath expression can include names which belong some namespaces only when th
 |=================
 
 [NOTE]
-_dest_ and file mappers can be specified exclusively. _dest_ and _refer_ can be specified exclusively. At least one of _dest_, _refer_ and a file mapper must be specified. At most one file mapper can be installed .
+_dest_ and file mappers can be specified exclusively.
+_dest_ and _refer_ can be specified exclusively.
+At least one of _dest_, _refer_ and a file mapper must be specified.
+At most one file mapper can be installed.
 
 
-== Criteria for skipping processing
+== Specifying dependency between resources
 
-All drivers of Chionographis skip processing inputs which are not newer than their corresponding outputs unless they are not forced to process by _force_ attrubutes.
+All drivers of Chionographis don't process inputs whose corresponding outputs are up to date unless they are not forced to process by _force_ attrubutes.
 
-By default, drivers trigger processing for each input, when either the input file itself or the XSLT stylesheet files are newer than the corresponding output files.
-So, in the following cases, skipping processing will occur and the corresponding outputs are left untouched:
+By default, drivers consider outputs to be up to date when they exist and their last modified times are equal to or newer than either their corresponding inputs or their corresponding stylesheet.
+Thus, in following cases, outputs will be regarded as up to date and left untouched:
 
 The input XML files depend on other files which are newer:: For example, newer DTD files and newer external parsed entities don't make the input files processed.
 The XSLT stylesheet files depend on other files which are newer:: For example, newer external document files referred by +document()+ XSLT functions and external stylesheet files imported by +<xsl:import>+ don't make the input files processed either.
 
-You can tell _Chionographis_ and _Transform_ drivers to refer the newness of these depended files by _depends_ child elements.
+To make _Chionographis_ task proceed to processing in above cases, you can use Ant's built-in _Dependset_ task to remove outputs prior to executing _Chionographis_ task. This task, however, requires output paths to be known statically. To be specific, it cannot handle outputs generated by _Output_ sink accompanied with _refer_ attrubute.
+
+_Chionographis_ task offers a more flexible way to take care of rather complex dependency between resources such as above, which is to use _Depends_ elements.
+
+[[dependency.depends]]
+=== Depends element
+
+_Depends_ elements can appear as children of _Chionographis_ and _Transform_ drivers. In addition, they can be placed outside targets, that is, as children of the project to be used by multiple targets.
+
+_Depends_ elements must have Ant's resource collections as children, such as _fileset_ and _filelist_, unless they have nested _Depends_ elements as below.
+These children resource collections specify referenced resources.
+
+_Depends_ elements can have a Ant's file selector as a child.
+When they have one, the referenced resources are considered to be referenced by the files selected by the selector.
+Otherwise, the referenced resources are regarded as referenced unconditionally.
+
+_Depends_ elements can be nested inside other _Depends_ elements to form larger and more complex dependency.
+
+_Depends_ elements can have _refid_ attribute to be a reference to another _Depends_ element.
+Those which have _refid_ attribute cannot have either any other attributes or any child elements.
+
+_Chionographis_ and _Transform_ drivers use their child _Depends_ elements recursively.
+That is, they scan the dependency again to find resources referenced by already-known referenced resources.
+But _Depends_ elements which have child resource collections and don't have a file selector are not referred in recurring scan.
+
+==== Example
+
+Suppose you define a composite _Depends_ element outside targets in your build file as below:
+
+[source,xml]
+----
+<depends id="dependency.flora">
+  <depends basedir="flora/genera" filename="*.xml"> <!-- A -->
+    <filelist files="flora/genera/genus.dtd"/>
+  </depends>
+  <depends basedir="flora" filename="**/*.dtd"> <!-- B -->
+    <filelist files="base.dtd"/>
+  </depends>
+</depends>
+----
+
+Then you can refer it in your _Chionographis_ task with _refid_:
+
+[source,xml]
+----
+<chinographis srcdir="flora/genera" includes="*.xml">
+  <depends refid="dependency.flora"/>
+  <transform style="flora/styles/genus-to-html.xsl">
+    <output destdir="html/flora/genera">
+      <globmapper from="*.xml" to="*.html"/>
+    </output>
+  </transform>
+</chionographis>
+----
+
+If _Chionographis_ finds 'flora/genera/physostigma.xml', it is deemed to refer to (or depend on) 'flora/genera/genus.dtd' due to dependency A.
+Then _Chionographis_ scans the dependency recursively and deems 'flora/genera/genus.dtd' to refer to 'base.dtd' due to dependency B.
+
+Hence _Chionographis_ decides whether to include 'flora/genera/physostigma.xml' into its process
+by comparing the last modified times of the four files:
+
+* 'flora/genera/physostigma.xml'
+* 'flora/genera/genus.dtd'
+* 'base.dtd'
+* 'html/flora/genera/physostigma.html'
+
+If at least one of the first three files is newer than the last one, _Chionographis_ decide to include 'flora/genera/physostigma.xml' to its process.
+
+
+==== Depends element's attributes and child elements
+
+[options="header", cols="1,3,1"]
+|=================
+| Attribute / Nested element | Description | Required
+|Attribute: absent|An instruction how referenced resources which do not exist are treated. +
+When +fail+, the execution will terminate with an error. +
+When +new+, the absent referenced resources are regarded ``very new'', so that the corresponding output files are regarded as not up to date. +
+When +ignore+, the absent referenced resources are silently ignored.| No; defaults to +fail+
+|Attribute: baseDir|The base directory where the child file selector applied. | Yes if child file selector exists; no otherwise
+|Attribute: fileName|+<depends basedir="a" filename="b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
+|Attribute: file|+<depends file="a/b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
+|Element: _file selector_|An selector which limits application of this dependency. | No; can appear at most once
+|Element: _resource collection_|The referenced resources represented by Ant resource collections. | Yes if there are no nested dependency; can be appear arbitrary number of times greater or equal to one
+|Element: _depends_|Nested dependency. | No; can be appear arbitrary number of times
+|=================
+
+[NOTE]
+_fileName_ and _file_ are literally shorthand notations as described above.
+Thus _file_ and _baseDir_ or _fileName_ cannot be specified at once,
+neither can _fileName_ or _file_ and a file selector.
+Specifying _fileName_ requires also _baseDir_ to be specified.
 
 == Parallelism
 
@@ -450,14 +542,14 @@ So if you run multiple Chinograhis tasks simultaneously in an Ant's _Parallel_ t
 
 If you want to know the version of your 'chionographis.jar', execute the Main-Class of the JAR:
 
-[source,sh]
+[source,shell]
 ----
 java -jar ./lib/chionographis.jar
 ----
 
 Instead, you can be informed of it by executing _Chionographis_ task with "debug" logging level:
 
-[source,sh]
+[source,shell]
 ----
 ant -d target-name
 ----
