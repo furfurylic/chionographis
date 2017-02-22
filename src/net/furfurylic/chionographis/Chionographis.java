@@ -528,6 +528,7 @@ public final class Chionographis extends MatchingTask implements Driver {
                 URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
                 Sink sink, EntityResolver resolver, Logger logger,
                 List<Map.Entry<String, Function<URI, String>>> metaFuncs, Location location) {
+            location_ = location;
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
