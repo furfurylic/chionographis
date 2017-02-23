@@ -272,6 +272,12 @@ public final class Depends extends AbstractSelectorContainer {
             }
         }
 
+        if (children_.isEmpty() && resources_.isEmpty()) {
+            throw new BuildException(
+                "Either resource collections or nested dependency must be specified",
+                getLocation());
+        }
+
         Predicate<File> selector = createFileSelector();
 
         NewerSourceFinder detachedChild = NewerSourceFinder.combine(
