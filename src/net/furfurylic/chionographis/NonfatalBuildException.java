@@ -54,14 +54,6 @@ class NonfatalBuildException extends BuildException {
     @Override
     public String toString() {
         String bySuper = super.toString();
-        if (bySuper.isEmpty()) {
-            return this.getClass().getName();
-        } else {
-            if (!bySuper.startsWith(this.getClass().getName())) {
-                return this.getClass().getName() + ": " + bySuper;
-            } else {
-                return bySuper;
-            }
-        }
+        return bySuper.isEmpty() ? getClass().getName() : bySuper;
     }
 }
