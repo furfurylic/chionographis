@@ -85,7 +85,7 @@ final class Assemblage<T> {
      * @throws BuildException
      *      if duplicated keys are detected.
      */
-    public <K, V> Map<K, V> toMap(Function<? super T, Map.Entry<K, V>> yield,
+    public <K, V> Map<K, V> toMap(Function<? super T, ? extends Map.Entry<K, V>> yield,
             Consumer<Map.Entry<K, V>> logAdded,
             Function<K, ? extends BuildException> generateTwiceEx) {
         if (ts_.isEmpty()) {

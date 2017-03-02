@@ -70,12 +70,7 @@ public final class Transform extends Filter {
 
     private Map<String, Object> paramMap_ = null;
 
-    /**
-     * Sole constructor.
-     *
-     * @param propertyExpander
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     */
+    /** Sole constructor. */
     Transform() {
     }
 
@@ -289,9 +284,9 @@ public final class Transform extends Filter {
 
         public FinisherSAXResult(Result openedResult) {
             openedResult_ = openedResult;
-            TransformerHandler styler = newTransformerHandler();
-            styler.setResult(openedResult_);
-            setHandler(styler);
+            TransformerHandler handler = newTransformerHandler();
+            handler.setResult(openedResult_);
+            setHandler(handler);
         }
 
         @Override
@@ -308,12 +303,13 @@ public final class Transform extends Filter {
     private class FinisherDOMResult extends DOMResult implements Finisher {
         private int origSrcIndex_;
         private String origSrcFileName_;
-        private LongFunction<Resource> lastModified_;
+        private LongFunction<Resource> finder_;
 
-        public FinisherDOMResult(int origSrcIndex, String origSrcFileName, LongFunction<Resource> lastModified) {
+        public FinisherDOMResult(int origSrcIndex, String origSrcFileName,
+                LongFunction<Resource> finder) {
             origSrcIndex_ = origSrcIndex;
             origSrcFileName_ = origSrcFileName;
-            lastModified_ = lastModified;
+            finder_ = finder;
         }
 
         @Override
@@ -334,7 +330,7 @@ public final class Transform extends Filter {
                 if (stylesheetLocation_ != null) {
                     // With a stylesheet fixed up-front
                     openedResult = sink().startOne(origSrcIndex_, origSrcFileName_,
-                            lastModified_, referredContents);
+                        finder_, referredContents);
                     if (openedResult != null) {
                         DOMSource source = new DOMSource(getNode(), getSystemId());
                         newTransformer().transform(source, openedResult);
@@ -345,9 +341,9 @@ public final class Transform extends Filter {
                     // With a stylesheet associated with the source
                     DOMSource source = new DOMSource(getNode(), getSystemId());
                     Map.Entry<LongFunction<Resource>, Supplier<Transformer>> assoc =
-                        extractAssociation(source, lastModified_);
+                        extractAssociation(source, finder_);
                     openedResult = sink().startOne(origSrcIndex_, origSrcFileName_,
-                            assoc.getKey(), referredContents);
+                        assoc.getKey(), referredContents);
                     if (openedResult != null) {
                         assoc.getValue().get().transform(source, openedResult);
                     } else {
@@ -374,11 +370,14 @@ public final class Transform extends Filter {
         }
     }
 
+    /** A bundle of a stylesheet URI and its "newness". */
     private static class StylesheetLocation {
         private URI uri_;
-        private LongFunction<Resource> finder_;
+        private LongFunction<Resource> finder_ = null;
 
         public StylesheetLocation(URI uri, Depends depends, Logger logger) {
+            assert(uri != null);
+            assert(logger != null);
             uri_ = uri;
             if (uri_.getScheme().equalsIgnoreCase("file")) {
                 finder_ = ((depends != null) ? depends.detach(logger) : NewerSourceFinder.OF_NONE)
@@ -386,27 +385,35 @@ public final class Transform extends Filter {
             }
         }
 
+        /**
+         * The URI of the stylesheet.
+         *
+         * @return
+         *      the URI of the stylesheet, which shall not be {@code null}.
+         */
         public URI uri() {
             return uri_;
         }
 
         /**
-         * Gets maximum last modified time of the stylesheet and the specified other resource.
+         * Mix the "newness" of the stylesheet itself and other resources.
          *
-         * @param otherLastModified
-         *      the last modified time of the other resource,
-         *      where 0 means "unknown" or "very new".
+         * @param other
+         *      the "newness" of the other resources, which receives milliseconds of epoch
+         *      (hereinafter called <var>l</var>) and returns a resource whose last modified time
+         *      is unknown or newer than <var>l</var>; which shall not be {@code null}.
          *
          * @return
-         *      0 if "unknown" (or "very new"), positive otherwise.
+         *      the mixed "newness" of the stylesheet and the other resources, which shall not be
+         *      {@code null}.
          */
         public LongFunction<Resource> mixFinder(LongFunction<Resource> other) {
-            return (long lastModified) ->
-                Stream.of(finder_, other)
-                      .map(f -> f.apply(lastModified))
-                      .filter(f -> f != null)
-                      .findAny()
-                      .orElse(null);
+            return l -> Stream.of(finder_, other)
+                              .filter(f -> f != null)
+                              .map(f -> f.apply(l))
+                              .filter(f -> f != null)
+                              .findAny()
+                              .orElse(null);
         }
     }
 
@@ -420,12 +427,12 @@ public final class Transform extends Filter {
      * @throws BuildException
      *      when a stylesheet compilation error occurs.
      */
-    private Transformer newTransformer() {
+    private Transformer newTransformer() throws BuildException {
         try {
             return configureTransformer(
                 getCompiledStylesheet(stylesheetLocation_.uri(), null, true).newTransformer());
         } catch (TransformerConfigurationException e) {
-            throw new BuildException(e, getLocation());
+            throw failureOnDetachingStylesheet(e, false);
         }
     }
 
@@ -439,20 +446,20 @@ public final class Transform extends Filter {
      * @throws BuildException
      *      when a stylesheet compilation error occurs.
      */
-    private TransformerHandler newTransformerHandler() {
+    private TransformerHandler newTransformerHandler() throws BuildException {
         prepareTransformerFactory();
-        TransformerHandler styler;
+        TransformerHandler handler;
         LOCK.lock();
         try {
-            styler = tfac_.newTransformerHandler(
+            handler = tfac_.newTransformerHandler(
                 getCompiledStylesheet(stylesheetLocation_.uri(), null, true));
         } catch (TransformerConfigurationException e) {
-            throw new BuildException(e, getLocation());
+            throw failureOnDetachingStylesheet(e, true);
         } finally {
             LOCK.unlock();
         }
-        configureTransformer(styler.getTransformer());
-        return styler;
+        configureTransformer(handler.getTransformer());
+        return handler;
     }
 
     /**
@@ -461,23 +468,23 @@ public final class Transform extends Filter {
      * @param source
      *      a TrAX {@code Source} object which possibly contains an associated stylesheet
      *      information, which shall not be {@code null}.
-     * @param lastModified
+     * @param finder
      *      the last modified time of {@code source}, where 0 means "unknown" (or "very new").
      *
      * @return
-     *      a pair of the last modified time of the stylesheet (where 0 means "unknown")
-     *      and a lazy initializer of a configured TrAX {@code Transformer} object,
-     *      which shall not be {@code null}.
+     *      a pair of the "newness" of the stylesheet and a lazy initializer of a configured TrAX
+     *      {@code Transformer} object; neither which itself, whose key nor value shall not be
+     *      {@code null}.
      *
      * @throws NonfatalBuildException
      *      when no associated stylesheet information found.
      */
     private Map.Entry<LongFunction<Resource>, Supplier<Transformer>> extractAssociation(
-            Source source, LongFunction<Resource> lastModified) {
+            Source source, LongFunction<Resource> finder) throws NonfatalBuildException {
         prepareTransformerFactory();
 
         // Get Source object of the stylesheet
-        Source styleSource = getAssociatedStylesheet(source);
+        Source styleSource = getAssociatedStylesheetSource(source);
         if (styleSource == null) {
             throw new NonfatalBuildException(
                 "Cannot get associated stylesheet information", getLocation());
@@ -497,26 +504,24 @@ public final class Transform extends Filter {
             StylesheetLocation stylesheetLocation = new StylesheetLocation(
                     getAbsoluteURI_.apply(styleSystemID), depends_, logger());
             return new AbstractMap.SimpleEntry<LongFunction<Resource>, Supplier<Transformer>>(
-                stylesheetLocation.mixFinder(lastModified),
+                stylesheetLocation.mixFinder(finder),
                 () -> {
                     try {
                         return configureTransformer(
                             getCompiledStylesheet(stylesheetLocation.uri(), styleSource, false)
                                 .newTransformer());
                     } catch (TransformerConfigurationException e) {
-                        throw new NonfatalBuildException(e);
+                        throw failureOnDetachingStylesheet(e, false);
                     }
                 });
         } else {
             return new AbstractMap.SimpleEntry<LongFunction<Resource>, Supplier<Transformer>>(
-                (long l) -> new URLResource(styleSystemID),
-                () -> {
-                    return configureTransformer(compileStylesheet1(styleSource));
-                });
+                l -> new URLResource(styleSystemID),
+                () -> configureTransformer(compileStylesheet1(styleSource)));
         }
     }
 
-    private Source getAssociatedStylesheet(Source source) {
+    private Source getAssociatedStylesheetSource(Source source) throws NonfatalBuildException {
         LOCK.lock();
         try {
             return tfac_.getAssociatedStylesheet(
@@ -535,9 +540,9 @@ public final class Transform extends Filter {
     /**
      * Gets a TrAX {@code Templates} object possibly from the cache.
      *
-     * @param styleURI
+     * @param uri
      *      the absolute URI of the stylesheet, which shall not be {@code null}.
-     * @param styleSource
+     * @param source
      *      the stylesheet in a TrAX {@code Source} object form, which can be {@code null}.
      * @param failsFatal
      *      {@code true} if stylesheet compilation errors should bring on a fatal situation;
@@ -549,17 +554,18 @@ public final class Transform extends Filter {
      * @throws BuildException
      *      when a stylesheet compilation error occurs.
      */
-    private Templates getCompiledStylesheet(
-            URI styleURI, Source styleSource, boolean failsFatal) {
+    private Templates getCompiledStylesheet(URI uri, Source source, boolean failsFatal)
+            throws BuildException {
+        assert(uri != null);
         return STYLESHEETS.get(
-            styleURI,
+            uri,
             u -> {},
             u -> {
                 logger().log(this,
                     "Reusing compiled stylesheet: " + u.toString(), Level.DEBUG);
             },
             u -> compileStylesheetN(
-                    ((styleSource == null) ? new StreamSource(u.toString()) : styleSource),
+                    ((source == null) ? new StreamSource(u.toString()) : source),
                     failsFatal));
     }
 
@@ -569,7 +575,7 @@ public final class Transform extends Filter {
      * <p>This method always tries to compile the stylesheet
      * (to be specific, does not refer the cache).</p>
      *
-     * @param styleSource
+     * @param source
      *      the stylesheet in a TrAX {@code Source} object form, which shall not be {@code null}.
      * @param failsFatal
      *      {@code true} if stylesheet compilation errors should bring on a fatal situation;
@@ -581,17 +587,13 @@ public final class Transform extends Filter {
      * @throws BuildException
      *      when a stylesheet compilation error occurs.
      */
-    private Templates compileStylesheetN(Source styleSource, boolean failsFatal) {
-        assert(styleSource.getSystemId() != null);
-        return compileStylesheet(styleSource,(f, s) -> {
+    private Templates compileStylesheetN(Source source, boolean failsFatal) throws BuildException {
+        assert(source.getSystemId() != null);
+        return compileStylesheet(source, (f, s) -> {
             try {
                 return f.newTemplates(s);
             } catch (TransformerConfigurationException e) {
-                if (failsFatal) {
-                    throw new BuildException(e, getLocation());
-                } else {
-                    throw new NonfatalBuildException(e, getLocation());
-                }
+                throw failureOnCompilation(source, e, failsFatal);
             }
         });
     }
@@ -616,41 +618,63 @@ public final class Transform extends Filter {
      * @throws NonfatalBuildException
      *      when a stylesheet compilation error occurs.
      */
-    private Transformer compileStylesheet1(Source styleSource) {
+    private Transformer compileStylesheet1(Source styleSource) throws NonfatalBuildException {
         assert (styleSource.getSystemId() == null);
-        return compileStylesheet(styleSource,(f, s) -> {
+        return compileStylesheet(styleSource, (f, s) -> {
             try {
                 return f.newTransformer(s);
             } catch (TransformerConfigurationException e) {
-                throw new NonfatalBuildException(e);
+                throw failureOnCompilation(styleSource, e, false);
             }
         });
     }
 
+    /**
+     * Compiles a stylesheet into TrAX {@code Templates} or {@code Transformer}.
+     * This method can be called simultaneously on one identical object safely.
+     *
+     * @param source
+     *      the source of the stylesheet, which shall not be {@code null}.
+     * @param compile
+     *      a function which compiles the stylesheet, which shall not be {@code null}.
+     *
+     * @return
+     *      the compiled stylesheet.
+     */
     private <R> R compileStylesheet(
-            Source style, BiFunction<SAXTransformerFactory, Source, R> f) {
-        if (style.getSystemId() != null) {
-            logger().log(this, "Compiling stylesheet: " + style.getSystemId(), Level.VERBOSE);
+            Source source, BiFunction<SAXTransformerFactory, Source, R> compile) {
+        if (source.getSystemId() != null) {
+            logger().log(this, "Compiling stylesheet: " + source.getSystemId(), Level.VERBOSE);
         } else {
             logger().log(this, "Compiling stylesheet", Level.VERBOSE);
         }
         prepareTransformerFactory();
         LOCK.lock();
         try {
-            return f.apply(tfac_, style);
-        } catch (BuildException e) {
-            String log = (style.getSystemId() != null) ?
-                "Failed to compile stylesheet: " + style.getSystemId() :
-                "Failed to compile stylesheet";
-            if (e instanceof NonfatalBuildException) {
-                logger().log(this, log, Level.WARN);
-            } else {
-                logger().log(this, log, Level.ERR);
-            }
-            throw e;
+            return compile.apply(tfac_, source);
         } finally {
             LOCK.unlock();
         }
+    }
+
+    private BuildException failureOnCompilation(Source source,
+            TransformerConfigurationException e, boolean failsFatal) throws BuildException {
+        String message = (source.getSystemId() != null) ?
+            "Failed to compile stylesheet: " + source.getSystemId() :
+            "Failed to compile stylesheet";
+        if (failsFatal) {
+            return new BuildException(message, e, getLocation());
+        } else {
+            return new NonfatalBuildException(message, e, getLocation());
+        }
+    }
+
+    private NonfatalBuildException failureOnDetachingStylesheet(
+            TransformerConfigurationException e, boolean onHandler) throws NonfatalBuildException {
+        String message = onHandler ?
+            "Cannot make a transformer from the stylesheet" :
+            "Cannot make a transformer handler from the stylesheet";
+        throw new NonfatalBuildException(message, e, getLocation());
     }
 
     private Transformer configureTransformer(Transformer transformer) {
