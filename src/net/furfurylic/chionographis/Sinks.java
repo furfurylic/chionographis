@@ -84,9 +84,6 @@ final class Sinks extends Sink {
     /**
      * Adds a {@link Transform} filter into this composite.
      *
-     * @param expander
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     *
      * @return
      *      a {@link Transform} filter object.
      */
@@ -99,9 +96,6 @@ final class Sinks extends Sink {
     /**
      * Adds an {@link All} filter into this composite.
      *
-     * @param expander
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     *
      * @return
      *      an {@link All} filter object.
      */
@@ -113,9 +107,6 @@ final class Sinks extends Sink {
 
     /**
      * Adds a {@link Snip} filter into this composite.
-     *
-     * @param expander
-     *      an object which expands properties in a text, which shall not be {@code null}.
      *
      * @return
      *      a {@link Snip} filter object.

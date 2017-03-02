@@ -26,6 +26,7 @@ public final class Doctype extends ProjectComponent {
     private String publicID_ = null;
     private String systemID_ = null;
 
+    /** Sole constructor. */
     Doctype() {
     }
 
@@ -62,7 +63,7 @@ public final class Doctype extends ProjectComponent {
      */
     void checkSanity() throws BuildException {
         if ((publicID_ == null) && (systemID_ == null)) {
-            throw new BuildException("Neither of IDs are specified", getLocation());
+            throw new BuildException("Neither of identifiers are specified", getLocation());
         }
     }
 

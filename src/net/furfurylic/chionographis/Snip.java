@@ -57,12 +57,7 @@ public final class Snip extends Filter {
     private XPathExpression expr_;
     private final ReentrantLock lock_ = new ReentrantLock();
 
-    /**
-     * Sole constructor.
-     *
-     * @param propertyExpander
-     *      an object which expands properties in a text, which shall not be {@code null}.
-     */
+    /** Sole constructor. */
     Snip() {
     }
 
