@@ -43,10 +43,10 @@ import net.furfurylic.chionographis.Logger.Level;
  * drivers or <i>{@linkplain Transform}</i> filters that they shall refer the last modified times
  * of the resources pointed by them.
  *
- * <p>For examble, if a <i>{@linkplain Transform}</i> filter is configured to use stylesheet
+ * <p>For example, if a <i>{@linkplain Transform}</i> filter is configured to use stylesheet
  * {@code style.xsl} and has an object of this class as its child element which points
  * {@code style-included.xsl}, then the filter shall refer both last modified times
- * and recognizes the latest one as its stylesheet's last modified time.</p>
+ * and recognises the latest one as its stylesheet's last modified time.</p>
  *
  * <p>An object of this class can have at most one file selector. If it has one, dependency on
  * resources it points are applied limitedly to the referrers match the file selector.
@@ -130,9 +130,10 @@ public final class Depends extends AbstractSelectorContainer {
     /**
      * Sets the name of files to which the dependency applies.
      *
-     * <p>This method is an abridged version of {@link #addSelector(
-     * org.apache.tools.ant.types.selectors.SelectSelector)} with a new {@link FilenameSelector}
-     * whose {@linkplain FilenameSelector#setName(String) name} is set to <var>fileName</var>.</p>
+     * <p>This method is an abridged version of {@link
+     * #addSelector(org.apache.tools.ant.types.selectors.SelectSelector)} with a new
+     * {@link FilenameSelector} whose {@linkplain FilenameSelector#setName(String) name} is set to
+     * <var>fileName</var>.</p>
      *
      * <p>NOTE: all attributes of this class including this have no effects on nested object of
      * this class.</p>
@@ -179,7 +180,7 @@ public final class Depends extends AbstractSelectorContainer {
      * Adds the pointed resources.
      *
      * @param resources
-     *      the pointed resorces.
+     *      the pointed resources.
      */
     public void add(ResourceCollection resources) {
         resources_.add(resources);
@@ -203,18 +204,40 @@ public final class Depends extends AbstractSelectorContainer {
     /**
      * Creates a new {@link NewerSourceFinder} object configured properly by this object.
      *
+     * @param logger
+     *      a {@link Logger} object, which shall not be {@code null}.
+     *
      * @return
      *      a new {@link NewerSourceFinder} object.
+     *
+     * @throws BuildException
+     *      if any configuration errors are detected.
      */
-    NewerSourceFinder detach(Logger logger) {
+    NewerSourceFinder detach(Logger logger) throws BuildException {
         dieOnCircularReference();
         return doDetach(logger);
     }
 
+    /**
+     * Checks whether there are any circular references on the definition of this object.
+     *
+     * <p>If this object has already been {@linkplain #isChecked() checked}, this method
+     * returns immediately. Otherwise, the checking takes place.</p>
+     *
+     * @param stack
+     *      a stack object containing objects which are directly or indirectly reference this
+     *      object. This stack contains {@code this} already.
+     * @param project
+     *      the project.
+     *
+     * @throws BuildException
+     *      if a circular reference is detected.
+     *
+     * @since 1.2
+     */
     @Override
     protected void dieOnCircularReference(
-        @SuppressWarnings("rawtypes") Stack stack, Project project)
-            throws BuildException {
+            @SuppressWarnings("rawtypes") Stack stack, Project project) throws BuildException {
         if (isChecked()) {
             return;
         }
