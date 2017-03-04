@@ -167,7 +167,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 |baseDir|The base directory of this task.| No; defaults to the project's base directory
 |srcDir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
 |force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
-|cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +no+
+|cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +yes+
 |verbose|Whether this task promotes log levels from +verbose+ to +info+ for some log entries, such as reports of document output.| No; defaults to +no+
 |parallel|Whether parallel execution is employed. The parallel execution is done with static thread pool whose maximum thread count coincides with the available processor count.| No; defaults to +yes+
 
