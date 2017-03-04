@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Spliterators;
 import java.util.Stack;
 import java.util.StringJoiner;
 import java.util.concurrent.locks.ReentrantLock;
@@ -370,9 +371,16 @@ public final class Depends extends AbstractSelectorContainer {
             if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
                 return (Collection<Iterable<Resource>>) (Object) resources_;
             } else {
-                return () -> new TransformIterator<>(
-                    resources_.iterator(), r -> () -> r.iterator());
+                return () -> resources_.stream()
+                                       .map(ResourceCollections::asResourceIterable)
+                                       .iterator();
             }
+        }
+
+        private static Iterable<Resource> asResourceIterable(ResourceCollection r) {
+            return () -> StreamSupport.stream(
+                            Spliterators.spliterator(r.iterator(), r.size(), 0), false)
+                                      .iterator();
         }
 
         @Override
