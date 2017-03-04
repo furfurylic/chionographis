@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +20,7 @@ import java.util.StringJoiner;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Location;
@@ -348,7 +350,18 @@ public final class Depends extends AbstractSelectorContainer {
 
         @Override
         public Iterator<Resource> iterator() {
-            return new SerialIterator<>(createResourceIterableIterable());
+            return StreamSupport
+                .stream(createResourceIterableIterable().spliterator(), false)
+                .flatMap(ir -> {
+                        try {
+                            return StreamSupport.stream(ir.spliterator(), false);
+                        } catch (RuntimeException e) {
+                            // FileSet.iterator() throws an exception
+                            // when file="a/b/c" and a/b does not exist.
+                            return Collections.<Resource>emptyList().stream();
+                        }
+                    })
+                .iterator();
         }
 
         @SuppressWarnings("unchecked")
