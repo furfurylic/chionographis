@@ -168,7 +168,7 @@ For full set of its ability to accept the source information, consult Ant's docu
 |baseDir|The base directory of this task.| No; defaults to the project's base directory
 |srcDir|The source directory. If not absolute, will be resolved by the base directory of the task.| No; defaults to the task's base directory
 |force|Whether this driver proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
-|cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +yes+
+|cache|Whether this driver uses a document cache shared in Chionographis library for external parsed entities. When set to +yes+ explicitly, use of _XMLCatalog_ (see "Nested element" section) will be disabled.| No; defaults to +no+ if an _XMLCatalog_ is added, +yes+ otherwise
 |verbose|Whether this task promotes log levels from +verbose+ to +info+ for some log entries, such as reports of document output.| No; defaults to +no+
 |parallel|Whether parallel execution is employed. The parallel execution is done with static thread pool whose maximum thread count coincides with the available processor count.| No; defaults to +yes+
 
@@ -182,6 +182,7 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 |Other _MatchingTask_'s attributes|Please consult Ant's document.|No
 |=================
 
+[[actors.chionographis.children]]
 ==== Nested elements
 
 [options="header", cols="1,3,1"]
@@ -195,6 +196,8 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 |depends|Dependency between resources applied to the orignal source documents. This information are used only to decide whether the corresponding outputs are up to date. +
 For details, see <<dependency.depends, "Depends element">> section. | No; can appear at most once
 
+|xmlcatalog|An Ant's _XMLCatalog_ for the processing of the original source files and XSLT transformation performed by _Transform_ filters. Use of this catalog is disabled by setting _cache_ attribute of the drivers to +yes+ explicitly. Also see note.| No; can appear at most once
+
 |transform|A _Transform_ sink. .4+| No; at least one sink required
 
 |all|An _All_ sink.
@@ -205,6 +208,10 @@ For details, see <<dependency.depends, "Depends element">> section. | No; can ap
 
 |Other _MatchingTask_'s nested elements|Please consult Ant's document.|No
 |=================
+
+[NOTE]
+Multithread-safety of Ant's _XMLCatalog_ is not documented explicitly.
+In this regard, _Chinographis_ driver synchronizes accesses to _XMLCatalogs_ added directly to it.
 
 ===== Meta element's attributes
 
@@ -248,7 +255,8 @@ generates output XML documents one per one input document and pass them to sinks
 |force|Whether this filter proceed to process even if existing output files seem new enough. The descendants (sinks, sinks' sinks, and so on) can not override this to +no+.| No; defaults to +no+
 
 |cache|Whether this driver uses a document cache shared in Chionographis library for +<xsl:include>+, +<xsl:import>+, XPath +document()+ functions, and external entities referred by documents above.  +
- When set to +no+, the performance will fall significantly. This option is provided to enable users to evade a certain XSLT processor's bug.| No; defaults to +yes+
+When set to +yes+ explicitly, use of _XMLCatalog_ (see <<actors.chionographis.children, "Nested element" section of the task driver>>) will be invalidated.| No; defaults to +no+ if an _XMLCatalog_ is added to the task driver, +yes+ otherwise
+
 |=================
 
 ==== Nested elements
