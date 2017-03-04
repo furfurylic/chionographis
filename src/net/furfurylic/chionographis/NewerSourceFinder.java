@@ -41,6 +41,12 @@ interface NewerSourceFinder {
     Resource findAnyNewerSource(File file, long lastModified, NewerSourceFinder reentry);
 
     /**
+     * A dumb {@code NewerSourceFinder} whose {@link #findAnyNewerSource(File, long,
+     * NewerSourceFinder)} always returns {@code null}.
+     */
+    static final NewerSourceFinder OF_NONE = (f, l, r) -> null;
+
+    /**
      * Combines multiple objects of this type into one.
      *
      * @param finders
