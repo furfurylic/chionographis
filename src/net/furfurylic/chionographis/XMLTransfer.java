@@ -24,7 +24,6 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.URIResolver;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
@@ -67,39 +66,25 @@ final class XMLTransfer {
     /**
      * Creates a new instance which uses the specified resolvers.
      *
-     * <p>If {@code entityResolver} is {@code null}, {@code uriResolver} is used
-     * as a SAX entity resolver provided that it implements {@code EntityResolver},
-     * and vice versa.</p>
-     *
-     * @param entityResolver
+     * @param resolver
      *      a SAX entity resolver.
-     *      If {@code null} is specified and {@code uriResolver} is not a SAX entity resolver,
+     *      If {@code null} is specified,
      *      no special resolution of external entities are done.
-     * @param uriResolver
-     *      a TrAX URI resolver.
-     *      If {@code null} is specified and {@code entityResolver} is not a TrAX URI resolver,
-     *      no special resolution of external sources are done.
      */
-    public XMLTransfer(EntityResolver entityResolver, URIResolver uriResolver) {
-        EntityResolver usedEntityResolver =
-            ((entityResolver == null) && (uriResolver instanceof EntityResolver)) ?
-                ((EntityResolver) uriResolver) : entityResolver;
-        URIResolver usedURIResolver =
-            ((uriResolver == null) && (entityResolver instanceof URIResolver)) ?
-                ((URIResolver) entityResolver) : uriResolver;
+    public XMLTransfer(EntityResolver resolver) {
         reader_ = ThreadLocal.withInitial(
-            () -> createXMLReaderCreator(usedEntityResolver));
+            () -> createXMLReaderCreator(resolver));
         builder_ = ThreadLocal.withInitial(
-            () -> createDocumentBuilderCreator(usedEntityResolver));
+            () -> createDocumentBuilderCreator(resolver));
         identity_ = ThreadLocal.withInitial(
-            () -> createIdentityTransformerCreator(usedURIResolver));
+            () -> createIdentityTransformerCreator());
     }
 
     /**
-     * Identical to {@code XMLTransfer(null, null)}.
+     * Identical to {@code XMLTransfer(null)}.
      */
     public XMLTransfer() {
-        this(null, null);
+        this(null);
     }
 
     /**
@@ -395,17 +380,11 @@ final class XMLTransfer {
         return builder;
     }
 
-    private static Function<Location, Transformer> createIdentityTransformerCreator(
-            URIResolver resolver) {
+    private static Function<Location, Transformer> createIdentityTransformerCreator() {
         Function<Location, Transformer> transformer = new One<Transformer, Transformer>(
             l -> {
                 try {
-                    TransformerFactory tfac = TransformerFactory.newInstance();
-                    Transformer transform = tfac.newTransformer();
-                    if (resolver != null) {
-                        transform.setURIResolver(resolver);
-                    }
-                    return transform;
+                    return TransformerFactory.newInstance().newTransformer();
                 } catch (TransformerConfigurationException e) {
                     throw new BuildException(e, l);
                 }
