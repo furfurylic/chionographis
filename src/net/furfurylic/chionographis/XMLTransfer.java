@@ -133,7 +133,13 @@ final class XMLTransfer {
                     transferDOM2DOM(new DOMSource(document, source.getSystemId()),
                         (DOMResult) result, true, location);
                     return;
-                } else {
+                } else if (resolver_ != null) {
+                    // Expansion of external entity references in StreamSource are not
+                    // controllable with neither EntityResolver nor URIResolver.
+                    // So here we use SAXSource instead.
+                    SAXSource saxSource = sourceToSAXSource(source);
+                    fillUpSAXSource(saxSource, location);
+                    source = saxSource;
                     // Fall through
                 }
             } else {
