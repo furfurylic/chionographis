@@ -189,7 +189,7 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 
 |meta|An instruction that the driver shall put a processing instruction (PI) which includes the meta-information of the original source document. The PIs shall be put as the first children of the document element. If there are multiple PIs to be put, their document order shall be the same as the order of these elements. | No; can be appear arbitrary number of times
 
-|namespace|A pair of a namespace prefix and a namespace name which is mapped from the prefix. This mapping is used by descentant _Transform_, _All_ and _Snip_ drivers.| No; can be appear arbitrary number of times
+|namespace|A pair of a namespace prefix and a namespace name which is mapped from the prefix. This mapping is used by descentant _Transform_, _All_ and _Snip_ drivers.| No; can appear arbitrary number of times
 
 |depends|Dependency between resources applied to the orignal source documents. This information are used only to decide whether the corresponding outputs are up to date. +
 For details, see <<dependency.depends, "Depends element">> section. | No; can appear at most once
@@ -258,7 +258,7 @@ generates output XML documents one per one input document and pass them to sinks
 
 |assoc|A narrowing information of the search of the associated stylesheet.| No; at most one can be specified
 
-|param|A key-value pair of stylesheet parameter. As of now, only string parameter values are supported.| No; can be appear arbitrary number of times
+|param|A key-value pair of stylesheet parameter. As of now, only string parameter values are supported.| No; can appear arbitrary number of times
 
 |depends|Dependency between resources applied to the stylesheet. This information are used only to decide whether the corresponding outputs are up to date. +
 For details, see <<dependency.depends, "Depends element">> section.| No; can appear at most once
@@ -513,8 +513,8 @@ When +ignore+, the absent referenced resources are silently ignored.| No; defaul
 |Attribute: fileName|+<depends basedir="a" filename="b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
 |Attribute: file|+<depends file="a/b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
 |Element: _file selector_|An selector which limits application of this dependency. | No; can appear at most once
-|Element: _resource collection_|The referenced resources represented by Ant resource collections. | Yes if there are no nested dependency; can be appear arbitrary number of times greater or equal to one
-|Element: _depends_|Nested dependency. | No; can be appear arbitrary number of times
+|Element: _resource collection_|The referenced resources represented by Ant resource collections. | Yes if there are no nested dependency; can appear arbitrary number of times greater or equal to one
+|Element: _depends_|Nested dependency. | No; can appear arbitrary number of times
 |=================
 
 [NOTE]
