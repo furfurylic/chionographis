@@ -367,20 +367,26 @@ public final class Depends extends AbstractSelectorContainer {
 
         @SuppressWarnings("unchecked")
         private Iterable<Iterable<Resource>> createResourceIterableIterable() {
-            // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Collection>
+            // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Resource>
             if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
                 return (Collection<Iterable<Resource>>) (Object) resources_;
             } else {
-                return () -> resources_.stream()
-                                       .map(ResourceCollections::asResourceIterable)
-                                       .iterator();
+                // In Ant 1.8, ResourceCollection.iterator() returns an Iterator (not an
+                // Iterator<Resource>), so we must employ casts which are not needed with Ant 1.9
+                // and therefore evoke dreaded 'unnecessary @SuppressWarnings("unchecked")'
+                // warnings.
+                // So we write everything which possibly needs '@SuppressWarnings("unchecked")' in
+                // one function (this).
+                return () ->
+                    resources_.stream()
+                              .map(rc ->
+                                      (Iterable<Resource>) () ->
+                                          StreamSupport.stream(Spliterators.spliterator(
+                                              (Iterator<Resource>) rc.iterator(), rc.size(), 0),
+                                              false)
+                                                       .iterator())
+                              .iterator();
             }
-        }
-
-        private static Iterable<Resource> asResourceIterable(ResourceCollection r) {
-            return () -> StreamSupport.stream(
-                            Spliterators.spliterator(r.iterator(), r.size(), 0), false)
-                                      .iterator();
         }
 
         @Override

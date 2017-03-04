@@ -25,6 +25,7 @@
       destdir="release/classes" nowarn="yes" source="1.8" debug="yes"
       debuglevel="source,lines" includeantruntime="yes">
       <compilerarg value="-Xdiags:verbose"/>
+      <compilerarg value="-Xlint:unchecked"/>
     </javac>
     <copy todir="release/classes">
       <fileset dir="src" includes="**/*.properties"/>
