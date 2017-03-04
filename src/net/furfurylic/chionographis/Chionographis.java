@@ -534,7 +534,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             fileNames_ = fileNames;
             finders_ = lastModifiedTimes;
             sink_ = sink;
-            xfer_ = new XMLTransfer(resolver, null);
+            xfer_ = new XMLTransfer(resolver);
             logger_ = logger;
             metaFuncs_ = metaFuncs;
             isOK_ = 1;
