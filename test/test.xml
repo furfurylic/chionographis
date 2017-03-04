@@ -1823,7 +1823,7 @@
 
     <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml" cache="no">
       <namespace prefix="q" uri="http://www.furfurylic.net/chionographis/test"/>
-      <snip select="//q:a[2]">
+      <snip select="//descendant::q:a[2]">
         <output destdir="${test.prefix}/output-${test.title}"
                 refer="//processing-instruction('chionographis-output')"/>
       </snip>
