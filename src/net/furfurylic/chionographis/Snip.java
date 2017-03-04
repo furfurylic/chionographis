@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.transform.Result;
 import javax.xml.transform.dom.DOMResult;
@@ -31,7 +32,10 @@ import javax.xml.xpath.XPathFactory;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
+import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -141,9 +145,11 @@ public final class Snip extends Filter {
     }
 
     private NodeList extractNodes(DOMResult result) {
+        NodeList nodes;
+
         lock_.lock();
         try {
-            NodeList nodes;
+            // Compile the XPath once
             if (expr_ == null) {
                 XPath xpath = XPathFactory.newInstance().newXPath();
                 xpath.setNamespaceContext(namespaceContext_);
@@ -154,15 +160,55 @@ public final class Snip extends Filter {
                         "Failed to compile the XPath expression: " + select_, e, getLocation());
                 }
             }
+
+            // Apply the XPath to extract nodes
             try {
                 nodes = (NodeList) expr_.evaluate(result.getNode(), XPathConstants.NODESET);
             } catch (XPathExpressionException e) {
                 throw new NonfatalBuildException(
                     "Failed to apply the XPath expression: " + select_, e, getLocation());
             }
-            return nodes;
         } finally {
             lock_.unlock();
+        }
+
+        // Copy all namespace decls in effect on extracted elements
+        // in order to keep valid qualified names of their descendants and themselves
+        // (maybe a needless fear...)
+        for (int i = 0; i < nodes.getLength(); ++i) {
+            Node node = nodes.item(i);
+            if (node.getNodeType() == Node.ELEMENT_NODE) {
+                copyAncestralNamespaceDecls((Element) node);
+            }
+        }
+
+        return nodes;
+    }
+
+    /**
+     * Copies all "xmlns" attributes into this element from all of its ancestors.
+     *
+     * @param e
+     *      an element.
+     */
+    private void copyAncestralNamespaceDecls(Element e) {
+        // We can use XPath "namespace::*" on e to know namespace decls in effect at once,
+        // but javax.xml.xpath seems to lack plausible ways to pull out the results. Sigh...
+
+        Node ee = e;
+        for (;;) {
+            ee = ee.getParentNode();
+            if ((ee == null) || (ee.getNodeType() != Node.ELEMENT_NODE)) {
+                return;
+            }
+            NamedNodeMap atts = ee.getAttributes();
+            for (int j = 0; j < atts.getLength(); ++j) {
+                Attr attr = (Attr) atts.item(j);
+                if (XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(attr.getNamespaceURI())
+                 && (e.getAttributeNodeNS(attr.getNamespaceURI(), attr.getLocalName()) == null)) {
+                    e.setAttributeNodeNS((Attr) attr.cloneNode(true));
+                }
+            }
         }
     }
 

@@ -1,1 +1,1 @@
-[{http://www.furfurylic.net/chionographis/test}a:a]
+[{http://www.furfurylic.net/chionographis/test}a:[{http://www.furfurylic.net/chionographis/test/2}b:]x[{http://www.furfurylic.net/chionographis/test/2}c:]]
