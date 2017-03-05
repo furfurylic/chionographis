@@ -524,7 +524,6 @@ public final class Output extends Sink {
 
     /** An extension of ByteArrayOutputStream which exposes its internal byte buffer. */
     private static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
-
         public byte[] buffer() {
             return buf;
         }
