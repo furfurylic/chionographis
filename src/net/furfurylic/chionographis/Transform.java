@@ -380,7 +380,7 @@ public final class Transform extends Filter {
             assert(logger != null);
             uri_ = uri;
             if (uri_.getScheme().equalsIgnoreCase("file")) {
-                finder_ = ((depends != null) ? depends.detach(logger) : NewerSourceFinder.OF_NONE)
+                finder_ = ((depends != null) ? depends.detach(logger) : ReferencedSources.EMPTY)
                         .close(new File(uri_));
             }
         }
