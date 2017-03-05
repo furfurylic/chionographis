@@ -15,7 +15,6 @@ import java.util.function.Function;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Result;
@@ -24,7 +23,6 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.URIResolver;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXResult;
@@ -54,9 +52,12 @@ import org.xml.sax.ext.LexicalHandler;
  */
 final class XMLTransfer {
 
-    private ThreadLocal<Function<Location, XMLReader>> reader_;
-    private ThreadLocal<Function<Location, DocumentBuilder>> builder_;
-    private ThreadLocal<Function<Location, Transformer>> identity_;
+    private static final ThreadLocal<BiFunction<EntityResolver, Location, XMLReader>>
+        GET_READER = ThreadLocal.withInitial(() -> createXMLReaderGetter());
+    private static final ThreadLocal<BiFunction<EntityResolver, Location, DocumentBuilder>>
+        GET_BUILDER = ThreadLocal.withInitial(() -> createDocumentBuilderGetter());
+    private static final ThreadLocal<BiFunction<Void, Location, Transformer>>
+        GET_IDENTITY = ThreadLocal.withInitial(() -> createIdentityTransformerGetter());
 
     private static final XMLTransfer DEFAULT = new XMLTransfer();
 
@@ -64,42 +65,22 @@ final class XMLTransfer {
         return DEFAULT;
     }
 
+    private EntityResolver resolver_  = null;
+
     /**
-     * Creates a new instance which uses the specified resolvers.
+     * Creates a new instance which uses the specified resolver.
      *
-     * <p>If {@code entityResolver} is {@code null}, {@code uriResolver} is used
-     * as a SAX entity resolver provided that it implements {@code EntityResolver},
-     * and vice versa.</p>
-     *
-     * @param entityResolver
-     *      a SAX entity resolver.
-     *      If {@code null} is specified and {@code uriResolver} is not a SAX entity resolver,
-     *      no special resolution of external entities are done.
-     * @param uriResolver
-     *      a TrAX URI resolver.
-     *      If {@code null} is specified and {@code entityResolver} is not a TrAX URI resolver,
-     *      no special resolution of external sources are done.
+     * @param resolver
+     *      a SAX entity resolver, which can be {@code null}.
      */
-    public XMLTransfer(EntityResolver entityResolver, URIResolver uriResolver) {
-        EntityResolver usedEntityResolver =
-            ((entityResolver == null) && (uriResolver instanceof EntityResolver)) ?
-                ((EntityResolver) uriResolver) : entityResolver;
-        URIResolver usedURIResolver =
-            ((uriResolver == null) && (entityResolver instanceof URIResolver)) ?
-                ((URIResolver) entityResolver) : uriResolver;
-        reader_ = ThreadLocal.withInitial(
-            () -> createXMLReaderCreator(usedEntityResolver));
-        builder_ = ThreadLocal.withInitial(
-            () -> createDocumentBuilderCreator(usedEntityResolver));
-        identity_ = ThreadLocal.withInitial(
-            () -> createIdentityTransformerCreator(usedURIResolver));
+    public XMLTransfer(EntityResolver resolver) {
+        resolver_ = resolver;
     }
 
     /**
-     * Identical to {@code XMLTransfer(null, null)}.
+     * Identical to {@code XMLTransfer(null)}.
      */
     public XMLTransfer() {
-        this(null, null);
     }
 
     /**
@@ -142,27 +123,30 @@ final class XMLTransfer {
                 return;
             } else if (source instanceof StreamSource) {
                 if (result instanceof SAXResult) {
-                    InputSource input = SAXSource.sourceToInputSource(source);
-                    SAXSource saxSource = new SAXSource(input);
-                    if (saxSource.getSystemId() == null) {
-                        saxSource.setSystemId(source.getSystemId());
-                    }
+                    SAXSource saxSource = sourceToSAXSource(source);
                     transferSAX2SAX(saxSource, (SAXResult) result, location);
                     return;
                 } else if (result instanceof DOMResult){
                     InputSource input = SAXSource.sourceToInputSource(source);
-                    Document document = builder_.get().apply(location).parse(input);
+                    Document document =
+                        getDocumentBuilder(location).parse(input);
                     transferDOM2DOM(new DOMSource(document, source.getSystemId()),
                         (DOMResult) result, true, location);
                     return;
-                } else {
+                } else if (resolver_ != null) {
+                    // Expansion of external entity references in StreamSource are not
+                    // controllable with neither EntityResolver nor URIResolver.
+                    // So here we use SAXSource instead.
+                    SAXSource saxSource = sourceToSAXSource(source);
+                    fillUpSAXSource(saxSource, location);
+                    source = saxSource;
                     // Fall through
                 }
             } else {
                 // Fall through
             }
 
-            identity_.get().apply(location).transform(source, result);
+            getIdentityTransformer(location).transform(source, result);
             copySystemID(source, result);
 
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
@@ -170,6 +154,15 @@ final class XMLTransfer {
         } catch (IOException | SAXException | TransformerException e) {
             throw new NonfatalBuildException(e, location);
         }
+    }
+
+    private SAXSource sourceToSAXSource(Source source) {
+        InputSource input = SAXSource.sourceToInputSource(source);
+        SAXSource saxSource = new SAXSource(input);
+        if (saxSource.getSystemId() == null) {
+            saxSource.setSystemId(source.getSystemId());
+        }
+        return saxSource;
     }
 
     /**
@@ -203,8 +196,8 @@ final class XMLTransfer {
 
         if (result instanceof StreamResult) {
             StreamResult streamResult = (StreamResult) result;
-            DOMImplementationLS ls =
-                (DOMImplementationLS) builder_.get().apply(location).getDOMImplementation();
+            DOMImplementationLS ls = (DOMImplementationLS)
+                    getDocumentBuilder(location).getDOMImplementation();
             LSOutput output = ls.createLSOutput();
             output.setByteStream(streamResult.getOutputStream());
             output.setCharacterStream(streamResult.getWriter());
@@ -212,7 +205,7 @@ final class XMLTransfer {
             ls.createLSSerializer().write(source.getNode(), output);
         } else {
             try {
-                identity_.get().apply(location).transform(source, result);
+                getIdentityTransformer(location).transform(source, result);
             } catch (TransformerException e) {
                 throw new NonfatalBuildException(e, location);
             }
@@ -238,7 +231,8 @@ final class XMLTransfer {
      */
     public Document parse(StreamSource source, Location location) {
         try {
-            return builder_.get().apply(location).parse(SAXSource.sourceToInputSource(source));
+            return getDocumentBuilder(location)
+                    .parse(SAXSource.sourceToInputSource(source));
         } catch (IOException | SAXException e) {
             throw new NonfatalBuildException(e, location);
         }
@@ -257,16 +251,16 @@ final class XMLTransfer {
      *      if a serious configuration problem occurs.
      */
     public Document newDocument(Location location) {
-        return builder_.get().apply(location).newDocument();
+        return getDocumentBuilder(location).newDocument();
     }
 
     private void fillUpSAXSource(SAXSource saxSource, Location location) {
         if (saxSource.getXMLReader() == null) {
-            saxSource.setXMLReader(reader_.get().apply(location));
+            saxSource.setXMLReader(getXMLReader(location));
         } else if (saxSource.getXMLReader() instanceof XMLFilter) {
             XMLFilter filter = (XMLFilter) saxSource.getXMLReader();
             if (filter.getParent() == null) {
-                filter.setParent(reader_.get().apply(location));
+                filter.setParent(getXMLReader(location));
             }
         }
         InputSource input = saxSource.getInputSource();
@@ -346,8 +340,20 @@ final class XMLTransfer {
         }
     }
 
-    private static Function<Location, XMLReader> createXMLReaderCreator(EntityResolver resolver) {
-        Function<Location, XMLReader> reader = new One<XMLReader, SAXParser>(
+    private XMLReader getXMLReader(Location location) {
+        return GET_READER.get().apply(resolver_, location);
+    }
+
+    private DocumentBuilder getDocumentBuilder(Location location) {
+        return GET_BUILDER.get().apply(resolver_, location);
+    }
+
+    private Transformer getIdentityTransformer(Location location) {
+        return GET_IDENTITY.get().apply(null, location);
+    }
+
+    private static BiFunction<EntityResolver, Location, XMLReader> createXMLReaderGetter() {
+        BiFunction<EntityResolver, Location, XMLReader> reader = new One<>(
             l -> {
                 SAXParserFactory pfac = SAXParserFactory.newInstance();
                 pfac.setNamespaceAware(true);
@@ -358,12 +364,12 @@ final class XMLTransfer {
                     throw new BuildException(e, l);
                 }
             },
-            (p, l) -> {
+            (r, p, l) -> {
                 try {
                     p.reset();
                     XMLReader xmlReader = p.getXMLReader();
-                    if (resolver != null) {
-                        xmlReader.setEntityResolver(resolver);
+                    if (r != null) {
+                        xmlReader.setEntityResolver(r);
                     }
                     return xmlReader;
                 } catch (SAXException e) {
@@ -373,9 +379,9 @@ final class XMLTransfer {
         return reader;
     }
 
-    private static Function<Location, DocumentBuilder> createDocumentBuilderCreator(
-            EntityResolver resolver) {
-        Function<Location, DocumentBuilder> builder = new One<DocumentBuilder, DocumentBuilder>(
+    private static BiFunction<EntityResolver, Location, DocumentBuilder>
+            createDocumentBuilderGetter() {
+        BiFunction<EntityResolver, Location, DocumentBuilder> builder = new One<>(
             l -> {
                 try {
                     DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
@@ -385,32 +391,27 @@ final class XMLTransfer {
                     throw new BuildException(e, l);
                 }
             },
-            (b, l) -> {
+            (r, b, l) -> {
                 b.reset();
-                if (resolver != null) {
-                    b.setEntityResolver(resolver);
+                if (r != null) {
+                    b.setEntityResolver(r);
                 }
                 return b;
             });
         return builder;
     }
 
-    private static Function<Location, Transformer> createIdentityTransformerCreator(
-            URIResolver resolver) {
-        Function<Location, Transformer> transformer = new One<Transformer, Transformer>(
+    private static BiFunction<Void, Location, Transformer>
+            createIdentityTransformerGetter() {
+        BiFunction<Void, Location, Transformer> transformer = new One<>(
             l -> {
                 try {
-                    TransformerFactory tfac = TransformerFactory.newInstance();
-                    Transformer transform = tfac.newTransformer();
-                    if (resolver != null) {
-                        transform.setURIResolver(resolver);
-                    }
-                    return transform;
+                    return TransformerFactory.newInstance().newTransformer();
                 } catch (TransformerConfigurationException e) {
                     throw new BuildException(e, l);
                 }
             },
-            (t, l) -> {
+            (v, t, l) -> {
                 t.reset();
                 t.setOutputProperty(OutputKeys.METHOD, "xml");
                 return t;
@@ -418,22 +419,27 @@ final class XMLTransfer {
         return transformer;
     }
 
-    private static final class One<T, U> implements Function<Location, T> {
-        private Function<Location, U> factory_;
-        private BiFunction<U, Location, T> resetter_;
-        private U one_;
+    private static final class One<S, O, T> implements BiFunction<S, Location, T> {
+        private Function<Location, O> factory_;
+        private Resetter<S, O, T> resetter_;
+        private O one_;
 
-        public One(Function<Location, U> factory, BiFunction<U, Location, T> resetter) {
+        public One(Function<Location, O> factory, Resetter<S, O, T> resetter) {
             factory_ = factory;
             resetter_ = resetter;
         }
 
         @Override
-        public T apply(Location location) {
+        public T apply(S s, Location location) {
             if (one_ == null) {
                 one_ = factory_.apply(location);
             }
-            return resetter_.apply(one_, location);
+            return resetter_.reset(s, one_, location);
+        }
+
+        @FunctionalInterface
+        public static interface Resetter<S, O, T> {
+            T reset(S s, O one, Location location);
         }
     }
 }
