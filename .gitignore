@@ -18,4 +18,5 @@ hs_err_pid*
 /devel/
 .settings
 *.orig
+*.bak
 
