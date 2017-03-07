@@ -62,7 +62,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
-    private Assemblage<Depends> depends_ = new Assemblage<>();
+    private Depends depends_ = null;
 
     private Sinks sinks_ = null;
     private Logger logger_ = null;
@@ -252,9 +252,11 @@ public final class Chionographis extends MatchingTask implements Driver {
      *      an empty object which instructs dependency between resources to this task.
      */
     public Depends createDepends() {
-        Depends depends = new Depends();
-        depends_.add(depends);
-        return depends;
+        if (depends_ != null) {
+            throw new BuildException("\"depends\" added twice", getLocation());
+        }
+        depends_ = new Depends();
+        return depends_;
     }
 
     /**
@@ -420,11 +422,8 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     @SuppressWarnings("unchecked")
     private LongFunction<Resource>[] createNewerSourceFinders(URI[] srcURIs) {
-        NewerSourceFinder finder =
-            NewerSourceFinder.combine(
-                depends_.getList().stream()
-                                  .map(d -> d.detach(logger_))
-                                  .collect(Collectors.toList()));
+        NewerSourceFinder finder = (depends_ != null) ?
+            depends_.detach(logger_) : NewerSourceFinder.OF_NONE;
         return Arrays.stream(srcURIs)
                      .map(u -> finder.close(new File(u)))
                      .toArray(LongFunction[]::new);

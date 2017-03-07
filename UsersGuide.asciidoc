@@ -192,7 +192,7 @@ If you set this property to +false+, "dry run" mode is disabled regardless of th
 |namespace|A pair of a namespace prefix and a namespace name which is mapped from the prefix. This mapping is used by descentant _Transform_, _All_ and _Snip_ drivers.| No; can be appear arbitrary number of times
 
 |depends|Dependency between resources applied to the orignal source documents. This information are used only to decide whether the corresponding outputs are up to date. +
-For details, see <<dependency.depends, "Depends element">> section. | No; can be appear arbitrary number of times
+For details, see <<dependency.depends, "Depends element">> section. | No; can appear at most once
 
 |transform|A _Transform_ sink. .4+| No; at least one sink required
 
@@ -261,7 +261,7 @@ generates output XML documents one per one input document and pass them to sinks
 |param|A key-value pair of stylesheet parameter. As of now, only string parameter values are supported.| No; can be appear arbitrary number of times
 
 |depends|Dependency between resources applied to the stylesheet. This information are used only to decide whether the corresponding outputs are up to date. +
-For details, see <<dependency.depends, "Depends element">> section.| No; can be appear arbitrary number of times
+For details, see <<dependency.depends, "Depends element">> section.| No; can appear at most once
 
 |transform|A _Transform_ sink. .4+| No; at least one sink required
 
