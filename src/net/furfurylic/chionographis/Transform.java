@@ -12,7 +12,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.AbstractMap;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +21,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.xml.namespace.NamespaceContext;
@@ -62,7 +60,7 @@ public final class Transform extends Filter {
     private boolean usesCache_ = true;
     private Optional<Assoc> assoc_ = Optional.empty();
     private Assemblage<Param> params_ = new Assemblage<>();
-    private Assemblage<Depends> depends_ = new Assemblage<>();
+    private Depends depends_ = null;
 
     private Function<String, URI> getAbsoluteURI_;
     private StylesheetLocation stylesheetLocation_;
@@ -167,9 +165,11 @@ public final class Transform extends Filter {
      *      an empty object which instructs dependency between resources to this driver.
      */
     public Depends createDepends() {
-        Depends depends = new Depends();
-        depends_.add(depends);
-        return depends;
+        if (depends_ != null) {
+            throw new BuildException("\"depends\" added twice", getLocation());
+        }
+        depends_ = new Depends();
+        return depends_;
     }
 
     /**
@@ -196,7 +196,7 @@ public final class Transform extends Filter {
         if (style_ != null) {
             getAbsoluteURI_ = null;
             stylesheetLocation_ = new StylesheetLocation(
-                    getAbsoluteURI.apply(style_), depends_.getList(), logger());
+                    getAbsoluteURI.apply(style_), depends_, logger());
         } else {
             getAbsoluteURI_ = getAbsoluteURI;
             stylesheetLocation_ = null;
@@ -371,15 +371,11 @@ public final class Transform extends Filter {
         private URI uri_;
         private LongFunction<Resource> finder_;
 
-        public StylesheetLocation(URI uri, Collection<Depends> allDepends, Logger logger) {
+        public StylesheetLocation(URI uri, Depends depends, Logger logger) {
             uri_ = uri;
-
             if (uri_.getScheme().equalsIgnoreCase("file")) {
-                finder_ = NewerSourceFinder.combine(
-                              allDepends.stream()
-                                        .map(d -> d.detach(logger))
-                                        .collect(Collectors.toList()))
-                          .close(new File(uri_));
+                finder_ = ((depends != null) ? depends.detach(logger) : NewerSourceFinder.OF_NONE)
+                        .close(new File(uri_));
             }
         }
 
@@ -492,7 +488,7 @@ public final class Transform extends Filter {
         //  so we evade caching then)
         if ((styleSystemID != null) && !styleSystemID.equals(source.getSystemId())) {
             StylesheetLocation stylesheetLocation = new StylesheetLocation(
-                    getAbsoluteURI_.apply(styleSystemID), depends_.getList(), logger());
+                    getAbsoluteURI_.apply(styleSystemID), depends_, logger());
             return new AbstractMap.SimpleEntry<LongFunction<Resource>, Supplier<Transformer>>(
                 stylesheetLocation.mixFinder(lastModified),
                 () -> {
