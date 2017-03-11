@@ -13,6 +13,11 @@
     <antcall target="basic-complex-depends"/>
     <antcall target="basic-depends-resource-circularity"/>
     <antcall target="basic-error-depends-circularity-by-nesting"/>
+    <antcall target="basic-error-depends-circularity-straight"/>
+    <antcall target="basic-error-depends-empty"/>
+    <antcall target="basic-error-depends-refid-and-basedir"/>
+    <antcall target="basic-error-depends-refid-and-absent"/>
+    <antcall target="basic-error-depends-reference-maltyped-object"/>
     <antcall target="basic-error-depends-fail"/>
     <antcall target="basic-refer-content"/>
     <antcall target="basic-force-output"/>
@@ -385,8 +390,10 @@
     <depends basedir="basic/output-complex-depends" filename="x/input2.xml">
       <fileset dir="basic/output-complex-depends/x" includes="input2.dtd"/>
     </depends>
-    <depends file="basic/output-complex-depends/x/input1.dtd">
-      <fileset file="basic/output-complex-depends/default.dtd"/>
+    <depends>
+      <depends file="basic/output-complex-depends/x/input1.dtd">
+        <fileset file="basic/output-complex-depends/default.dtd"/>
+      </depends>
     </depends>
   </depends>
 
@@ -488,6 +495,123 @@
 
     <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
       <depends refid="depends1-basic-error-depends-circularity-by-nesting"/>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <depends id="depends1-basic-error-depends-circularity-straight"
+        refid="depends2-basic-error-depends-circularity-straight"/>
+  <depends id="depends2-basic-error-depends-circularity-straight"
+        refid="depends1-basic-error-depends-circularity-straight"/>
+
+  <target name="basic-error-depends-circularity-straight">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-circularity-straight"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends refid="depends1-basic-error-depends-circularity-straight"/>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-depends-empty">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-empty"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends>
+        <filename name="*.xml"/>
+        <!-- lacks referenced resources -->
+      </depends>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <depends id="depends-basic-error-depends-and-xxx" file="dummy"/>
+
+  <target name="basic-error-depends-refid-and-basedir">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-refid-and-basedir"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends refid="depends-basic-error-depends-and-xxx" basedir="${dir.output}"/>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="basic-error-depends-refid-and-absent">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-refid-and-absent"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends refid="depends-basic-error-depends-and-xxx" absent="ignore"/>
+      <output dest="${dir.output}"/>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <filelist id="filelist-basic-error-depends-reference-maltyped-object" files="dummy"/>
+
+  <target name="basic-error-depends-reference-maltyped-object">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="error-depends-reference-maltyped-object"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="input.xml" cache="no" failonerror="no">
+      <depends refid="filelist-basic-error-depends-reference-maltyped-object"/>
       <output dest="${dir.output}"/>
     </chionographis>
 
