@@ -10,13 +10,18 @@ package net.furfurylic.chionographis;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Spliterators;
 import java.util.Stack;
+import java.util.StringJoiner;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Location;
@@ -41,10 +46,10 @@ import net.furfurylic.chionographis.Logger.Level;
  * drivers or <i>{@linkplain Transform}</i> filters that they shall refer the last modified times
  * of the resources pointed by them.
  *
- * <p>For examble, if a <i>{@linkplain Transform}</i> filter is configured to use stylesheet
+ * <p>For example, if a <i>{@linkplain Transform}</i> filter is configured to use stylesheet
  * {@code style.xsl} and has an object of this class as its child element which points
  * {@code style-included.xsl}, then the filter shall refer both last modified times
- * and recognizes the latest one as its stylesheet's last modified time.</p>
+ * and recognises the latest one as its stylesheet's last modified time.</p>
  *
  * <p>An object of this class can have at most one file selector. If it has one, dependency on
  * resources it points are applied limitedly to the referrers match the file selector.
@@ -56,8 +61,6 @@ import net.furfurylic.chionographis.Logger.Level;
 public final class Depends extends AbstractSelectorContainer {
 
     private static final FileUtils FILE_UTILS = FileUtils.getFileUtils();
-
-    private Logger logger_;
 
     /** Instructions for the case of the pointed resources do not exist. */
     public enum Absent {
@@ -130,9 +133,10 @@ public final class Depends extends AbstractSelectorContainer {
     /**
      * Sets the name of files to which the dependency applies.
      *
-     * <p>This method is an abridged version of {@link #addSelector(
-     * org.apache.tools.ant.types.selectors.SelectSelector)} with a new {@link FilenameSelector}
-     * whose {@linkplain FilenameSelector#setName(String) name} is set to <var>fileName</var>.</p>
+     * <p>This method is an abridged version of {@link
+     * #addSelector(org.apache.tools.ant.types.selectors.SelectSelector)} with a new
+     * {@link FilenameSelector} whose {@linkplain FilenameSelector#setName(String) name} is set to
+     * <var>fileName</var>.</p>
      *
      * <p>NOTE: all attributes of this class including this have no effects on nested object of
      * this class.</p>
@@ -179,7 +183,7 @@ public final class Depends extends AbstractSelectorContainer {
      * Adds the pointed resources.
      *
      * @param resources
-     *      the pointed resorces.
+     *      the pointed resources.
      */
     public void add(ResourceCollection resources) {
         resources_.add(resources);
@@ -203,19 +207,40 @@ public final class Depends extends AbstractSelectorContainer {
     /**
      * Creates a new {@link NewerSourceFinder} object configured properly by this object.
      *
+     * @param logger
+     *      a {@link Logger} object, which shall not be {@code null}.
+     *
      * @return
      *      a new {@link NewerSourceFinder} object.
+     *
+     * @throws BuildException
+     *      if any configuration errors are detected.
      */
-    NewerSourceFinder detach(Logger logger) {
+    NewerSourceFinder detach(Logger logger) throws BuildException {
         dieOnCircularReference();
-        logger_ = logger;
-        return doDetach(logger_);
+        return doDetach(logger);
     }
 
+    /**
+     * Checks whether there are any circular references on the definition of this object.
+     *
+     * <p>If this object has already been {@linkplain #isChecked() checked}, this method
+     * returns immediately. Otherwise, the checking takes place.</p>
+     *
+     * @param stack
+     *      a stack object containing objects which are directly or indirectly reference this
+     *      object. This stack contains {@code this} already.
+     * @param project
+     *      the project.
+     *
+     * @throws BuildException
+     *      if a circular reference is detected.
+     *
+     * @since 1.2
+     */
     @Override
     protected void dieOnCircularReference(
-        @SuppressWarnings("rawtypes") Stack stack, Project project)
-            throws BuildException {
+            @SuppressWarnings("rawtypes") Stack stack, Project project) throws BuildException {
         if (isChecked()) {
             return;
         }
@@ -247,7 +272,7 @@ public final class Depends extends AbstractSelectorContainer {
     }
 
     private BuildException setLocation(BuildException e) {
-        if (e.getLocation() == null) {
+        if ((e.getLocation() == null) || (e.getLocation().getFileName() == null)) {
             e.setLocation(getLocation());
         }
         return e;
@@ -255,12 +280,12 @@ public final class Depends extends AbstractSelectorContainer {
 
     private NewerSourceFinder doDetach(Logger logger) {
         if (isReference()) {
-            if (absent_.isPresent() || (!resources_.isEmpty())
-             || (baseDir_ != null) || (!children_.isEmpty())) {
+            if (absent_.isPresent() || (baseDir_ != null)) {
                 throw new BuildException(
                     "\"refid\" and other attributes can only be specified mutually exclusively",
                     getLocation());
             }
+            // Ant itself forbids child elements to exist when "refid" is specified
 
             Reference refid = getRefid();
             Object o = refid.getReferencedObject();
@@ -285,45 +310,9 @@ public final class Depends extends AbstractSelectorContainer {
                                .map(x -> x.doDetach(logger))
                                .collect(Collectors.toList()));
 
-        Iterable<Resource> sources = resources_.getList().isEmpty() ?
+        Iterable<Resource> sources = resources_.isEmpty() ?
             null :
-            new Iterable<Resource>() {
-                @Override
-                public Iterator<Resource> iterator() {
-                    return new SerialIterator<>(createResourceIterableIterable());
-                }
-                @Override
-                public String toString() {
-                    switch (resources_.getList().size()) {
-                    case 0:
-                        assert false;
-                        return "";
-                    case 1:
-                        return stringValueOfResourceCollection(
-                            resources_.getList().iterator().next());
-                    default:
-                        return '['
-                              + String.join(
-                                    ", ",
-                                    () -> new TransformIterator<>(
-                                            resources_.getList().iterator(),
-                                            r -> stringValueOfResourceCollection(r)))
-                              + ']';
-                    }
-                }
-                private String stringValueOfResourceCollection(ResourceCollection r) {
-                    if (r instanceof FileSet) {
-                        return "fileset(dir=" + ((FileSet) r).getDir() + ")";
-                    } else if (r instanceof FileList) {
-                        FileList l = (FileList) r;
-                        return "filelist(dir=" + l.getDir(getProject()) +
-                               ", files=" + Arrays.asList(l.getFiles(getProject())) + ")";
-                    } else {
-                        String raw = String.valueOf(r);
-                        return raw.isEmpty() ? r.getClass().getName() : raw;
-                    }
-                }
-            };
+            new ResourceCollections(resources_.getList(), getProject());
 
         return new DetachedDepends(this, getLocation(),
             sources, selector, detachedChild, absent_.orElse(Absent.FAIL), logger);
@@ -351,14 +340,85 @@ public final class Depends extends AbstractSelectorContainer {
                             baseDir_, FILE_UTILS.removeLeadingPath(baseDir_, target), target);
     }
 
-    @SuppressWarnings("unchecked")
-    private Iterable<Iterable<Resource>> createResourceIterableIterable() {
-        // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Collection>
-        if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
-            return (List<Iterable<Resource>>) (Object) resources_.getList();
-        } else {
-            return () -> new TransformIterator<>(
-                resources_.getList().iterator(), r -> () -> r.iterator());
+    private static final class ResourceCollections implements Iterable<Resource> {
+        private Collection<ResourceCollection> resources_;
+        private Project project_;
+
+        ResourceCollections(Collection<ResourceCollection> resources, Project project) {
+            resources_ = resources;
+            project_ = project;
+        }
+
+        @Override
+        public Iterator<Resource> iterator() {
+            return StreamSupport
+                .stream(createResourceIterableIterable().spliterator(), false)
+                .flatMap(ir -> {
+                        try {
+                            return StreamSupport.stream(ir.spliterator(), false);
+                        } catch (RuntimeException e) {
+                            // FileSet.iterator() throws an exception
+                            // when file="a/b/c" and a/b does not exist.
+                            return Collections.<Resource>emptyList().stream();
+                        }
+                    })
+                .iterator();
+        }
+
+        @SuppressWarnings("unchecked")
+        private Iterable<Iterable<Resource>> createResourceIterableIterable() {
+            // In Ant 1.8, ResourceCollection is not a subinterface of Iterable<Resource>
+            if (Iterable.class.isAssignableFrom(ResourceCollection.class)) {
+                return (Collection<Iterable<Resource>>) (Object) resources_;
+            } else {
+                // In Ant 1.8, ResourceCollection.iterator() returns an Iterator (not an
+                // Iterator<Resource>), so we must employ casts which are not needed with Ant 1.9
+                // and therefore evoke dreaded 'unnecessary @SuppressWarnings("unchecked")'
+                // warnings.
+                // So we write everything which possibly needs '@SuppressWarnings("unchecked")' in
+                // one function (this).
+                return () ->
+                    resources_.stream()
+                              .map(rc ->
+                                      (Iterable<Resource>) () ->
+                                          StreamSupport.stream(Spliterators.spliterator(
+                                              (Iterator<Resource>) rc.iterator(), rc.size(), 0),
+                                              false)
+                                                       .iterator())
+                              .iterator();
+            }
+        }
+
+        @Override
+        public String toString() {
+            switch (resources_.size()) {
+            case 0:
+                assert false;
+                return "";
+            case 1:
+                return stringValueOfResourceCollection(resources_.iterator().next());
+            default:
+                {
+                    StringJoiner joiner = new StringJoiner(", ", "[", "]");
+                    resources_.stream()
+                              .map(this::stringValueOfResourceCollection)
+                              .forEach(joiner::add);
+                    return joiner.toString();
+                }
+            }
+        }
+
+        private String stringValueOfResourceCollection(ResourceCollection r) {
+            if (r instanceof FileSet) {
+                return "fileset(dir=" + ((FileSet) r).getDir() + ')';
+            } else if (r instanceof FileList) {
+                FileList l = (FileList) r;
+                return "filelist(dir=" + l.getDir(project_) +
+                       ", files=" + Arrays.asList(l.getFiles(project_)) + ')';
+            } else {
+                String raw = String.valueOf(r);
+                return raw.isEmpty() ? r.getClass().getName() : raw;
+            }
         }
     }
 
