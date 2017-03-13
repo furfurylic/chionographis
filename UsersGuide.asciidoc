@@ -43,6 +43,7 @@ Then you can use _chionographis_ task:
     <all root="flora">
       <transform style="flora/styles/to-genera.xsl">
         <snip select="/genera/genus">
+          <doctype systemid="genus.dtd"/>
           <output destdir="flora/genera" refer="/genus/@name">
             <globmapper from="*" to="*.xml"/>
           </output>
@@ -58,7 +59,7 @@ This target does following:
  . first reads and parses all files with '.xml' extension in 'flora' directory,
  . then collects all parsed documents into a new document whose document element is +<flora>...</flora>+,
  . then transforms this document with XSLT stylesheet 'flora/styles/to-genera.xsl',
- . then finds all fragments from the resulted document which matches XPath criterion +/genera/genus+,
+ . then finds all fragments from the resulted document which matches XPath criterion +/genera/genus+ and inserts document type declarations like +<!DOCTYPE genus SYSTEM "genus.dtd">+ into them,
  . finally writes each fragment to a file whose path is 'flora-genera/XXX.xml', where +XXX+ is the string value of XPath expression +/genus/@name+ of each fragment document (that is, +XXX+ of the document element +<genus name="XXX">...</genus>+).
 
 Additionally, it might be noteworthy that:
@@ -342,10 +343,21 @@ documents are added or removed.
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
+|doctype|The document type of the emitted documents. |No; at most one can be specified
 |transform|A _Transform_ sink. .4+| No; at least one sink required
 |all|An _All_ sink.
 |snip|A _Snip_ sink.
 |output|An _Output_ sink.
+|=================
+
+[[actors.all.children.doctype]]
+===== Doctype element's attributes
+
+[options="header", cols="1,3,1"]
+|=================
+| Attribute | Description | Required
+|publicID|The public identifier of the document type. | No unless _systemID_ is specified
+|systemID|The system identifier of the document type. | No unless _publicID_ is specified
 |=================
 
 
@@ -372,6 +384,7 @@ It can include names which belong some namespaces only when the namespaces are d
 [options="header", cols="1,3,1"]
 |=================
 | Element | Description | Required
+|doctype|The document type of the emitted documents. For details of this element, see <<actors.all.children.doctype, "Doctype element's attributes">> in "All filter" section. |No; at most one can be specified
 |transform|A _Transform_ sink. .4+| No; at least one sink required
 |all|An _All_ sink.
 |snip|A _Snip_ sink.
