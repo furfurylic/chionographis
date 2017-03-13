@@ -64,11 +64,14 @@
     <antcall target="all-up-to-date-late"/>
     <antcall target="all-not-up-to-date-late"/>
     <antcall target="all-ns"/>
+    <antcall target="all-doctype"/>
     <antcall target="all-error-bad-prefix"/>
     <antcall target="all-force"/>
     <antcall target="snip-1"/>
     <antcall target="snip-2"/>
     <antcall target="snip-ns"/>
+    <antcall target="snip-doctype"/>
+    <antcall target="snip-error-doctype-empty"/>
     <antcall target="snip-error-bad-xpath"/>
     <antcall target="crossing-cache"/>
     <antcall target="crossing-cache-refer-content"/>
@@ -1823,6 +1826,33 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="all-doctype">
+    <property name="test.prefix" value="all"/>
+    <property name="test.title" value="doctype"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <chionographis basedir="${test.prefix}" includes="input-${test.title}/*.xml" cache="no">
+      <all root="r">
+        <doctype systemid="all-doctype.dtd" publicid="All"/>
+        <output dest="output-${test.title}/output.xml"/>
+      </all>
+    </chionographis>
+
+    <copy file="${dir.input}/all-doctype.dtd" todir="${dir.output}"/>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
   <target name="all-error-bad-prefix">
     <property name="test.prefix" value="all"/>
     <property name="test.title" value="error-bad-prefix"/>
@@ -1961,6 +1991,55 @@
     <delete dir="${dir.output}"/>
   </target>
 
+  <target name="snip-doctype">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="doctype"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+
+    <chionographis srcdir="${test.prefix}/input-${test.title}" includes="*.xml" cache="no">
+      <snip select="/root/a">
+        <doctype systemid="snip-doctype.dtd"/>
+        <output dest="${test.prefix}/output-${test.title}/output.xml"/>
+      </snip>
+    </chionographis>
+
+    <copy file="${dir.input}/snip-doctype.dtd" todir="${dir.output}"/>
+
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt"/>
+    <assertfileeq name="${test.name}"
+      expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
+  <target name="snip-error-doctype-empty">
+    <property name="test.prefix" value="snip"/>
+    <property name="test.title" value="error-doctype-empty"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+    <mkdir dir="${dir.output}"/>
+    <touch file="${dir.output}/input.xml"/>
+
+    <chionographis srcdir="${dir.output}" includes="*.xml" cache="no" failonerror="no">
+      <snip select="/a">
+        <doctype/>
+        <output dest="${dir.output}/output.xml"/>
+      </snip>
+    </chionographis>
+
+    <assertfilenotexists name="${test.name}" file="${dir.output}/output.xml"/>
+
+    <delete dir="${dir.output}"/>
+  </target>
+
   <target name="snip-error-bad-xpath">
     <property name="test.prefix" value="snip"/>
     <property name="test.title" value="error-bad-xpath"/>
@@ -2025,6 +2104,8 @@
         <output dest="../output-${test.title}/actual2.txt"/>
       </transform>
     </chionographis>
+
+    <copy file="${dir.input}/input.dtd" todir="${dir.output}"/>
 
     <xslt style="${basedir}/flatten.xsl"
           basedir="${dir.output}" destdir="${dir.output}" includes="*.xml">

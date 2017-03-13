@@ -1,0 +1,2 @@
+<!ELEMENT a EMPTY>
+<!ATTLIST a b NMTOKEN "c">

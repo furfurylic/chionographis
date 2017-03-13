@@ -49,7 +49,14 @@ public final class All extends Filter {
      */
     private String root_ = null;
 
+    /**
+     * The qualified name of the root element in Java {@link javax.xml.namespace.QName} version.
+     *
+     * This field shall be filled up by {@link #init(File, NamespaceContext, boolean)}.
+     */
     private QName rootQ_;
+
+    private Doctype doctype_ = null;
 
     private Document resultDocument_;
     private Assemblage<LongFunction<Resource>> finders_;
@@ -80,8 +87,32 @@ public final class All extends Filter {
         root_ = root;
     }
 
+    /**
+     * Creates a new {@link Doctype} object which instructs this filter to embed a document type
+     * declaration.
+     *
+     * @return
+     *      a new {@link Doctype} object
+     *
+     * @throws BuildException
+     *      if this invocation is not the first for this object.
+     *
+     * @since 1.2
+     */
+    public Doctype createDoctype() throws BuildException {
+        if (doctype_ != null) {
+            throw new BuildException("Document types given twice", getLocation());
+        }
+        doctype_ = new Doctype();
+        return doctype_;
+    }
+
     @Override
     void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
+        if (doctype_ != null) {
+            doctype_.checkSanity();
+        }
+
         rootQ_ = null;
 
         // First take care of "prefix:localName" cases only
@@ -206,6 +237,10 @@ public final class All extends Filter {
                               .orElse(null);
         Result result = sink().startOne(-1, null, finder, referredContents);
         if (result != null) {
+            // Prepare DOCTYPE
+            if (doctype_ != null) {
+                doctype_.populateInto(resultDocument_);
+            }
             // Send fragment to sink
             XMLTransfer.getDefault().transfer(
                     new DOMSource(resultDocument_), result, getLocation());

@@ -33,6 +33,7 @@ import javax.xml.transform.stream.StreamSource;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Location;
 import org.w3c.dom.Document;
+import org.w3c.dom.DocumentType;
 import org.w3c.dom.Node;
 import org.w3c.dom.ls.DOMImplementationLS;
 import org.w3c.dom.ls.LSOutput;
@@ -182,7 +183,6 @@ final class XMLTransfer {
      *      {@code true} if nodes are moved; {@code false} otherwise, that is, they are copied.
      * @param location
      *      the location embedded into exceptions thrown, which can be {@code null}.
-     *
      * @throws NonfatalBuildException
      *      if a recoverable error occurs.
      * @throws BuildException
@@ -205,7 +205,17 @@ final class XMLTransfer {
             ls.createLSSerializer().write(source.getNode(), output);
         } else {
             try {
-                getIdentityTransformer(location).transform(source, result);
+                Transformer id = getIdentityTransformer(location);
+                DocumentType doctype = getOwnerDocument(source.getNode()).getDoctype();
+                if (doctype != null) {
+                    if (doctype.getPublicId() != null) {
+                        id.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, doctype.getPublicId());
+                    }
+                    if (doctype.getSystemId() != null) {
+                        id.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, doctype.getSystemId());
+                    }
+                }
+                id.transform(source, result);
             } catch (TransformerException e) {
                 throw new NonfatalBuildException(e, location);
             }
@@ -304,8 +314,7 @@ final class XMLTransfer {
             }
         }
 
-        Document resultDocument = (result.getNode().getNodeType() == Node.DOCUMENT_NODE) ?
-            (Document) result.getNode() : result.getNode().getOwnerDocument();
+        Document resultDocument = getOwnerDocument(result.getNode());
         Consumer<Node> appendNode = (result.getNextSibling() != null) ?
             n -> result.getNextSibling().getParentNode().insertBefore(n, result.getNextSibling()) :
             n -> result.getNode().appendChild(n);
@@ -326,7 +335,17 @@ final class XMLTransfer {
             node = nextNode;
         }
 
-        assert result.getNode() != null;
+        if (resultDocument.getDoctype() == null) {
+            DocumentType doctype = getOwnerDocument(source.getNode()).getDoctype();
+            if (doctype != null) {
+                DocumentType resultDoctype =
+                    resultDocument.getImplementation().createDocumentType(
+                        resultDocument.getDocumentElement().getNodeName(),
+                        doctype.getPublicId(), doctype.getSystemId());
+                resultDocument.insertBefore(resultDoctype, resultDocument.getFirstChild());
+            }
+        }
+
         copySystemID(source, result);
     }
 
@@ -338,6 +357,10 @@ final class XMLTransfer {
                 result.setSystemId(((SAXSource) source).getInputSource().getSystemId());
             }
         }
+    }
+
+    private static Document getOwnerDocument(Node n) {
+        return (n.getNodeType() == Node.DOCUMENT_NODE) ? (Document) n : n.getOwnerDocument();
     }
 
     private XMLReader getXMLReader(Location location) {
