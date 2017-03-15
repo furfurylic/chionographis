@@ -207,8 +207,8 @@ public final class Output extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
-            boolean force, boolean dryRun) {
+    void init(File baseDir, NamespaceContext namespaceContext, XMLHelper xmlHelper,
+            Logger logger, boolean force, boolean dryRun) {
         logger_ = logger;
 
         // Configure destDir_ to be an absolute path.

@@ -47,6 +47,7 @@ final class Sinks extends Sink {
     private static final String ABORT_DOOMED =
             "Failed to process at least one source to give up all";
 
+    private XMLHelper xmlHelper_;
     private Location location_;
     private Assemblage<Sink> sinks_ = new Assemblage<>();
 
@@ -142,9 +143,11 @@ final class Sinks extends Sink {
     }
 
     @Override
-    void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
-            boolean force, boolean dryRun) {
-        sinks().stream().forEach(s -> s.init(baseDir, namespaceContext, logger, force, dryRun));
+    void init(File baseDir, NamespaceContext namespaceContext, XMLHelper xmlHelper,
+            Logger logger, boolean force, boolean dryRun) {
+        xmlHelper_ = xmlHelper;
+        sinks().stream()
+               .forEach(s -> s.init(baseDir, namespaceContext, xmlHelper, logger, force, dryRun));
     }
 
     @Override
@@ -194,7 +197,7 @@ final class Sinks extends Sink {
     Result startOne(int origSrcIndex, String origSrcFileName,
             LongFunction<Resource> finder, List<String> referredContents) {
         Assemblage<Sink> activeSinks = new Assemblage<>();
-        CompositeResultBuilder builder = new CompositeResultBuilder(location_);
+        CompositeResultBuilder builder = new CompositeResultBuilder(xmlHelper_, location_);
         int j = 0;
         try {
             int i = 0;
@@ -378,11 +381,10 @@ final class Sinks extends Sink {
     }
 
     private static class CompositeDOMResult extends DOMResult implements CompositeResult {
-
         private Location location_;
         private Results results_;
 
-        public CompositeDOMResult(Node node, List<Result> results, Location location) {
+        public CompositeDOMResult(Node node, List<Result> results, XMLHelper xferFactory, Location location) {
             super(node);
             location_ = location;
             results_ = new Results(results) {
@@ -398,7 +400,7 @@ final class Sinks extends Sink {
                     assert realDOM.isPresent();
                     int j = realDOM.getAsInt();
 
-                    XMLTransfer xfer = XMLTransfer.getDefault();
+                    XMLTransfer xfer = xferFactory.transfer();
                     DOMSource source = new DOMSource(getNode());
 
                     // For indices other than j, send the result by copy
@@ -436,10 +438,12 @@ final class Sinks extends Sink {
 
     private static final class CompositeResultBuilder {
 
+        private XMLHelper xferFactory_;
         private Location location_;
         private List<Result> results_ = new ArrayList<>();
 
-        public CompositeResultBuilder(Location location) {
+        public CompositeResultBuilder(XMLHelper xferFactory, Location location) {
+            xferFactory_ = xferFactory;
             location_ = location;
         }
 
@@ -457,7 +461,7 @@ final class Sinks extends Sink {
             }
             if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
                 return new CompositeDOMResult(
-                        XMLTransfer.getDefault().newDocument(location_), results_, location_);
+                        xferFactory_.transfer().newDocument(location_), results_, xferFactory_, location_);
             }
 
             try {

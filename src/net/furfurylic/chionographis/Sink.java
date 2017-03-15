@@ -44,6 +44,8 @@ public abstract class Sink extends ProjectComponent {
      *      which represents an absolute file path and is never {@code null}.
      * @param namespaceContext
      *      the namespace context used to resolve prefixes in the configurations of this object.
+     * @param xmlHelper
+     *      an {@link XMLHelper} object, which shall not be {@code null}.
      * @param logger
      *      a logger, which shall not be {@code null}.
      * @param force
@@ -52,8 +54,8 @@ public abstract class Sink extends ProjectComponent {
      * @param dryRun
      *      whether the driver wants this object not to finalize its outputs onto external devices.
      */
-    abstract void init(File baseDir, NamespaceContext namespaceContext, Logger logger,
-        boolean force, boolean dryRun);
+    abstract void init(File baseDir, NamespaceContext namespaceContext, XMLHelper xmlHelper,
+        Logger logger, boolean force, boolean dryRun);
 
     /**
      * Returns XPath expressions which point the source document contents required by this object.

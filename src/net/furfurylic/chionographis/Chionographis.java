@@ -8,6 +8,7 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
@@ -20,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.LongFunction;
@@ -31,6 +33,9 @@ import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
+import javax.xml.transform.Source;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.URIResolver;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
@@ -38,7 +43,10 @@ import org.apache.tools.ant.Location;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.LogLevel;
 import org.apache.tools.ant.types.Resource;
+import org.apache.tools.ant.types.XMLCatalog;
 import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -52,7 +60,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     private Path srcDir_;
     private Path baseDir_;
-    private boolean usesCache_ = true;
+    private YesNo usesCache_ = YesNo.DEFAULT;
     private boolean force_ = false;
     private boolean verbose_ = false;
     private boolean parallel_ = true;
@@ -60,6 +68,7 @@ public final class Chionographis extends MatchingTask implements Driver {
     private boolean failOnError_ = true;
     private boolean failOnNonfatalError_ = false;
 
+    private XMLCatalog xmlCatalog_ = null;
     private Assemblage<Namespace> namespaces_ = new Assemblage<>();
     private Assemblage<Meta> metas_ = new Assemblage<>();
     private Depends depends_ = null;
@@ -113,11 +122,15 @@ public final class Chionographis extends MatchingTask implements Driver {
      * Sets whether the external parsed entities in the original source files are cached.
      * Defaulted to {@code true}.
      *
+     * <p>When this attribute is set to {@code true} explicitly, {@linkplain
+     * #addXMLCatalog(XMLCatalog) XML catalogs} will not be used to process the original source
+     * files.</p>
+     *
      * @param cache
      *      {@code true} if cached; {@code false} otherwise.
      */
     public void setCache(boolean cache) {
-        usesCache_ = cache;
+        usesCache_ = YesNo.valueOf(cache);
     }
 
     /**
@@ -206,7 +219,27 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     /**
-     * Add an instruction to include the meta-information of the original source documents
+     * Adds an XML catalog used to look up external entities and DTDs.
+     *
+     * <p>When {@linkplain #setCache(boolean) caching for the original source files is explicitly
+     * employed}, then this catalog is not used to process the original source files.</p>
+     *
+     * <p>This driver can have at most one XML catalog.</p>
+     *
+     * @param xmlCatalog
+     *      an XML catalog used to look up external entities and DTDs.
+     *
+     * @since 1.2
+     */
+    public void addXMLCatalog(XMLCatalog xmlCatalog) {
+        if (xmlCatalog_ != null) {
+            throw new BuildException("XMLcatalog can be specified at most once", getLocation());
+        }
+        xmlCatalog_ = xmlCatalog;
+    }
+
+    /**
+     * Adds an instruction to include the meta-information of the original source documents
      * into the processing instruction in the documents emitted to the sinks.
      *
      * <p>The processing instructions appear as the document elements first children.</p>
@@ -353,7 +386,10 @@ public final class Chionographis extends MatchingTask implements Driver {
                               .toArray(URI[]::new);
         LongFunction<Resource>[] finders = createNewerSourceFinders(srcURIs);
 
-        sinks_.init(baseDir_.toFile(), createNamespaceContext(), logger_, force_, dryRun);
+        XMLHelper xmlHelper = createXMLHelper();
+
+        sinks_.init(baseDir_.toFile(), createNamespaceContext(), xmlHelper,
+                logger_, force_, dryRun);
 
         // Tell whether destinations are older.
         boolean[] includes = (force_ || (finders == null)) ?
@@ -377,7 +413,7 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         ChionographisWorkerFactory wfac = new ChionographisWorkerFactory(
             failOnNonfatalError_, srcURIs, srcFileNames, finders,
-            sinks_, createEntityResolver(), logger_, createMetaFuncs(), getLocation());
+            sinks_, xmlHelper.transfer(), logger_, createMetaFuncs(), getLocation());
 
         // This report is placed here in order to appear after all preparation passed in peace.
         logSrcFound.run();
@@ -466,16 +502,6 @@ public final class Chionographis extends MatchingTask implements Driver {
         return scanner.getIncludedFiles();
     }
 
-    private EntityResolver createEntityResolver() {
-        if (usesCache_) {
-            return new CachingResolver(
-                u -> logger_.log(this, "Caching " + u, Level.DEBUG),
-                u -> logger_.log(this, "Reusing " + u, Level.DEBUG));
-        } else {
-            return null;
-        }
-    }
-
     private List<Map.Entry<String, Function<URI, String>>> createMetaFuncs() {
         List<Map.Entry<String, Function<URI, String>>> metaFuncs =
             metas_.getList().stream().map(Meta::yield).collect(Collectors.toList());
@@ -489,6 +515,54 @@ public final class Chionographis extends MatchingTask implements Driver {
             e -> logger_.log(this, "Adding namespace prefix mapping: " + e, Level.DEBUG),
             k -> new BuildException("Namespace prefix " + k + " added twice", getLocation()));
         return new PrefixMap(namespaceMap);
+    }
+
+    private XMLHelper createXMLHelper() {
+        CatalogResolver xmlCatalog = (xmlCatalog_ == null) ? null : new CatalogResolver();
+        EntityResolver resolver;
+        if ((usesCache_ == YesNo.YES)
+         || ((usesCache_ == YesNo.DEFAULT) && (xmlCatalog == null))) {
+            resolver = new CachingResolver(
+                u -> logger_.log(this, "Caching " + u, Level.DEBUG),
+                u -> logger_.log(this, "Reusing " + u, Level.DEBUG));
+        } else {
+            resolver = xmlCatalog;
+        }
+        XMLTransfer defaultXfer = new XMLTransfer(resolver);
+        return new XMLHelper() {
+            @Override
+            public XMLTransfer transfer() {
+                return defaultXfer;
+            }
+            @Override
+            public URIResolver fallbackURIResolver() {
+                return xmlCatalog;
+            }
+        };
+        // TODO: make combination of XMLCatalog and CachingResolver OK
+    }
+
+    private final class CatalogResolver implements EntityResolver, URIResolver {
+        private final ReentrantLock lock_ = new ReentrantLock();
+        @Override
+        public InputSource resolveEntity(String publicId, String systemId)
+                throws SAXException, IOException {
+            lock_.lock();
+            try {
+                return xmlCatalog_.resolveEntity(publicId, systemId);
+            } finally {
+                lock_.unlock();
+            }
+        }
+        @Override
+        public Source resolve(String href, String base) throws TransformerException {
+            lock_.lock();
+            try {
+                return xmlCatalog_.resolve(href, base);
+            } finally {
+                lock_.unlock();
+            }
+        }
     }
 
     private final class LogOnce implements Runnable {
@@ -525,7 +599,7 @@ public final class Chionographis extends MatchingTask implements Driver {
         public ChionographisWorkerFactory(
                 boolean failOnNonfatalError,
                 URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
-                Sink sink, EntityResolver resolver, Logger logger,
+                Sink sink, XMLTransfer xfer, Logger logger,
                 List<Map.Entry<String, Function<URI, String>>> metaFuncs, Location location) {
             location_ = location;
             failOnNonfatalError_ = failOnNonfatalError;
@@ -533,7 +607,7 @@ public final class Chionographis extends MatchingTask implements Driver {
             fileNames_ = fileNames;
             finders_ = lastModifiedTimes;
             sink_ = sink;
-            xfer_ = new XMLTransfer(resolver);
+            xfer_ = xfer;
             logger_ = logger;
             metaFuncs_ = metaFuncs;
             isOK_ = 1;
