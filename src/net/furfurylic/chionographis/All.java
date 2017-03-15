@@ -139,7 +139,7 @@ public final class All extends Filter {
             }
         }
 
-        sink().init(baseDir, namespaceContext, logger(), isForce(), dryRun);
+        sink().init(baseDir, namespaceContext, xmlHelper(), logger(), isForce(), dryRun);
     }
 
     @Override
@@ -161,7 +161,7 @@ public final class All extends Filter {
     void startBundle() {
         logger().log(this, "Starting to collect input sources into " + rootQ_, Level.DEBUG);
         sink().startBundle();
-        resultDocument_ = XMLTransfer.getDefault().newDocument(getLocation());
+        resultDocument_ = xmlHelper().transfer().newDocument(getLocation());
         Element docElement = resultDocument_.createElementNS(rootQ_.getNamespaceURI(), root_);
         if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
             // If rootQ_ is in a certain namespace, add the namespace decl
@@ -194,7 +194,7 @@ public final class All extends Filter {
         assert ((DOMResult) result).getNode() != null;
         DOMResult r = (DOMResult) result;
         synchronized (resultDocument_) {
-            XMLTransfer.getDefault().transfer(new DOMSource(r.getNode()),
+            xmlHelper().transfer().transfer(new DOMSource(r.getNode()),
                 new DOMResult(resultDocument_.getDocumentElement()), true, getLocation());
         }
         assert r.getNode() != null;
@@ -242,7 +242,7 @@ public final class All extends Filter {
                 doctype_.populateInto(resultDocument_);
             }
             // Send fragment to sink
-            XMLTransfer.getDefault().transfer(
+            xmlHelper().transfer().transfer(
                     new DOMSource(resultDocument_), result, getLocation());
             resultDocument_ = null;
             // Finish sink

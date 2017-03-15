@@ -60,12 +60,6 @@ final class XMLTransfer {
     private static final ThreadLocal<BiFunction<Void, Location, Transformer>>
         GET_IDENTITY = ThreadLocal.withInitial(() -> createIdentityTransformerGetter());
 
-    private static final XMLTransfer DEFAULT = new XMLTransfer();
-
-    public static XMLTransfer getDefault() {
-        return DEFAULT;
-    }
-
     private EntityResolver resolver_  = null;
 
     /**
@@ -117,6 +111,7 @@ final class XMLTransfer {
                     return;
                 } else {
                     fillUpSAXSource(saxSource, location);
+                    saxSource.getXMLReader().setEntityResolver(resolver_);
                     // Fall through
                 }
             } else if (source instanceof DOMSource) {

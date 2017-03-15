@@ -43,6 +43,7 @@
     <antcall target="basic-error-output-bad-refer"/>
     <antcall target="basic-no-matching-input"/>
     <antcall target="basic-output-no-mapped"/>
+    <antcall target="basic-catalog"/>
     <antcall target="transform"/>
     <antcall target="transform-error-no-stylesheet-configured"/>
     <antcall target="transform-error-stylesheet"/>
@@ -1208,12 +1209,39 @@
     <delete dir="${dir.output}"/>
 
     <chionographis srcdir="${dir.input}" includes="input*.xml" cache="no">
+      <meta type="uri"/>
       <output destdir="${dir.output}" refer="local-name(/*/*)">
         <globmapper from="input*.xml" to="output*.xml"/>
       </output>
     </chionographis>
 
     <assertfilenotexists name="${test.name}" file="${dir.output}"/>
+  </target>
+
+  <target name="basic-catalog">
+    <property name="test.prefix" value="basic"/>
+    <property name="test.title" value="catalog"/>
+    <property name="test.name" value="${test.prefix}-${test.title}"/>
+    <property name="dir.input" location="${test.prefix}/input-${test.title}"/>
+    <property name="dir.output" location="${test.prefix}/output-${test.title}"/>
+
+    <delete dir="${dir.output}"/>
+
+    <chionographis srcdir="${dir.input}" includes="input.xml" cache="no">
+      <xmlcatalog>
+        <dtd publicid="-//Chionographis//DTD Test basic-catalog//EN"
+             location="${dir.input}/resolved.dtd"/>
+      </xmlcatalog>
+      <output dest="${dir.output}/output.xml"/>
+    </chionographis>
+
+    <copy file="${dir.input}/pointed2.dtd" tofile="${dir.output}/pointed.dtd"/>
+    <xslt style="${basedir}/flatten.xsl"
+          in="${dir.output}/output.xml" out="${dir.output}/actual.txt/"/>
+    <assertfileeq name="${test.name}"
+                  expected="${dir.input}/expected.txt" actual="${dir.output}/actual.txt"/>
+
+    <delete dir="${dir.output}"/>
   </target>
 
   <target name="transform">
