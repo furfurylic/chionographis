@@ -63,9 +63,7 @@ public final class All extends Filter {
 
     private Queue<Node> nodes_;
 
-    /**
-     * Sole constructor.
-     */
+    /** Sole constructor. */
     All() {
     }
 

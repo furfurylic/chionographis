@@ -9,9 +9,12 @@ package net.furfurylic.chionographis;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLConnection;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
@@ -37,7 +40,7 @@ import org.xml.sax.SAXException;
  */
 final class CachingResolver implements EntityResolver, URIResolver {
 
-    private static final NetResourceCache<byte[]> BYTES = new NetResourceCache<>();
+    private static final NetResourceCache<ByteBuffer> BYTES = new NetResourceCache<>();
     private static final NetResourceCache<Source> TREES = new NetResourceCache<>();
 
     private Consumer<URI> listenStored_;
@@ -68,34 +71,50 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        byte[] cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
+        ByteBuffer cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
             try {
+                // 1: files
                 if (u.getScheme().equalsIgnoreCase("file")) {
-                    return Files.readAllBytes(Paths.get(u));
-                } else {
-                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    return ByteBuffer.wrap(Files.readAllBytes(Paths.get(u)));
+                }
+
+                URLConnection connection = u.toURL().openConnection();
+                connection.setDoInput(true);
+                connection.setDoOutput(false);
+                connection.connect();
+                int length = connection.getContentLength();
+
+                // 2: content length is known
+                if (length > -1) {
+                    byte[] content = new byte[length];
+                    try (DataInputStream in =
+                            new DataInputStream(connection.getInputStream())) {
+                        in.readFully(content);
+                    }
+                    return ByteBuffer.wrap(content);
+                }
+
+                // 3: content length is unknown
+                try (ExposingByteArrayOutputStream bytes = new ExposingByteArrayOutputStream()) {
                     byte[] buffer = Pool.BYTES.get();
-                    try {
-                        try (InputStream in = u.toURL().openStream()) {
-                            int length;
-                            while ((length = in.read(buffer)) != -1) {
-                                bytes.write(buffer, 0, length);
-                            }
+                    try (InputStream in = connection.getInputStream()) {
+                        int readLength;
+                        while ((readLength = in.read(buffer)) != -1) {
+                            bytes.write(buffer, 0, readLength);
                         }
                     } finally {
                         Pool.BYTES.release(buffer);
                     }
-                    // TODO: Can make more efficient (by avoiding copy)
-                    return bytes.toByteArray();
+                    return ByteBuffer.wrap(bytes.buffer(), 0, bytes.size());
                 }
-
             } catch (IOException e) {
                 return null;
             }
         });
 
         if (cached != null) {
-            InputSource inputSource = new InputSource(new ByteArrayInputStream(cached));
+            InputSource inputSource = new InputSource(
+                new ByteArrayInputStream(cached.array(), cached.arrayOffset(), cached.limit()));
             inputSource.setSystemId(systemId);
             inputSource.setPublicId(publicId);
             return inputSource;
@@ -157,5 +176,12 @@ final class CachingResolver implements EntityResolver, URIResolver {
             uri = uri.normalize();
         }
         return uri;
+    }
+
+    /** An extension of ByteArrayOutputStream which exposes its internal byte buffer. */
+    private static class ExposingByteArrayOutputStream extends ByteArrayOutputStream {
+        public byte[] buffer() {
+            return buf;
+        }
     }
 }

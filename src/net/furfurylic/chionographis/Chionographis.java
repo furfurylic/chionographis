@@ -458,8 +458,8 @@ public final class Chionographis extends MatchingTask implements Driver {
 
     @SuppressWarnings("unchecked")
     private LongFunction<Resource>[] createNewerSourceFinders(URI[] srcURIs) {
-        NewerSourceFinder finder = (depends_ != null) ?
-            depends_.detach(logger_) : NewerSourceFinder.OF_NONE;
+        ReferencedSources finder = (depends_ != null) ?
+            depends_.detach(logger_) : ReferencedSources.EMPTY;
         return Arrays.stream(srcURIs)
                      .map(u -> finder.close(new File(u)))
                      .toArray(LongFunction[]::new);
@@ -598,14 +598,14 @@ public final class Chionographis extends MatchingTask implements Driver {
 
         public ChionographisWorkerFactory(
                 boolean failOnNonfatalError,
-                URI[] uris, String[] fileNames, LongFunction<Resource>[] lastModifiedTimes,
+                URI[] uris, String[] fileNames, LongFunction<Resource>[] finders,
                 Sink sink, XMLTransfer xfer, Logger logger,
                 List<Map.Entry<String, Function<URI, String>>> metaFuncs, Location location) {
             location_ = location;
             failOnNonfatalError_ = failOnNonfatalError;
             uris_ = uris;
             fileNames_ = fileNames;
-            finders_ = lastModifiedTimes;
+            finders_ = finders;
             sink_ = sink;
             xfer_ = xfer;
             logger_ = logger;

@@ -108,57 +108,34 @@ final class XMLTransfer {
                 SAXSource saxSource = (SAXSource) source;
                 if (result instanceof SAXResult) {
                     transferSAX2SAX(saxSource, (SAXResult) result, location);
-                    return;
                 } else {
-                    fillUpSAXSource(saxSource, location);
-                    saxSource.getXMLReader().setEntityResolver(resolver_);
-                    // Fall through
+                    transferWithIdentity(fillUpSAXSource(saxSource, location), result, location);
                 }
             } else if (source instanceof DOMSource) {
                 transfer((DOMSource) source, result, true, location);
-                return;
             } else if (source instanceof StreamSource) {
                 if (result instanceof SAXResult) {
-                    SAXSource saxSource = sourceToSAXSource(source);
-                    transferSAX2SAX(saxSource, (SAXResult) result, location);
-                    return;
+                    transferSAX2SAX(sourceToSAXSource(source), (SAXResult) result, location);
                 } else if (result instanceof DOMResult){
-                    InputSource input = SAXSource.sourceToInputSource(source);
-                    Document document =
-                        getDocumentBuilder(location).parse(input);
-                    transferDOM2DOM(new DOMSource(document, source.getSystemId()),
+                    transferDOM2DOM(sourceToDOMSource((StreamSource) source, location),
                         (DOMResult) result, true, location);
-                    return;
                 } else if (resolver_ != null) {
                     // Expansion of external entity references in StreamSource are not
                     // controllable with neither EntityResolver nor URIResolver.
                     // So here we use SAXSource instead.
-                    SAXSource saxSource = sourceToSAXSource(source);
-                    fillUpSAXSource(saxSource, location);
-                    source = saxSource;
-                    // Fall through
+                    transferWithIdentity(fillUpSAXSource(sourceToSAXSource(source), location),
+                        result, location);
+                } else {
+                    transferWithIdentity(source, result, location);
                 }
             } else {
-                // Fall through
+                transferWithIdentity(source, result, location);
             }
-
-            getIdentityTransformer(location).transform(source, result);
-            copySystemID(source, result);
-
         } catch (SAXNotRecognizedException | SAXNotSupportedException e) {
             throw new BuildException(e, location);
         } catch (IOException | SAXException | TransformerException e) {
             throw new NonfatalBuildException(e, location);
         }
-    }
-
-    private SAXSource sourceToSAXSource(Source source) {
-        InputSource input = SAXSource.sourceToInputSource(source);
-        SAXSource saxSource = new SAXSource(input);
-        if (saxSource.getSystemId() == null) {
-            saxSource.setSystemId(source.getSystemId());
-        }
-        return saxSource;
     }
 
     /**
@@ -186,18 +163,16 @@ final class XMLTransfer {
     public void transfer(DOMSource source, Result result, boolean adopts, Location location) {
         if (result instanceof DOMResult) {
             transferDOM2DOM(source, (DOMResult) result, adopts, location);
-            return;
-        }
-
-        if (result instanceof StreamResult) {
+        } else if (result instanceof StreamResult) {
             StreamResult streamResult = (StreamResult) result;
             DOMImplementationLS ls = (DOMImplementationLS)
-                    getDocumentBuilder(location).getDOMImplementation();
+                getDocumentBuilder(location).getDOMImplementation();
             LSOutput output = ls.createLSOutput();
             output.setByteStream(streamResult.getOutputStream());
             output.setCharacterStream(streamResult.getWriter());
             output.setSystemId(streamResult.getSystemId());
             ls.createLSSerializer().write(source.getNode(), output);
+            copySystemID(source, result);
         } else {
             try {
                 Transformer id = getIdentityTransformer(location);
@@ -211,11 +186,11 @@ final class XMLTransfer {
                     }
                 }
                 id.transform(source, result);
+                copySystemID(source, result);
             } catch (TransformerException e) {
                 throw new NonfatalBuildException(e, location);
             }
         }
-        copySystemID(source, result);
     }
 
     /**
@@ -259,41 +234,63 @@ final class XMLTransfer {
         return getDocumentBuilder(location).newDocument();
     }
 
-    private void fillUpSAXSource(SAXSource saxSource, Location location) {
-        if (saxSource.getXMLReader() == null) {
-            saxSource.setXMLReader(getXMLReader(location));
-        } else if (saxSource.getXMLReader() instanceof XMLFilter) {
-            XMLFilter filter = (XMLFilter) saxSource.getXMLReader();
-            if (filter.getParent() == null) {
-                filter.setParent(getXMLReader(location));
-            }
+    private SAXSource sourceToSAXSource(Source source) {
+        InputSource input = SAXSource.sourceToInputSource(source);
+        SAXSource saxSource = new SAXSource(input);
+        if (saxSource.getSystemId() == null) {
+            saxSource.setSystemId(source.getSystemId());
         }
-        InputSource input = saxSource.getInputSource();
-        if (input == null) {
-            saxSource.setInputSource(new InputSource());
-        }
+        return saxSource;
     }
 
-    private static void setHandlers(XMLReader reader, SAXResult saxResult)
+    private DOMSource sourceToDOMSource(StreamSource source, Location location) {
+        return new DOMSource(parse(source, location), source.getSystemId());
+    }
+
+    private SAXSource fillUpSAXSource(SAXSource source, Location location) {
+        XMLReader reader = source.getXMLReader();
+        if (reader == null) {
+            source.setXMLReader(getXMLReader(location));
+        } else {
+            while (reader instanceof XMLFilter) {
+                XMLFilter filter = (XMLFilter) reader;
+                XMLReader parent = filter.getParent();
+                if (parent == null) {
+                    filter.setParent(getXMLReader(location));
+                    break;
+                } else {
+                    reader = parent;
+                }
+            }
+        }
+        InputSource input = source.getInputSource();
+        if (input == null) {
+            source.setInputSource(new InputSource());
+        }
+        source.getXMLReader().setEntityResolver(resolver_);
+        return source;
+    }
+
+    private void transferSAX2SAX(SAXSource source, SAXResult result, Location location)
+            throws SAXException, IOException {
+        fillUpSAXSource(source, location);
+        setHandlers(source.getXMLReader(), result);
+        source.getXMLReader().parse(source.getInputSource());
+        copySystemID(source, result);
+    }
+
+    private static void setHandlers(XMLReader reader, SAXResult result)
             throws SAXNotRecognizedException, SAXNotSupportedException {
-        reader.setContentHandler(saxResult.getHandler());
+        reader.setContentHandler(result.getHandler());
         LexicalHandler lex = null;
-        if (saxResult.getLexicalHandler() != null) {
-            lex = saxResult.getLexicalHandler();
-        } else if (saxResult.getHandler() instanceof LexicalHandler) {
-            lex = (LexicalHandler) saxResult.getHandler();
+        if (result.getLexicalHandler() != null) {
+            lex = result.getLexicalHandler();
+        } else if (result.getHandler() instanceof LexicalHandler) {
+            lex = (LexicalHandler) result.getHandler();
         }
         if (lex != null) {
             reader.setProperty("http://xml.org/sax/properties/lexical-handler", lex);
         }
-    }
-
-    private void transferSAX2SAX(SAXSource saxSource, SAXResult saxResult, Location location)
-            throws SAXException, IOException {
-        fillUpSAXSource(saxSource, location);
-        setHandlers(saxSource.getXMLReader(), saxResult);
-        saxSource.getXMLReader().parse(saxSource.getInputSource());
-        copySystemID(saxSource, saxResult);
     }
 
     private void transferDOM2DOM(DOMSource source, DOMResult result, boolean adopts,
@@ -302,34 +299,36 @@ final class XMLTransfer {
             if (adopts) {
                 result.setNode(source.getNode());
                 source.setNode(null);
-                copySystemID(source, result);
-                return;
             } else {
                 result.setNode(newDocument(location));
+                moveNodes(source, result, adopts);
             }
+        } else {
+            moveNodes(source, result, adopts);
         }
+        copySystemID(source, result);
+    }
 
+    private void moveNodes(DOMSource source, DOMResult result, boolean adopts) {
         Document resultDocument = getOwnerDocument(result.getNode());
         Consumer<Node> appendNode = (result.getNextSibling() != null) ?
             n -> result.getNextSibling().getParentNode().insertBefore(n, result.getNextSibling()) :
             n -> result.getNode().appendChild(n);
-
         Function<Node, Node> transferNode = adopts ?
-            n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
-                    null : resultDocument.adoptNode(n) :
-            n -> (n.getNodeType() == Node.DOCUMENT_TYPE_NODE) ?
-                    null : resultDocument.importNode(n, true);
+            resultDocument::adoptNode :
+            n -> resultDocument.importNode(n, true);
 
+        // Transfer nodes other than DocumentType
         Node node = source.getNode().getFirstChild();
         while (node != null) {
             Node nextNode = node.getNextSibling();
-            Node transferred = transferNode.apply(node);
-            if (transferred != null) {
-                appendNode.accept(transferred);
+            if (node.getNodeType() != Node.DOCUMENT_TYPE_NODE) {
+                appendNode.accept(transferNode.apply(node));
             }
             node = nextNode;
         }
 
+        // Transfer DocumentType only if resultDocument has not one yet
         if (resultDocument.getDoctype() == null) {
             DocumentType doctype = getOwnerDocument(source.getNode()).getDoctype();
             if (doctype != null) {
@@ -340,7 +339,11 @@ final class XMLTransfer {
                 resultDocument.insertBefore(resultDoctype, resultDocument.getFirstChild());
             }
         }
+    }
 
+    private void transferWithIdentity(Source source, Result result, Location location)
+            throws TransformerException {
+        getIdentityTransformer(location).transform(source, result);
         copySystemID(source, result);
     }
 
