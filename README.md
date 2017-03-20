@@ -21,15 +21,15 @@ To build Chionographis, with `ant` command in your `PATH`, at the top directory 
 ```
 $ ant
 ```
-and JAR files will be generated in `release/lib` directory.
+and JAR files will be generated in `build` directory.
 
 If you want API documents, similarly run
 
 ```
-$ ant doc
+$ ant api-docs
 ```
 
-and you will get API documents in `release/doc` directory.
+and you will get API documents in `build/doc/api` directory.
 
 ## Example
 

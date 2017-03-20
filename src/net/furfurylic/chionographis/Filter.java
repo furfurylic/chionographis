@@ -113,7 +113,7 @@ abstract class Filter extends Sink implements Driver {
     }
 
     /**
-     * Called by {@link #init(File, NamespaceContext, Logger, boolean, boolean)},
+     * Called by {@link #init(File, NamespaceContext, XMLHelper, Logger, boolean, boolean)},
      * does the core process of the initialization.
      *
      * @param baseDir
