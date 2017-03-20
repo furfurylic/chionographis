@@ -205,18 +205,18 @@ public final class Depends extends AbstractSelectorContainer {
     }
 
     /**
-     * Creates a new {@link NewerSourceFinder} object configured properly by this object.
+     * Creates a new {@link ReferencedSources} object configured properly by this object.
      *
      * @param logger
      *      a {@link Logger} object, which shall not be {@code null}.
      *
      * @return
-     *      a new {@link NewerSourceFinder} object.
+     *      a new {@link ReferencedSources} object.
      *
      * @throws BuildException
      *      if any configuration errors are detected.
      */
-    NewerSourceFinder detach(Logger logger) throws BuildException {
+    ReferencedSources detach(Logger logger) throws BuildException {
         dieOnCircularReference();
         return doDetach(logger);
     }
@@ -278,7 +278,7 @@ public final class Depends extends AbstractSelectorContainer {
         return e;
     }
 
-    private NewerSourceFinder doDetach(Logger logger) {
+    private ReferencedSources doDetach(Logger logger) {
         if (isReference()) {
             if (absent_.isPresent() || (baseDir_ != null)) {
                 throw new BuildException(
@@ -305,7 +305,7 @@ public final class Depends extends AbstractSelectorContainer {
 
         Predicate<File> selector = createFileSelector();
 
-        NewerSourceFinder detachedChild = NewerSourceFinder.combine(
+        ReferencedSources detachedChild = ReferencedSources.combine(
             children_.getList().stream()
                                .map(x -> x.doDetach(logger))
                                .collect(Collectors.toList()));
@@ -422,7 +422,7 @@ public final class Depends extends AbstractSelectorContainer {
         }
     }
 
-    private static class DetachedDepends implements NewerSourceFinder {
+    private static class DetachedDepends implements ReferencedSources {
         private final ReentrantLock scanLock_ = new ReentrantLock();
 
         private Object issuer_;
@@ -432,7 +432,7 @@ public final class Depends extends AbstractSelectorContainer {
 
         private Iterable<Resource> sources_;
         private Predicate<File> selector_;
-        private NewerSourceFinder child_;
+        private ReferencedSources child_;
 
         private boolean absentSignificantly_ = false;
         private List<File> sourceFiles_ = null;
@@ -451,7 +451,7 @@ public final class Depends extends AbstractSelectorContainer {
          * @param logger
          */
         public DetachedDepends(Object issuer, Location location, Iterable<Resource> sources,
-                Predicate<File> selector, NewerSourceFinder child, Absent absent, Logger logger) {
+                Predicate<File> selector, ReferencedSources child, Absent absent, Logger logger) {
             issuer_ = issuer;
             location_ = location;
             absent_ = absent;
@@ -463,7 +463,7 @@ public final class Depends extends AbstractSelectorContainer {
 
         @Override
         public Resource findAnyNewerSource(
-                File file, long lastModified, NewerSourceFinder reentry) {
+                File file, long lastModified, ReferencedSources reentry) {
             if ((selector_ == null) || selector_.test(file)) {
                 Resource r = findAnyNewerSourceHere(lastModified, reentry);
                 if (r != null) {
@@ -473,7 +473,7 @@ public final class Depends extends AbstractSelectorContainer {
             return child_.findAnyNewerSource(file, lastModified, reentry);
         }
 
-        private Resource findAnyNewerSourceHere(long lastModified, NewerSourceFinder reentry) {
+        private Resource findAnyNewerSourceHere(long lastModified, ReferencedSources reentry) {
             try {
                 scanLock_.lock();
                 if (sourceFiles_ == null) {

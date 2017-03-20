@@ -23,7 +23,7 @@ import org.apache.tools.ant.types.resources.FileResource;
  * An interface of objects which can tell whether there are any newer resource referenced by the
  * specified file.
  */
-interface NewerSourceFinder {
+interface ReferencedSources {
     /**
      * Searches files referenced by the specified file which are updated after the specified time.
      *
@@ -41,13 +41,13 @@ interface NewerSourceFinder {
      *      <var>lastModified</var> which is referred by <var>file</var>,
      *      a {@link Resource} which possively points it; otherwise {@code null}.
      */
-    Resource findAnyNewerSource(File file, long lastModified, NewerSourceFinder reentry);
+    Resource findAnyNewerSource(File file, long lastModified, ReferencedSources reentry);
 
     /**
-     * A dumb {@code NewerSourceFinder} whose {@link #findAnyNewerSource(File, long,
-     * NewerSourceFinder)} always returns {@code null}.
+     * A dumb {@link ReferencedSources} object whose {@link #findAnyNewerSource(File, long,
+     * ReferencedSources)} always returns {@code null}.
      */
-    static final NewerSourceFinder OF_NONE = (f, l, r) -> null;
+    static final ReferencedSources EMPTY = (f, l, r) -> null;
 
     /**
      * Combines multiple objects of this type into one.
@@ -58,12 +58,12 @@ interface NewerSourceFinder {
      * @return
      *      the resulted object, which shall not be {@code null}.
      */
-    static NewerSourceFinder combine(Iterable<NewerSourceFinder> finders) {
-        List<NewerSourceFinder> fs = StreamSupport.stream(finders.spliterator(), false)
+    static ReferencedSources combine(Iterable<ReferencedSources> finders) {
+        List<ReferencedSources> fs = StreamSupport.stream(finders.spliterator(), false)
                                                   .collect(Collectors.toList());
         switch (fs.size()) {
         case 0:
-            return OF_NONE;
+            return EMPTY;
         case 1:
             return fs.get(0);
         default:
@@ -98,9 +98,9 @@ interface NewerSourceFinder {
             if ((l == 0) || (l > lastModified)) {
                 return new FileResource(file);
             } else {
-                NewerSourceFinder bare = this;
+                ReferencedSources bare = this;
                 Set<File> s = new HashSet<>();
-                NewerSourceFinder checking =
+                ReferencedSources checking =
                     (file2, lastModified2, reentry) -> {
                         File canon;
                         try {

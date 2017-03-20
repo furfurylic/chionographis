@@ -30,7 +30,7 @@ public interface Driver {
      * @return
      *      a {@code Transform} filter object.
      */
-    Filter createTransform();
+    Transform createTransform();
 
     /**
      * Adds an {@code All} filter which consumes the output of this driver object.
