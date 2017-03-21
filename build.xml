@@ -1,17 +1,20 @@
 <project name="chionographis" default="jar">
 
-  <target name="release" depends="jar,api-docs,users-guide">
-    <delete dir="release/notices"/>
-    <mkdir dir="release/notices"/>
-    <copy file="LICENSE" todir="release/notices"/>
-    <copy file="CHANGES" todir="release/notices"/>
+  <target name="clean">
+    <delete dir="build"/>
+    <delete dir="dist"/>
+  </target>
+
+  <target name="release" depends="clean,jar,api-docs,users-guide">
+    <mkdir dir="build/notices"/>
+    <copy file="LICENSE" todir="build/notices"/>
+    <copy file="doc/CHANGES" todir="build/notices"/>
     <condition property="archive.name"
         value="chionographis-${rev.number}.zip" else="chionographis.zip">
         <equals arg1="${rev.base}" arg2="${rev.number}"/>
     </condition>
-    <zip destfile="release/artifact/${archive.name}"
-      basedir="release" includes="doc/**, notices/**, chionographis.jar" level="9"/>
-    <delete dir="release/notices"/>
+    <zip destfile="dist/${archive.name}"
+      basedir="build" includes="doc/**, notices/**, chionographis.jar" level="9"/>
   </target>
 
   <target name="jar" depends="-compile,-archive">
@@ -19,15 +22,14 @@
   </target>
 
   <target name="-compile">
-    <delete dir="release/classes"/>
-    <mkdir dir="release/classes"/>
+    <mkdir dir="build/classes"/>
     <javac srcdir="src" includes="net/furfurylic/chionographis/**/*.java"
-      destdir="release/classes" nowarn="yes" source="1.8" debug="yes"
+      destdir="build/classes" nowarn="yes" source="1.8" debug="yes"
       debuglevel="source,lines" includeantruntime="yes">
       <compilerarg value="-Xdiags:verbose"/>
       <compilerarg value="-Xlint:unchecked"/>
     </javac>
-    <copy todir="release/classes">
+    <copy todir="build/classes">
       <fileset dir="src" includes="**/*.properties"/>
       <identitymapper/>
     </copy>
@@ -45,8 +47,8 @@
       manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
         "Main-Class", "net.furfurylic.chionographis.Main"));
 
-      number = project.getProperty("rev.number");
-      spec = project.getProperty("rev.spec");
+      number = project.getProperty("chionographis.rev.number");
+      spec = project.getProperty("chionographis.rev.spec");
       if (spec != null) {
         manifest.addConfiguredAttribute(new org.apache.tools.ant.taskdefs.Manifest.Attribute(
           "Specification-Version", spec));
@@ -57,8 +59,8 @@
       }
 
       jar = project.createTask("jar");
-      jar.setDestFile(new java.io.File(project.getBaseDir(), "release/chionographis.jar"));
-      jar.setBasedir(new java.io.File(project.getBaseDir(), "release/classes"));
+      jar.setDestFile(new java.io.File(project.getBaseDir(), "build/chionographis.jar"));
+      jar.setBasedir(new java.io.File(project.getBaseDir(), "build/classes"));
       jar.setIncludes("**/*");
       jar.setUpdate(false);
       jar.setFilesonly(true);
@@ -73,8 +75,8 @@
     <delete dir="release/doc/api"/>
     <mkdir dir="release/doc/api"/>
     <script language="javascript"><![CDATA[
-      number = project.getProperty("rev.number");
-      spec = project.getProperty("rev.spec");
+      number = project.getProperty("chionographis.rev.number");
+      spec = project.getProperty("chionographis.rev.spec");
       if (spec != null) {
         project.setNewProperty("doc.api.title",
           "Chionographis API version " + spec + " (" + number + ")");
@@ -88,7 +90,7 @@
       }
     ]]></script>
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
-      sourcepath="src" destdir="release/doc/api" encoding="UTF-8" docencoding="UTF-8"
+      sourcepath="src" destdir="build/doc/api" encoding="UTF-8" docencoding="UTF-8"
       charset="UTF-8" classpath="${ant.home}/lib/ant.jar" use="yes"
       windowtitle="${doc.api.title}" doctitle="${doc.api.header}" header="${doc.api.header}"/>
   </target>
@@ -97,69 +99,69 @@
   <target name="rev" depends="-git-check,-rev-git"/>
 
   <target name="-git-check">
-    <exec executable="git" resultproperty="git.exitcode"
+    <exec executable="git" resultproperty="chionographis.git.exitcode"
       failonerror="false" failifexecutionfails="false">
       <arg line="status"/>
       <arg line="-s"/>
     </exec>
-    <condition property="git.available" else="false">
-      <equals arg1="${git.exitcode}" arg2="0"/>
+    <condition property="chionographis.git.available" else="false">
+      <equals arg1="${chionographis.git.exitcode}" arg2="0"/>
     </condition>
   </target>
 
-  <target name="-rev-git" if="${git.available}">
-    <exec executable="git" outputproperty="git.desc.tags">
+  <target name="-rev-git" if="${chionographis.git.available}">
+    <exec executable="git" outputproperty="chionographis.git.desc.tags">
       <arg line="describe" />
       <arg line="--tags" />
     </exec>
-    <exec executable="git" outputproperty="git.log.date">
+    <exec executable="git" outputproperty="chionographis.git.log.date">
       <arg line="log"/>
       <arg line="-1"/>
       <arg line="--date=iso"/>
       <arg line="--format='%cd'"/>
      </exec>
     <script language="javascript"><![CDATA[
-      number = project.getProperty("git.desc.tags").replaceAll("^[\\s]*v([\\S]+)[\\s]*$", "$1");
+      number = project.getProperty("chionographis.git.desc.tags").replaceAll("^[\\s]*v([\\S]+)[\\s]*$", "$1");
       base = number.replaceAll("^[\\s]*([\\d]+\\.[\\d]+\\.[\\d]+).*$", "$1");
-      project.setNewProperty("rev.number", number);
-      project.setNewProperty("rev.base", base);
+      project.setNewProperty("chionographis.rev.number", number);
+      project.setNewProperty("chionographis.rev.base", base);
       if (number.equals(base)) {
         spec = base.replaceAll("^[\\s]*([\\d]+\\.[\\d]+).*$", "$1");
-        project.setNewProperty("rev.spec", spec);
+        project.setNewProperty("chionographis.rev.spec", spec);
       }
-      dateString = project.getProperty("git.log.date").trim();
+      dateString = project.getProperty("chionographis.git.log.date").trim();
       date = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ssX").parse(dateString);
       format = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
       format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
       dateString = format.format(date);
-      project.setNewProperty("rev.date", dateString);
+      project.setNewProperty("chionographis.rev.date", dateString);
     ]]></script>
   </target>
 
   <target name="users-guide" depends="-rev">
     <mkdir dir="release/doc"/>
     <script language="javascript"><![CDATA[
+      dist = project.getProperty("chionographis.build")
       exec = project.createTask("exec");
       exec.setExecutable("asciidoc");
       exec.setFailIfExecutionFails(false);
       exec.createArg().setLine("-b html5");
       exec.createArg().setLine("-a toc");
       exec.createArg().setLine("-n");
-      exec.createArg().setLine("-o release/doc/UsersGuide.html");
-      if (project.getProperty("rev.number") != null) {
-        exec.createArg().setLine("-a revnumber=" + project.getProperty("rev.number"));
-        exec.createArg().setLine("-a revdate='" + project.getProperty("rev.date") + "'");
+      exec.createArg().setLine("-o build/doc/UsersGuide.html");
+      if (project.getProperty("chionographis.rev.number") != null) {
+        exec.createArg().setLine("-a revnumber=" + project.getProperty("chionographis.rev.number"));
+        exec.createArg().setLine("-a revdate='" + project.getProperty("chionographis.rev.date") + "'");
       }
-      exec.createArg().setLine("UsersGuide.asciidoc");
+      exec.createArg().setLine("doc/UsersGuide.asciidoc");
       exec.perform();
     ]]></script>
   </target>
 
   <target name="api-docs-devel">
-    <delete dir="devel/doc/api"/>
     <mkdir dir="devel/doc/api"/>
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
-      sourcepath="src" destdir="devel/doc/api" encoding="UTF-8" docencoding="UTF-8"
+      sourcepath="src" destdir="build/doc/api-devel" encoding="UTF-8" docencoding="UTF-8"
       classpath="${ant.home}/lib/ant.jar" access="package" use="yes"
       charset="UTF-8" windowtitle="Chionographis API for developers"
       doctitle="Chionographis API for developers"

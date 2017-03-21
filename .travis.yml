@@ -6,5 +6,6 @@ jdk:
 env:
   - ANT_ARGS="-logger org.apache.tools.ant.listener.AnsiColorLogger -Dnet.furfurylic.chionographis.squelch=true"
 script:
+  - ant clean
   - ant
-  - ant -lib release -f test/test.xml
+  - ant -lib build -f test/test.xml

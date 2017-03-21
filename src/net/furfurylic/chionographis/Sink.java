@@ -65,7 +65,7 @@ public abstract class Sink extends ProjectComponent {
      * {@link #startOne(int, String, LongFunction, List)}.</p>
      *
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,
-     * Logger, boolean, boolean)} arbitrary number of times.
+     * XMLHelper, Logger, boolean, boolean)} arbitrary number of times.
      * If the driver is not responsive to this sink's request,
      * this method might never be invoked.</p>
      *
