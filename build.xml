@@ -141,7 +141,6 @@
   <target name="users-guide" depends="-rev">
     <mkdir dir="release/doc"/>
     <script language="javascript"><![CDATA[
-      dist = project.getProperty("chionographis.build")
       exec = project.createTask("exec");
       exec.setExecutable("asciidoc");
       exec.setFailIfExecutionFails(false);
