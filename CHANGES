@@ -1,3 +1,13 @@
+Changes for 1.2.0:
+
+ * Made Transform filters able to be configured to find associated XSLT style-
+   sheets with <?xml-stylesheet ... ?> processing instructions.
+ * Made <depends> able to be placed outside the Chionographis task and able to
+   have nested <depends> elements and child file selectors.
+ * Made Ant's XMLCatalogs able to be used by Chionographis.
+ * Made All and Snip filters able to emit document type declarations to their
+   resulting documents.
+
 Changes for 1.1.0:
 
  * Added "timid" attribute to Output sink which can inhibit unnecessary
