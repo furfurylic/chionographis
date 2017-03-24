@@ -17,9 +17,7 @@
       basedir="build" includes="doc/**, notices/**, chionographis.jar" level="9"/>
   </target>
 
-  <target name="jar" depends="-compile,-archive">
-    <delete dir="release/classes"/>
-  </target>
+  <target name="jar" depends="-compile,-archive"/>
 
   <target name="-compile">
     <mkdir dir="build/classes"/>
@@ -72,8 +70,7 @@
   </target>
 
   <target name="api-docs" depends="-rev">
-    <delete dir="release/doc/api"/>
-    <mkdir dir="release/doc/api"/>
+    <mkdir dir="build/doc/api"/>
     <script language="javascript"><![CDATA[
       number = project.getProperty("chionographis.rev.number");
       spec = project.getProperty("chionographis.rev.spec");
@@ -139,7 +136,7 @@
   </target>
 
   <target name="users-guide" depends="-rev">
-    <mkdir dir="release/doc"/>
+    <mkdir dir="build/doc"/>
     <script language="javascript"><![CDATA[
       exec = project.createTask("exec");
       exec.setExecutable("asciidoc");
@@ -158,7 +155,7 @@
   </target>
 
   <target name="api-docs-devel">
-    <mkdir dir="devel/doc/api"/>
+    <mkdir dir="build/doc/api-devel"/>
     <javadoc locale="en" packagenames="net.furfurylic.chionographis.*"
       sourcepath="src" destdir="build/doc/api-devel" encoding="UTF-8" docencoding="UTF-8"
       classpath="${ant.home}/lib/ant.jar" access="package" use="yes"
