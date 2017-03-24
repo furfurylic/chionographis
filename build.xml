@@ -8,7 +8,7 @@
   <target name="release" depends="clean,jar,api-docs,users-guide">
     <mkdir dir="build/notices"/>
     <copy file="LICENSE" todir="build/notices"/>
-    <copy file="doc/CHANGES" todir="build/notices"/>
+    <copy file="CHANGES" todir="build/notices"/>
     <condition property="archive.name"
         value="chionographis-${rev.number}.zip" else="chionographis.zip">
         <equals arg1="${rev.base}" arg2="${rev.number}"/>
@@ -141,7 +141,6 @@
   <target name="users-guide" depends="-rev">
     <mkdir dir="release/doc"/>
     <script language="javascript"><![CDATA[
-      dist = project.getProperty("chionographis.build")
       exec = project.createTask("exec");
       exec.setExecutable("asciidoc");
       exec.setFailIfExecutionFails(false);
