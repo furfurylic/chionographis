@@ -1,6 +1,6 @@
 Changes for 1.2.1:
 
- * Make All filter cease reusing nodes, which fixes a rather fatal bug.
+ * Made All filter cease reusing nodes, which fixes a rather fatal bug.
 
 Changes for 1.2.0:
 
