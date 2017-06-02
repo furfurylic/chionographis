@@ -8,11 +8,9 @@
 package net.furfurylic.chionographis;
 
 import java.io.File;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Queue;
 import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 
@@ -28,7 +26,6 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -60,8 +57,6 @@ public final class All extends Filter {
 
     private Document resultDocument_;
     private Assemblage<LongFunction<Resource>> finders_;
-
-    private Queue<Node> nodes_;
 
     /** Sole constructor. */
     All() {
@@ -177,9 +172,6 @@ public final class All extends Filter {
         assert resultDocument_ != null;
         synchronized (resultDocument_) {
             finders_.add(finder);
-            if (nodes_ != null) {
-                return new DOMResult(nodes_.poll());
-            }
         }
         return new DOMResult();
     }
@@ -194,16 +186,6 @@ public final class All extends Filter {
         synchronized (resultDocument_) {
             xmlHelper().transfer().transfer(new DOMSource(r.getNode()),
                 new DOMResult(resultDocument_.getDocumentElement()), true, getLocation());
-        }
-        assert r.getNode() != null;
-        while (r.getNode().getFirstChild() != null) {
-            r.getNode().removeChild(r.getNode().getFirstChild());
-        }
-        synchronized (resultDocument_) {
-            if (nodes_ == null) {
-                nodes_ = new ArrayDeque<>();
-            }
-            nodes_.offer(r.getNode());
         }
     }
 
