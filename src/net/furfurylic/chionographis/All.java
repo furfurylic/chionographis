@@ -25,7 +25,9 @@ import javax.xml.xpath.XPathExpression;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.types.Resource;
 import org.w3c.dom.Document;
+import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 import net.furfurylic.chionographis.Logger.Level;
 
@@ -172,8 +174,8 @@ public final class All extends Filter {
         assert resultDocument_ != null;
         synchronized (resultDocument_) {
             finders_.add(finder);
+            return new DOMResult(resultDocument_.createDocumentFragment());
         }
-        return new DOMResult();
     }
 
     @Override
@@ -183,9 +185,12 @@ public final class All extends Filter {
         assert result instanceof DOMResult;
         assert ((DOMResult) result).getNode() != null;
         DOMResult r = (DOMResult) result;
+        Node n = r.getNode();
+        assert n != null;
+        assert n instanceof DocumentFragment;
+        assert n.getOwnerDocument() == resultDocument_;
         synchronized (resultDocument_) {
-            xmlHelper().transfer().transfer(new DOMSource(r.getNode()),
-                new DOMResult(resultDocument_.getDocumentElement()), true, getLocation());
+            resultDocument_.getDocumentElement().appendChild(n);
         }
     }
 
