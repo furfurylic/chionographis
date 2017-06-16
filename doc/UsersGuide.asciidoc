@@ -60,11 +60,11 @@ This target does following:
  . then collects all parsed documents into a new document whose document element is +<flora>...</flora>+,
  . then transforms this document with XSLT stylesheet 'flora/styles/to-genera.xsl',
  . then finds all fragments from the resulted document which matches XPath criterion +/genera/genus+ and inserts document type declarations like +<!DOCTYPE genus SYSTEM "genus.dtd">+ into them,
- . finally writes each fragment to a file whose path is 'flora-genera/XXX.xml', where +XXX+ is the string value of XPath expression +/genus/@name+ of each fragment document (that is, +XXX+ of the document element +<genus name="XXX">...</genus>+).
+ . finally writes each fragment to a file whose path is 'flora/genera/XXX.xml', where +XXX+ is the string value of XPath expression +/genus/@name+ of each fragment document (that is, +XXX+ of the document element +<genus name="XXX">...</genus>+).
 
 Additionally, it might be noteworthy that:
 
- * this target recognizes whether the output files are up to date for the input files, and, if so, cuts out the file output process,
+ * this target recognizes whether the output files are up to date for the input files (including the stylesheet files), and, if so, cuts out the file output process,
  * and if the runtime environment has multiple available processors, this target tries to take advantage of them to parallelize the reading and writing of the files.
 
 == Defining the task and related types
@@ -533,15 +533,15 @@ When +ignore+, the absent referenced resources are silently ignored.| No; defaul
 |Attribute: baseDir|The base directory where the child file selector applied. | Yes if child file selector exists; no otherwise
 |Attribute: fileName|+<depends basedir="a" filename="b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
 |Attribute: file|+<depends file="a/b">+ is a shorthand notation of +<depends basedir="a"> <filename name="b"/>+.| No; see note
-|Element: _file selector_|An selector which limits application of this dependency. | No; can appear at most once
-|Element: _resource collection_|The referenced resources represented by Ant resource collections. | Yes if there are no nested dependency; can appear arbitrary number of times greater or equal to one
-|Element: _depends_|Nested dependency. | No; can appear arbitrary number of times
+|Element: _file selector_|An selector which limits application of this dependency. | No; can appear at most once; see note
+|Element: _resource collection_|The referenced resources represented by Ant resource collections. | No; can appear arbitrary number of times, but at least either a _resource collection_ or a _despends_ element must be specified.
+|Element: _depends_|Nested dependency. | No; can appear arbitrary number of times, but at least either a _depends_ element or a _resource collection_ must be specified.
 |=================
 
 [NOTE]
 _fileName_ and _file_ are literally shorthand notations as described above.
-Thus _file_ and _baseDir_ or _fileName_ cannot be specified at once,
-neither can _fileName_ or _file_ and a file selector.
+Thus either _baseDir_ or _fileName_ cannot be specified with _file_.
+Similarly, either _fileName_ or _file_ cannot be specified with a file selector.
 Specifying _fileName_ requires also _baseDir_ to be specified.
 
 == Parallelism
