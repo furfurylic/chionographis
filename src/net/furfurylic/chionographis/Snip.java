@@ -143,7 +143,7 @@ public final class Snip extends Filter {
                      .filter(n -> n.getNodeType() == Node.ELEMENT_NODE)
                      .map(n -> newFragmentDocument(n));
         if (pool != null) {
-            // We do document creation sequentially.
+            // We create documents sequentially.
             List<Document> documents = fragsStream.collect(Collectors.toList());
             // Created documents are passed to sink in parallel.
             count = pool.submit(() -> documents.stream()
@@ -151,7 +151,7 @@ public final class Snip extends Filter {
                                                .mapToInt(d -> sendFragmentDocument(d, r))
                                                .sum())
                         .join();
-            // It is OK if some fragments failed.
+            // It is OK if some fragments have failed.
         } else {
             count = fragsStream.mapToInt(d -> sendFragmentDocument(d, r))
                                .sum();
@@ -243,7 +243,7 @@ public final class Snip extends Filter {
         List<XPathExpression> referents = sink().referents();
         List<String> referredContents;
         if (!referents.isEmpty()) {
-            referredContents = Referral.extract(document, referents);
+            referredContents = XMLUtils.extract(document, referents);
             logger().log(this, "Referred source data: "
                 + String.join(", ", referredContents), Level.DEBUG);
         } else {

@@ -135,7 +135,7 @@ final class ChionographisWorker {
                     docElem.insertBefore(metas, docElem.getFirstChild());
                 }
 
-                referredContents = Referral.extract(document, referents);
+                referredContents = XMLUtils.extract(document, referents);
                 logger_.log(null, "Referred source data: "
                     + String.join(", ", referredContents), Level.DEBUG);
 

@@ -60,8 +60,8 @@ public abstract class Sink extends ProjectComponent {
     /**
      * Returns XPath expressions which point the source document contents required by this object.
      *
-     * <p>When the driver is responsive to the requirement and finds the pointees,
-     * the data is informed as the argument of
+     * <p>When the driver is responsive to the request and finds the pointees,
+     * the data is informed as the fourth argument of
      * {@link #startOne(int, String, LongFunction, List)}.</p>
      *
      * <p>This method can be invoked after the invocation of {@link #init(File, NamespaceContext,

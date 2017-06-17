@@ -71,47 +71,7 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
 
-        ByteBuffer cached = BYTES.get(uri, listenStored_, listenHit_, u -> {
-            try {
-                // 1: files
-                if (u.getScheme().equalsIgnoreCase("file")) {
-                    return ByteBuffer.wrap(Files.readAllBytes(Paths.get(u)));
-                }
-
-                URLConnection connection = u.toURL().openConnection();
-                connection.setDoInput(true);
-                connection.setDoOutput(false);
-                connection.connect();
-                int length = connection.getContentLength();
-
-                // 2: content length is known
-                if (length > -1) {
-                    byte[] content = new byte[length];
-                    try (DataInputStream in =
-                            new DataInputStream(connection.getInputStream())) {
-                        in.readFully(content);
-                    }
-                    return ByteBuffer.wrap(content);
-                }
-
-                // 3: content length is unknown
-                try (ExposingByteArrayOutputStream bytes = new ExposingByteArrayOutputStream()) {
-                    byte[] buffer = Pool.BYTES.get();
-                    try (InputStream in = connection.getInputStream()) {
-                        int readLength;
-                        while ((readLength = in.read(buffer)) != -1) {
-                            bytes.write(buffer, 0, readLength);
-                        }
-                    } finally {
-                        Pool.BYTES.release(buffer);
-                    }
-                    return ByteBuffer.wrap(bytes.buffer(), 0, bytes.size());
-                }
-            } catch (IOException e) {
-                return null;
-            }
-        });
-
+        ByteBuffer cached = BYTES.get(uri, listenStored_, listenHit_, CachingResolver::getContent);
         if (cached != null) {
             InputSource inputSource = new InputSource(
                 new ByteArrayInputStream(cached.array(), cached.arrayOffset(), cached.limit()));
@@ -119,6 +79,57 @@ final class CachingResolver implements EntityResolver, URIResolver {
             inputSource.setPublicId(publicId);
             return inputSource;
         } else {
+            return null;
+        }
+    }
+
+    /**
+     * Reads all contents from the resource pointed by a URI into a {@link ByteBuffer}.
+     *
+     * @param uri
+     *      a URI which shall not be {@code null}.
+     *
+     * @return
+     *      the contents of the resource pointed by <var>uri</var>, which would be {@code null}
+     *      if the operation fails.
+     */
+    private static ByteBuffer getContent(URI uri) {
+        try {
+            // 1: files
+            if (uri.getScheme().equalsIgnoreCase("file")) {
+                return ByteBuffer.wrap(Files.readAllBytes(Paths.get(uri)));
+            }
+
+            URLConnection connection = uri.toURL().openConnection();
+            connection.setDoInput(true);
+            connection.setDoOutput(false);
+            connection.connect();
+            int length = connection.getContentLength();
+
+            // 2: content length is known
+            if (length > -1) {
+                byte[] content = new byte[length];
+                try (DataInputStream in =
+                        new DataInputStream(connection.getInputStream())) {
+                    in.readFully(content);
+                }
+                return ByteBuffer.wrap(content);
+            }
+
+            // 3: content length is unknown
+            try (ExposingByteArrayOutputStream bytes = new ExposingByteArrayOutputStream()) {
+                byte[] buffer = Pool.BYTES.get();
+                try (InputStream in = connection.getInputStream()) {
+                    int readLength;
+                    while ((readLength = in.read(buffer)) != -1) {
+                        bytes.write(buffer, 0, readLength);
+                    }
+                } finally {
+                    Pool.BYTES.release(buffer);
+                }
+                return ByteBuffer.wrap(bytes.buffer(), 0, bytes.size());
+            }
+        } catch (IOException e) {
             return null;
         }
     }
@@ -166,7 +177,9 @@ final class CachingResolver implements EntityResolver, URIResolver {
             return null;
         }
         if (uri.getScheme().equalsIgnoreCase("file")) {
-            // Afraid that omission of "xx/../" may break path meanings for symbolic links
+            // We omit "xx/../" after following symbolic links.
+            // In addition, in Windows, we would like to generate the same URI
+            // for "Foo.xml" and "foo.xml" to augment the performance with caching.
             try {
                 uri = Paths.get(uri).toRealPath().toUri();
             } catch (IOException e) {

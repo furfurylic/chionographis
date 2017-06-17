@@ -65,7 +65,16 @@ public final class Transform extends Filter {
     private Assemblage<Param> params_ = new Assemblage<>();
     private Depends depends_ = null;
 
+    /**
+     * A function which convert the stylesheet URI string into the real URI.
+     * This field remains {@c null} forever if there is a stylesheet URI configured up-front.
+     */
     private Function<String, URI> getAbsoluteURI_;
+
+    /**
+     * The stylesheet URI, which remains {@c null} forever if there is no stylesheet URI
+     * configured up-front.
+     */
     private StylesheetLocation stylesheetLocation_;
 
     private Map<String, Object> paramMap_ = null;
@@ -197,8 +206,8 @@ public final class Transform extends Filter {
 
         if (style_ != null) {
             getAbsoluteURI_ = null;
-            stylesheetLocation_ = new StylesheetLocation(
-                    getAbsoluteURI.apply(style_), depends_, logger());
+            URI absoluteURI = getAbsoluteURI.apply(style_);
+            stylesheetLocation_ = new StylesheetLocation(absoluteURI, depends_, logger());
         } else {
             getAbsoluteURI_ = getAbsoluteURI;
             stylesheetLocation_ = null;
@@ -317,7 +326,7 @@ public final class Transform extends Filter {
             // Prepare referred contents if needed
             List<String> referredContents;
             if (!sink().referents().isEmpty()) {
-                referredContents = Referral.extract(getNode(), sink().referents());
+                referredContents = XMLUtils.extract(getNode(), sink().referents());
                 logger().log(Transform.this, "Referred source data: "
                     + String.join(", ", referredContents), Level.DEBUG);
             } else {
@@ -344,11 +353,10 @@ public final class Transform extends Filter {
                         extractAssociation(source, finder_);
                     openedResult = sink().startOne(origSrcIndex_, origSrcFileName_,
                         assoc.getKey(), referredContents);
-                    if (openedResult != null) {
-                        assoc.getValue().get().transform(source, openedResult);
-                    } else {
+                    if (openedResult == null) {
                         return;
                     }
+                    assoc.getValue().get().transform(source, openedResult);
                 }
             } catch (TransformerException e) {
                 if (openedResult != null) {

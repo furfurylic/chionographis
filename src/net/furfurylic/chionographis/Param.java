@@ -10,8 +10,8 @@ package net.furfurylic.chionographis;
 import java.util.AbstractMap;
 import java.util.Map;
 
-import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
+import javax.xml.namespace.QName;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.ProjectComponent;
@@ -114,21 +114,7 @@ public final class Param extends ProjectComponent {
         }
         Object value = (value_ == null) ? "" : value_;
 
-        String name = name_;
-        if (!name.startsWith("{")) {
-            int indexOfColon = name.indexOf(':');
-            if (indexOfColon != -1) {
-                String prefix = name.substring(0, indexOfColon);
-                String namespaceURI = namespaceContext.getNamespaceURI(prefix);
-                if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
-                    throw new BuildException(
-                        "Unbound namespace prefix: " + prefix, getLocation());
-                }
-                String localName = name.substring(indexOfColon + 1);
-                name = '{' + namespaceURI + '}' + localName;
-            }
-        }
-
-        return new AbstractMap.SimpleEntry<>(name, value);
+        QName name = XMLUtils.parseQualifiedName(name_, namespaceContext, getLocation());
+        return new AbstractMap.SimpleEntry<>(name.toString(), value);
     }
 }
