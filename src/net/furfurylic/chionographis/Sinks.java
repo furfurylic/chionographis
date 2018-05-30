@@ -375,7 +375,8 @@ final class Sinks extends Sink {
         private Location location_;
         private Results results_;
 
-        public CompositeDOMResult(Node node, List<Result> results, XMLHelper xferFactory, Location location) {
+        public CompositeDOMResult(
+                Node node, List<Result> results, XMLHelper xferFactory, Location location) {
             super(node);
             location_ = location;
             results_ = new Results(results) {
@@ -452,7 +453,8 @@ final class Sinks extends Sink {
             }
             if (results_.stream().anyMatch(r -> r instanceof DOMResult)) {
                 return new CompositeDOMResult(
-                        xferFactory_.transfer().newDocument(location_), results_, xferFactory_, location_);
+                    xferFactory_.transfer().newDocument(location_),
+                    results_, xferFactory_, location_);
             }
 
             try {

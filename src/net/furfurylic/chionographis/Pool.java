@@ -56,11 +56,11 @@ final class Pool<T> {
                     o = queue.poll();
                 }
             }
+            if (o == null) {
+                o = create_.get();
+            }
         } finally {
             lock_.unlock();
-        }
-        if (o == null) {
-            o = create_.get();
         }
         return o;
     }

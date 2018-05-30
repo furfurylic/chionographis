@@ -44,7 +44,7 @@ public final class All extends Filter {
      *
      * Before {@link #init(File, NamespaceContext, boolean)} is invoked,
      * this field is the user-specified string.
-     * After the invocation, this field is the string value of {@link #rootQ_}.
+     * After the invocation, this field has a form of prefix:local-part or local-part.
      */
     private String root_ = null;
 
@@ -108,31 +108,15 @@ public final class All extends Filter {
             doctype_.checkSanity();
         }
 
-        rootQ_ = null;
+        rootQ_ = XMLUtils.parseQualifiedName(root_, namespaceContext, getLocation());
 
-        // First take care of "prefix:localName" cases only
-        if (!root_.startsWith("{")) {
-            int indexOfColon = root_.indexOf(':');
-            if (indexOfColon != -1) {
-                String prefix = root_.substring(0, indexOfColon);
-                String namespaceURI = namespaceContext.getNamespaceURI(prefix);
-                if (namespaceURI.equals(XMLConstants.NULL_NS_URI)) {
-                    throw new BuildException("Unbound namespace prefix: " + prefix, getLocation());
-                }
-                String localName = root_.substring(indexOfColon + 1);
-                rootQ_ = new QName(namespaceURI, localName, prefix);
-            }
+        // If rootQ_ is in a certain namespace and has no prefix, make its prefix "all"
+        if ((!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI))
+         && rootQ_.getPrefix().equals(XMLConstants.DEFAULT_NS_PREFIX)) {
+            rootQ_ = new QName(rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), "all");
         }
 
-        // Other cases
-        if (rootQ_ == null) {
-            rootQ_ = QName.valueOf(root_);
-            if (!rootQ_.getNamespaceURI().equals(XMLConstants.NULL_NS_URI)) {
-                // If rootQ_ is in a certain namespace, make its prefix "all"
-                rootQ_ = new QName(rootQ_.getNamespaceURI(), rootQ_.getLocalPart(), "all");
-                root_ = rootQ_.getPrefix() + ':' + rootQ_.getLocalPart();
-            }
-        }
+        root_ = XMLUtils.createQualifiedName(rootQ_);
 
         sink().init(baseDir, namespaceContext, xmlHelper(), logger(), isForce(), dryRun);
     }
@@ -208,7 +192,7 @@ public final class All extends Filter {
         List<XPathExpression> referents = sink().referents();
         List<String> referredContents;
         if (!referents.isEmpty()) {
-            referredContents = Referral.extract(resultDocument_, referents);
+            referredContents = XMLUtils.extract(resultDocument_, referents);
             logger().log(this, "Referred source data: "
                 + String.join(", ", referredContents), Level.DEBUG);
         } else {

@@ -228,7 +228,7 @@ public final class Depends extends AbstractSelectorContainer {
      * returns immediately. Otherwise, the checking takes place.</p>
      *
      * @param stack
-     *      a stack object containing objects which are directly or indirectly reference this
+     *      a stack object containing objects which directly or indirectly reference this
      *      object. This stack contains {@code this} already.
      * @param project
      *      the project.
@@ -256,7 +256,8 @@ public final class Depends extends AbstractSelectorContainer {
                 dieOnCircularReferenceOne(id, project, (Depends) o);
             }
         } else {
-            children_.getList().stream().forEach(c -> dieOnCircularReferenceOne(id, project, c));
+            children_.getList().stream()
+                               .forEach(c -> dieOnCircularReferenceOne(id, project, c));
         }
         setChecked(true);
     }
@@ -434,6 +435,7 @@ public final class Depends extends AbstractSelectorContainer {
         private Predicate<File> selector_;
         private ReferencedSources child_;
 
+        // Results of scanSources(), which are cached to avoid re-scanning.
         private boolean absentSignificantly_ = false;
         private List<File> sourceFiles_ = null;
         private Resource newestSource_ = null;
@@ -488,17 +490,14 @@ public final class Depends extends AbstractSelectorContainer {
             if ((newestSource_ !=  null) && (newestSource_.getLastModified() > lastModified)) {
                 return newestSource_;
             }
-            if (selector_ != null) {
-                Optional<Resource> newer =
-                    sourceFiles_.stream()
-                                .map(s -> reentry.findAnyNewerSource(s, lastModified, reentry))
-                                .filter(f -> f != null)
-                                .findAny();
-                if (newer.isPresent()) {
-                    return newer.get();
-                }
+            if (selector_ == null) {
+                return null;
             }
-            return null;
+            return sourceFiles_.stream()
+                               .map(s -> reentry.findAnyNewerSource(s, lastModified, reentry))
+                               .filter(f -> f != null)
+                               .findAny()
+                               .orElse(null);
         }
 
         /**
