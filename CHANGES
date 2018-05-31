@@ -1,3 +1,7 @@
+Changes for 1.2.2:
+
+ * Fixed some typos and misleading comments on user's guide.
+
 Changes for 1.2.1:
 
  * Made All filter cease reusing nodes, which fixes a rather fatal bug.
@@ -41,3 +45,4 @@ Changes for 1.0.1:
 Changes for 1.0.0:
 
  * Initial release of Chionographis.
+
