@@ -301,7 +301,7 @@ _style_ and _assoc_ can be specified exclusively.
 | Attribute / Element contents | Description | Required
 
 |name|The name of the stylesheet parameter. +
-Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+.
+Supported forms are +localName+, +prefix:localName+ and +\{namespaceURI\}localName+.
 In the first form, the name doesn't belong to any namespace.
 In the second form, the name belongs to a namespace whose name is mapped from prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
@@ -330,7 +330,7 @@ If the order is significant, you should sort the elements by a descendant _Trans
 | Attribute | Description | Required
 
 |root|The name of the document element of the resulted document. +
-Supported forms are +localName+, +prefix:localName+ and +{namespaceURI}localName+.
+Supported forms are +localName+, +prefix:localName+ and +\{namespaceURI\}localName+.
 In the first form, the name doesn't belong to any namespace.
 In the second form, the name belongs to a namespace whose name is mapped from the prefix using the _Chionographis_'s child _namespace_ elements.| Yes
 
