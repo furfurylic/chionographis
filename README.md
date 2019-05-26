@@ -53,7 +53,7 @@ Here is an example of a Ant target which uses Chionographis:
 
 This target reads all `.xml` files in `flora` directory and collects all of them into a new document `<flora>...</flora>`,
 then transforms it with XSLT stylesheet `flora/to-genera.xsl`,
-then finds all document fragemnts which matches XPath `/genera/genus`,
+then finds all document fragments which matches XPath `/genera/genus`,
 and then finally writes all fragments into separated files in directory `flora-genera` as `XXX.xml`, where `XXX` is the `name` attribute of the document element of each document fragment.
 
 For details, please consult the Users Guide.
