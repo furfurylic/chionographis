@@ -2,7 +2,7 @@ language: java
 notifications:
   email: false
 jdk:
-  - oraclejdk8
+  - openjdk8
 env:
   - ANT_ARGS="-logger org.apache.tools.ant.listener.AnsiColorLogger -Dnet.furfurylic.chionographis.squelch=true"
 script:
