@@ -70,9 +70,9 @@ final class XMLUtils {
      *      the location where this parsing is required.
      *
      * @return
-     *      the resulted {@link QName} object, whose {@link QName#prefix() prefix} shall be
+     *      the resulted {@link QName} object, whose {@link QName#getPrefix() prefix} shall be
      *      {@code namespace-prefix} if <var>name</var> has a form of
-     *      {@code namespace-prefix:local-part}, or be {@link QName.DEFAULT_NS_PREFIX} otherwise.
+     *      {@code namespace-prefix:local-part}, or be {@link XMLConstants#DEFAULT_NS_PREFIX} otherwise.
      *
      * @throws BuildException
      *      when the {@code namespace-prefix} has no mappings in <var>namespaceContext</var>.
