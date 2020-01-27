@@ -7,7 +7,6 @@
 
 package net.furfurylic.chionographis;
 
-import java.net.URI;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -32,10 +31,18 @@ public final class Meta extends ProjectComponent {
         /** The absolute URI. The corresponding string expression is "uri". */
         URI {
             @Override
-            Function<URI, String> extractor() {
+            Function<java.net.URI, String> extractor(java.net.URI baseURI) {
                 return java.net.URI::toString;
             }
         },
+
+        /** The relative URI. The corresponding string expression is "relative-uri". */
+        RELATIVE_URI {
+            @Override
+            Function<java.net.URI, String> extractor(java.net.URI baseURI) {
+                return (java.net.URI u) -> baseURI.relativize(u).toString();
+            }
+         },
 
         /**
          * The last part of the path of the {@linkplain #URI}.
@@ -43,7 +50,7 @@ public final class Meta extends ProjectComponent {
          */
         FILE_NAME {
             @Override
-            Function<URI, String> extractor() {
+            Function<java.net.URI, String> extractor(java.net.URI baseURI) {
                 return createFileNameExtractor();
             }
         },
@@ -54,19 +61,19 @@ public final class Meta extends ProjectComponent {
          */
         FILE_TITLE {
             @Override
-            Function<URI, String> extractor() {
+            Function<java.net.URI, String> extractor(java.net.URI baseURI) {
                 return createFileNameExtractor().andThen(Type::extractFileTitle);
             }
         };
 
-        abstract Function<URI, String> extractor();
+        abstract Function<java.net.URI, String> extractor(java.net.URI baseURI);
 
         String defaultName() {
             return "chionographis-" + name().toLowerCase().replace('_', '-');
         }
 
         // /a/b/c.xml -> c.xml
-        private static Function<URI, String> createFileNameExtractor() {
+        private static Function<java.net.URI, String> createFileNameExtractor() {
             Pattern pattern = Pattern.compile("([^/]*)/?$");
             return u -> {
                 String path = u.getPath();
@@ -144,15 +151,18 @@ public final class Meta extends ProjectComponent {
     /**
      * Creates a key-value pair from this object's content.
      *
+     * @param baseURI
+     *      the base URI to relativize URIs.
+     *
      * @return
      *      a key-value pair for this object's content, which shall not be {@code null}.
-     *      The key is the meta-information name, and the value is the function which decudes the
+     *      The key is the meta-information name, and the value is the function which deduces the
      *      string value from the URI of the original source.
      *
      * @throws BuildException
      *      if the {@linkplain #setType(String) type} is not set.
      */
-    Map.Entry<String, Function<URI, String>> yield() {
+    Map.Entry<String, Function<java.net.URI, String>> yield(java.net.URI baseURI) {
         if (type_ == null) {
             String message = "Incomplete meta-information instruction found";
             if (name_ != null) {
@@ -165,6 +175,6 @@ public final class Meta extends ProjectComponent {
         if (name_ == null) {
             name = type_.defaultName();
         }
-        return new AbstractMap.SimpleImmutableEntry<>(name, type_.extractor());
+        return new AbstractMap.SimpleImmutableEntry<>(name, type_.extractor(baseURI));
     }
 }

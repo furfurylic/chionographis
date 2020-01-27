@@ -879,6 +879,7 @@
     <chionographis srcdir="${dir.input}" includes="*.xml" cache="no">
       <meta type="file-name"/>
       <meta type="file-title"/>
+      <meta type="relative-uri"/>
       <output dest="${dir.output}/output.xml"/>
     </chionographis>
 
