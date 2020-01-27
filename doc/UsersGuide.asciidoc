@@ -27,7 +27,7 @@ To use Chionographis, first you have to define the task:
 ----
 <!-- Define a path which includes chionographis.jar -->
 <path id="chionographis">
-  <fileset file="./lib" includes="*.jar"/>
+  <fileset dir="./lib" includes="*.jar"/>
 </path>
 
 <!-- Define chionographis task with the path -->
