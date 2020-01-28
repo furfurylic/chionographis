@@ -224,6 +224,7 @@ In this regard, _Chinographis_ driver synchronizes accesses to _XMLCatalogs_ add
 
 |type|The type of the meta-information, which is the data of PI.  +
 When +uri+, the data shall be the absolute URI of the original source. +
+When +relative-uri+, the data shall be the relative URI of the original source to the base directory to the task. +
 When +file-name+, the data shall be the last part of the path of the URI. +
 When +file-title+, the data shall be the substring of the file name before its last period (+.+).| Yes
 |=================

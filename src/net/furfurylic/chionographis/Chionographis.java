@@ -503,8 +503,9 @@ public final class Chionographis extends MatchingTask implements Driver {
     }
 
     private List<Map.Entry<String, Function<URI, String>>> createMetaFuncs() {
+        final URI baseURI = baseDir_.toAbsolutePath().toUri();
         List<Map.Entry<String, Function<URI, String>>> metaFuncs =
-            metas_.getList().stream().map(Meta::yield).collect(Collectors.toList());
+            metas_.getList().stream().map(m -> m.yield(baseURI)).collect(Collectors.toList());
         metaFuncs.forEach(e -> logger_.log(this,
                     "Adding a meta-information instruction: name=" + e.getKey(), Level.DEBUG));
         return metaFuncs;
