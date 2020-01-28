@@ -1,1 +1,1 @@
-[input:<chionographis-file-name=input.xml><chionographis-file-title=input><chionographis-relative-uri=basic/input-meta/input.xml>[child:]]
+[input:<chionographis-file-name=input.xml><chionographis-file-title=input><chionographis-relative-uri=basic/input-meta/input.xml><rel=input.xml>[child:]]

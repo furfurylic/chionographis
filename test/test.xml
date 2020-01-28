@@ -880,6 +880,7 @@
       <meta type="file-name"/>
       <meta type="file-title"/>
       <meta type="relative-uri"/>
+      <meta type="relative-uri" baseuri="${dir.input}" name="rel"/>
       <output dest="${dir.output}/output.xml"/>
     </chionographis>
 

@@ -9,7 +9,6 @@ package net.furfurylic.chionographis;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collections;
@@ -190,26 +189,12 @@ public final class Transform extends Filter {
     void doInit(File baseDir, NamespaceContext namespaceContext, boolean dryRun) {
         paramMap_ = createParamMap(namespaceContext);
 
-        Function<String, URI> getAbsoluteURI = s -> {
-            URI uri = null;
-            try {
-                // First we try as a URI
-                uri = new URI(s);
-            } catch (URISyntaxException e) {
-                // Second we try as a file
-            }
-            if ((uri == null) || !uri.isAbsolute()) {
-                uri = baseDir.toPath().resolve(s).toUri();
-            }
-            return uri;
-        };
-
         if (style_ != null) {
             getAbsoluteURI_ = null;
-            URI absoluteURI = getAbsoluteURI.apply(style_);
+            URI absoluteURI = URIUtils.getAbsoluteURI(style_, baseDir);
             stylesheetLocation_ = new StylesheetLocation(absoluteURI, depends_, logger());
         } else {
-            getAbsoluteURI_ = getAbsoluteURI;
+            getAbsoluteURI_ = s -> URIUtils.getAbsoluteURI(s, baseDir);
             stylesheetLocation_ = null;
         }
 
