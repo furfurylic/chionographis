@@ -7,6 +7,7 @@
 
 package net.furfurylic.chionographis;
 
+import java.io.File;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,11 +37,15 @@ public final class Meta extends ProjectComponent {
             }
         },
 
-        /** The relative URI. The corresponding string expression is "relative-uri". */
+        /**
+         * The relative URI. The corresponding string expression is "relative-uri".
+         *
+         * @since 1.3
+         */
         RELATIVE_URI {
             @Override
             Function<java.net.URI, String> extractor(java.net.URI baseURI) {
-                return (java.net.URI u) -> baseURI.relativize(u).toString();
+                return u -> baseURI.relativize(u).toString();
             }
          },
 
@@ -99,6 +104,7 @@ public final class Meta extends ProjectComponent {
 
     private Type type_ = null;
     private String name_ = null;
+    private String baseURI_ = null;
 
     /**
      * Sole constructor.
@@ -149,10 +155,25 @@ public final class Meta extends ProjectComponent {
     }
 
     /**
-     * Creates a key-value pair from this object's content.
+     * Sets the base URI to relativize URIs of the original sources.
+     *
+     * <p>This base URI is meaningful only when "relative-uri" is set
+     * with {@link #setType(String)}.</p>
      *
      * @param baseURI
-     *      the base URI to relativize URIs.
+     *      the base URI.
+     *
+     * @since 1.3
+     */
+    public void setBaseURI(String baseURI) {
+        baseURI_ = baseURI;
+    }
+
+    /**
+     * Creates a key-value pair from this object's content.
+     *
+     * @param baseDir
+     *      the base directory to relativize URIs.
      *
      * @return
      *      a key-value pair for this object's content, which shall not be {@code null}.
@@ -162,7 +183,7 @@ public final class Meta extends ProjectComponent {
      * @throws BuildException
      *      if the {@linkplain #setType(String) type} is not set.
      */
-    Map.Entry<String, Function<java.net.URI, String>> yield(java.net.URI baseURI) {
+    Map.Entry<String, Function<java.net.URI, String>> yield(File baseDir) {
         if (type_ == null) {
             String message = "Incomplete meta-information instruction found";
             if (name_ != null) {
@@ -175,6 +196,8 @@ public final class Meta extends ProjectComponent {
         if (name_ == null) {
             name = type_.defaultName();
         }
+        final java.net.URI baseURI = (baseURI_ != null) ?
+            URIUtils.getAbsoluteURI(baseURI_, baseDir) : baseDir.toURI();
         return new AbstractMap.SimpleImmutableEntry<>(name, type_.extractor(baseURI));
     }
 }
